@@ -437,9 +437,10 @@ function gasStation(ctx) {
   // 小さな店(中に入れる)
   const S = new Bld(ctx, { name: 'コンビニ', x0: 150, z0: 150, x1: 168, z1: 166, h: 4.5, y0, skin: M.shop, skinS: [12, 4.5], floor: M.tile, floorCol: [0.95, 0.95, 0.95], small: true, roofCol: [0.7, 0.7, 0.7] });
   S.shell([{ side: 'N', at: 159, w: 4.5 }, { side: 'W', at: 158, w: 4 }]);
-  S.prop('shelf', 159, 156, Math.PI / 2, { s: 0.7 }); S.prop('shelf2', 163.5, 157, Math.PI / 2, { s: 0.7 });
+  S.prop('shelf', 158, 157, Math.PI / 2, { s: 0.85 }); S.prop('shelf2', 162.5, 157, Math.PI / 2, { s: 0.85 });
   S.prop('counter', 154, 163.8, 0, { col: [0.85, 0.3, 0.2] });
-  CB.box(M.glow, 166.9, 0.4, 152, 167.5, 2.1, 160, { col: [0.6, 1.2, 1.6] });
+  CB.box(M.plain, 166.6, 0.15, 152, 167.5, 2.1, 160, { col: [0.75, 0.78, 0.8] }); CB.box(M.glow, 166.55, 0.5, 152.2, 166.6, 1.9, 159.8, { col: [0.25, 0.45, 0.6], skip: 'tbnsew'.replace('w', '') });
+  ctx.solid(166.6, 152, 167.5, 160, 2.1);
   S.light(159, 158, 5, [0.35, 0.38, 0.4]);
   S.flatRoof({ ac: 1 });
   S.finish();
@@ -521,7 +522,7 @@ function factory(ctx) {
 // ---------------- 学校の体育館 ----------------
 function gym(ctx) {
   const { M, rnd } = ctx;
-  const B = new Bld(ctx, { name: '体育館', x0: -176, z0: 200, x1: -124, z1: 236, h: 9, y0: 0, skin: M.apt, skinCol: [1, 0.95, 0.9], skinS: [12, 12], floor: M.woodFloor, floorCol: [1, 0.88, 0.7], wallCol: [0.95, 0.92, 0.85], roofCol: [0.35, 0.45, 0.55] });
+  const B = new Bld(ctx, { name: '体育館', x0: -176, z0: 200, x1: -124, z1: 236, h: 9, y0: 0, skin: M.apt, skinCol: [1, 0.95, 0.9], skinS: [12, 12], floor: M.woodFloor, floorCol: [0.95, 0.82, 0.66], wallCol: [0.95, 0.92, 0.85], roofCol: [0.35, 0.45, 0.55] });
   B.shell([{ side: 'N', at: -150, w: 6 }, { side: 'E', at: 218, w: 5 }, { side: 'W', at: 218, w: 5 }, { side: 'S', at: -150, w: 5 }]);
   // コートの線
   const w = [0.95, 0.95, 0.92], cx = -150, cz = 218;
@@ -559,14 +560,14 @@ export function house(ctx, x0, z0, w, d, door, o = {}) {
     return;
   }
   const B = new Bld(ctx, { name: '民家', x0, z0, x1, z1, h: 4, y0: 0, skin: M.apt, skinCol: wallC, skinS: [12, 12], floor: M.woodFloor, floorCol: [0.9, 0.8, 0.65], wallCol: [0.95, 0.92, 0.85], small: true });
-  const doors = [{ side: door, at: door === 'N' || door === 'S' ? x0 + w / 2 : z0 + d / 2, w: 4 }];
-  if (o.back) doors.push({ side: { N: 'S', S: 'N', E: 'W', W: 'E' }[door], at: doors[0].at + 2, w: 4 });
+  // 入口は左の部屋(表)と右の部屋(裏)。まん中の仕切りにも広い出入口
+  const doors = [{ side: door, at: x0 + w * 0.25, w: 3.6 }];
+  if (o.back) doors.push({ side: { N: 'S', S: 'N' }[door] || 'S', at: x0 + w * 0.75, w: 3.6 });
   B.shell(doors);
-  // 2 部屋(まん中に仕切り)
-  const mx = x0 + w / 2;
-  B.wallZ(mx, z0 + 0.5, z1 - 0.5, [[(z0 + z1) / 2, 3.4]]);
-  B.prop('sofa', x0 + w / 4, z0 + 1.2, 0, { col: [0.5, 0.3, 0.25] }); B.prop('table', x0 + w / 4, (z0 + z1) / 2 + 1, 0);
-  B.prop('bed', x1 - 1.6, z0 + 2, Math.PI / 2); B.prop('cabinet', x1 - 0.8, z1 - 1.5, -Math.PI / 2);
+  const mx = x0 + w / 2, cz = (z0 + z1) / 2;
+  B.wallZ(mx, z0 + 0.5, z1 - 0.5, [[cz, 3.6]]);
+  B.prop('sofa', x0 + 0.9, cz, Math.PI / 2, { col: [0.5, 0.3, 0.25] }); B.prop('table', x0 + w * 0.25 + 0.3, cz, 0);
+  B.prop('bed', x1 - 0.9, cz, Math.PI / 2); B.prop('cabinet', mx + 1.2, door === 'N' ? z1 - 0.9 : z0 + 0.9, 0);
   B.light(x0 + w / 4, (z0 + z1) / 2, 3.5, [0.45, 0.33, 0.2]); B.light(x1 - w / 4, (z0 + z1) / 2, 3.5, [0.45, 0.33, 0.2]);
   B.gableRoof({ pitch: 0.6, col: roofC, alongX: true });
   B.finish();

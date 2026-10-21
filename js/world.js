@@ -85,6 +85,7 @@ export const World = {
     this._ctx = ctx;
     defineProps(ctx);
     this._atmosphere();
+    if (q !== 'low') this._embers(q === 'high' ? 420 : 260);
     this._ground(ctx, mx, k);
     genTown(ctx);
     genBuildings(ctx);
@@ -125,6 +126,43 @@ export const World = {
     this.group.add(dome);
     if (Engine.hemi) { Engine.hemi.color.set(0x9aa4d2); Engine.hemi.groundColor.set(0x3d3631); Engine.hemi.intensity = 1.15; }
     if (Engine.sun) { Engine.sun.color.set(0xffd2ae); Engine.sun.intensity = 2.25; }
+  },
+
+  // 空気中を舞う 火の粉と灰(動きはシェーダーの中だけ。毎フレームの計算なし)
+  _embers(n) {
+    const g = new THREE.BufferGeometry(), r = seeded(31337);
+    const pos = new Float32Array(n * 3), seed = new Float32Array(n);
+    for (let i = 0; i < n; i++) { pos[i * 3] = r(); pos[i * 3 + 1] = r(); pos[i * 3 + 2] = r(); seed[i] = r(); }
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.setAttribute('aSeed', new THREE.BufferAttribute(seed, 1));
+    const u = this._emberU = { uTime: { value: 0 }, uCenter: { value: new THREE.Vector3() }, uScale: { value: 50 } };
+    const m = new THREE.ShaderMaterial({
+      uniforms: u, transparent: true, depthWrite: false, fog: false,
+      vertexShader: `uniform float uTime; uniform vec3 uCenter; uniform float uScale; attribute float aSeed; varying float vA; varying float vK;
+        void main() {
+          vec3 B = vec3(64.0, 22.0, 64.0);
+          vec3 p = position * B;
+          float sp = 0.5 + aSeed * 0.9;
+          p.y = mod(p.y + uTime * sp, B.y);
+          p.x += uTime * (0.8 + aSeed * 0.6) + sin(uTime * 0.7 + aSeed * 40.0) * 1.2;
+          p.z += cos(uTime * 0.5 + aSeed * 23.0) * 1.2;
+          p.xz = mod(p.xz - uCenter.xz + B.xz * 0.5, B.xz) + uCenter.xz - B.xz * 0.5;
+          vec4 mv = modelViewMatrix * vec4(p, 1.0);
+          gl_Position = projectionMatrix * mv;
+          vK = aSeed;
+          gl_PointSize = (aSeed > 0.62 ? 2.6 : 3.4) * uScale / max(1.0, -mv.z);
+          vA = smoothstep(0.0, 2.0, p.y) * (1.0 - smoothstep(14.0, 22.0, p.y)) * (0.6 + 0.4 * sin(uTime * 6.0 + aSeed * 90.0));
+        }`,
+      fragmentShader: `varying float vA; varying float vK;
+        void main() {
+          float a = smoothstep(0.5, 0.1, length(gl_PointCoord - 0.5));
+          vec3 c = vK > 0.62 ? vec3(3.2, 1.3, 0.35) : vec3(0.42, 0.4, 0.4);
+          gl_FragColor = vec4(c, a * vA * (vK > 0.62 ? 0.95 : 0.35));
+        }`,
+    });
+    const pts = new THREE.Points(g, m);
+    pts.frustumCulled = false; pts.renderOrder = 5;
+    this.group.add(pts);
   },
 
   // 地面(区画ごとの板。場所によって色を変える)
@@ -187,6 +225,9 @@ export const World = {
 
   // 中に入れる建物を登録する(壁・床は world-interiors.js が作る)。roofs = 中に入ると消える屋根のメッシュ
   addBuildingInfo(b) { this.buildings.push(b); return b; },
+  // 主人公が test(x,z) の所にいる間、材質(mats)を うすくする(高架の下など)
+  faders: [],
+  addFader(mats, test, minOp = 0.15) { this.faders.push({ mats, test, minOp, op: 1 }); },
 
   // 壁(ぶつかる箱)を登録する。mesh: false なら見た目は作らない(見た目は別に作るとき)
   addBox(minX, minZ, maxX, maxZ, { h = 3, mat = null, mesh = true, building = null } = {}) {
@@ -243,7 +284,8 @@ export const World = {
   },
 
   // 線(弾の通り道)が壁に当たるか。当たった所までの割合 0..1 を返す(当たらなければ 1)
-  segmentHit(x0, z0, x1, z1) {
+  // minH を渡すと、それより低い物(土のう・ベンチ・車など)は 飛びこえる(例: 1.6)
+  segmentHit(x0, z0, x1, z1, minH = 0) {
     const c0 = this._cell(Math.min(x0, x1), Math.min(z0, z1)), c1 = this._cell(Math.max(x0, x1), Math.max(z0, z1));
     const dx = x1 - x0, dz = z1 - z0;
     let best = 1;
@@ -255,6 +297,7 @@ export const World = {
         const id = cell[k];
         if (seen[id] === stamp) continue; seen[id] = stamp;
         const b = this.boxes[id];
+        if (b.h < minH) continue;
         let tmin = 0, tmax = best;
         if (Math.abs(dx) < 1e-9) { if (x0 < b.minX || x0 > b.maxX) continue; }
         else { let a = (b.minX - x0) / dx, c = (b.maxX - x0) / dx; if (a > c) { const t = a; a = c; c = t; } tmin = Math.max(tmin, a); tmax = Math.min(tmax, c); if (tmin > tmax) continue; }
@@ -431,12 +474,24 @@ export const World = {
       }
     }
     this._cur = b;
+    for (let i = 0; i < this.faders.length; i++) {
+      const f = this.faders[i], want = f.test(px, pz) ? f.minOp : 1;
+      if (f.op !== want) {
+        f.op += Math.sign(want - f.op) * Math.min(Math.abs(want - f.op), dt * 3);
+        for (let j = 0; j < f.mats.length; j++) f.mats[j].opacity = f.op;
+      }
+    }
     CUT.pos.value.set(px, 1.0, pz);
     CUT.r.value = b ? 0.24 : 0.2;
     const M = this.M;
     if (M) {
       M.water.map.offset.x = (this._time * 0.012) % 1; M.water.map.offset.y = (this._time * 0.007) % 1;
       M.flame.opacity = 0.75 + Math.sin(this._time * 17) * 0.12 + Math.sin(this._time * 7.3) * 0.1;
+    }
+    if (this._emberU) {
+      this._emberU.uTime.value = this._time % 1000;
+      this._emberU.uCenter.value.set(px, 0, pz);
+      this._emberU.uScale.value = (Engine.renderer ? Engine.renderer.domElement.height : 400) * 0.12;
     }
     this._fT -= dt;
     if (this._fT <= 0) { this._fT = 0.1; this._flowUpdate(px, pz); }

@@ -295,7 +295,7 @@ export function defineProps(ctx) {
   I.define('broad', makeGeo((b) => {
     cyl(b, 0, 2.1, 0, 0.26, 4.2, [0.33, 0.24, 0.16], 6, 0, 0, 0.17);
     const blobs = [[0, 5.3, 0, 1.9, [0.16, 0.32, 0.12]], [1.0, 4.8, 0.5, 1.3, [0.19, 0.36, 0.13]], [-0.9, 4.9, -0.5, 1.35, [0.14, 0.29, 0.11]], [0.2, 6.3, -0.2, 1.2, [0.21, 0.38, 0.15]]];
-    for (const [x, y, z, r, c] of blobs) { const g = new THREE.IcosahedronGeometry(r, 1); _m.makeScale(1, 0.82, 1); _m.setPosition(x, y, z); b.geom(null, g, _m, { col: c }); }
+    for (const [x, y, z, r, c] of blobs) { const g = new THREE.IcosahedronGeometry(r, ctx.q === 'low' ? 0 : 1); _m.makeScale(1, 0.82, 1); _m.setPosition(x, y, z); b.geom(null, g, _m, { col: c }); }
   }), fol);
   I.define('dead', makeGeo((b) => {
     cyl(b, 0, 2.5, 0, 0.28, 5, [0.3, 0.27, 0.23], 6, 0, 0, 0.1);

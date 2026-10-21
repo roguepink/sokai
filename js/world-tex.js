@@ -272,7 +272,7 @@ function woodTex() {       // 板の床(4m)
     let X = -R() * 120;
     while (X < S) {
       const L = rr(80, 160), v = rr(0.8, 1.15);
-      x.fillStyle = rgb(170 * v, 120 * v, 75 * v); x.fillRect(X, j * q, L, q);
+      x.fillStyle = rgb(150 * v, 112 * v, 80 * v); x.fillRect(X, j * q, L, q);
       for (let k = 0; k < 5; k++) { x.strokeStyle = `rgba(90,55,30,${rr(0.1, 0.3)})`; x.lineWidth = 1; const yy = j * q + R() * q; x.beginPath(); x.moveTo(X, yy); x.bezierCurveTo(X + L / 3, yy + rr(-3, 3), X + L * 2 / 3, yy + rr(-3, 3), X + L, yy); x.stroke(); }
       x.fillStyle = 'rgba(50,30,15,0.8)'; x.fillRect(X, j * q, 2, q);
       X += L;

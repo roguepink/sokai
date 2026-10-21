@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { cutout } from './world-tex.js';
 import { placeTree } from './world-props.js';
+import { Builder } from './world-build.js';
 
 const LINES = [-178, -112, -40, 40, 112, 178];      // 道路の中心線(x 一定の南北の道 / z 一定の東西の道)
 const RW = 6;                                        // 道路の半分の幅(片側 2 車線)
@@ -399,11 +400,14 @@ function streetStuff(ctx, R) {
 
 // 高架道路(高さ 9m)。柱は道のまん中。上には事故車。下を通ると透けて見える
 function overpass(ctx) {
-  const { B, M, rnd, half } = ctx;
+  const { M, rnd, half } = ctx;
   const Z = TOWN.overZ, W = 7.5, Y0 = 9, Y1 = 10.2;
-  const deckTop = M._deckTop || (M._deckTop = cutout(M.asphalt.clone()));
-  deckTop.userData = { ...M.asphalt.userData };
+  const deckTop = M.asphalt;
   const conc = [0.62, 0.6, 0.57];
+  // 橋げたの上の部分は 別のまとまり(DB)に作る。下を歩くと うすくなる(World.addFader)
+  const B0 = ctx.B, DB = new Builder(80, half);
+  ctx.B = DB;
+  const B = DB;
   for (let x = -half; x < half; x += 40) {
     const xb = Math.min(half, x + 40);
     B.box(M.concrete, x, Y0, Z - W, xb, Y1, Z + W, { top: deckTop, col: conc, skip: (x > -half ? 'w' : '') + (xb < half ? 'e' : '') });
@@ -411,24 +415,33 @@ function overpass(ctx) {
     for (const s of [-1, 1]) B.box(M.concrete, x, Y1, s > 0 ? Z + W - 0.4 : Z - W, xb, Y1 + 1.0, s > 0 ? Z + W : Z - W + 0.4, { col: conc, skip: (x > -half ? 'w' : '') + (xb < half ? 'e' : '') });
     for (let k = 0; k < 40; k += 7) B.flat(M.paint, x + k + 2, Y1 + 0.01, Z, 3.5, 0.15, { col: [0.9, 0.9, 0.88] });
   }
-  // 柱(道のまん中。40m ごと)
-  for (let x = -half + 20; x < half; x += 40) {
-    B.box(M.concrete, x - 1.1, 0, Z - 1.1, x + 1.1, Y0 - 0.6, Z + 1.1, { col: conc });
-    B.box(M.concrete, x - 1.4, Y0 - 1.6, Z - W + 1, x + 1.4, Y0, Z + W - 1, { col: [0.55, 0.53, 0.5] });
-    ctx.solid(x - 1.1, Z - 1.1, x + 1.1, Z + 1.1, Y0);
-    ctx.prop('jersey', x - 4, Z, 0, {}); ctx.prop('jersey', x + 4, Z, 0, {});
-    if (rnd() < 0.5) { const fx = x + (rnd() < 0.5 ? -9 : 9); ctx.prop('fireBarrel', fx, Z + (rnd() - 0.5) * 6, 0); pool(ctx, fx, Z, 5, [0.9, 0.45, 0.12]); }
-  }
+  for (let x = -half + 20; x < half; x += 40) B.box(M.concrete, x - 1.4, Y0 - 1.6, Z - W + 1, x + 1.4, Y0, Z + W - 1, { col: [0.55, 0.53, 0.5] });
   // 高架の上の事故車(当たり判定なし)
   const cols = [[0.7, 0.1, 0.1], [0.15, 0.25, 0.5], [0.85, 0.85, 0.85], [0.13, 0.11, 0.1]];
   for (let x = -half + 10; x < half - 10; x += 14 + rnd() * 20) {
     ctx.prop(rnd() < 0.15 ? 'bus' : 'sedan', x, Z + (rnd() - 0.5) * 9, (rnd() - 0.5) * 0.8, { y: Y1, solid: false, occupy: false, col: cols[Math.floor(rnd() * cols.length)] });
   }
+  ctx.B = B0;
+  const meshes = DB.finish(ctx.W.group), clones = new Map();
+  for (const m of meshes) {
+    let c = clones.get(m.material);
+    if (!c) { c = m.material.isMeshBasicMaterial ? m.material.clone() : cutout(m.material.clone()); c.transparent = true; clones.set(m.material, c); }
+    m.material = c;
+  }
+  ctx.W.addFader([...clones.values()], (x, z) => Math.abs(z - Z) < W + 4, 0.12);
+  // 柱(道のまん中。40m ごと)
+  for (let x = -half + 20; x < half; x += 40) {
+    B0.box(M.concrete, x - 1.1, 0, Z - 1.1, x + 1.1, Y0 - 0.6, Z + 1.1, { col: conc });
+    ctx.solid(x - 1.1, Z - 1.1, x + 1.1, Z + 1.1, Y0);
+    ctx.prop('jersey', x - 4, Z, 0, {}); ctx.prop('jersey', x + 4, Z, 0, {});
+    if (rnd() < 0.5) { const fx = x + (rnd() < 0.5 ? -9 : 9); ctx.prop('fireBarrel', fx, Z + (rnd() - 0.5) * 6, 0); pool(ctx, fx, Z, 5, [0.9, 0.45, 0.12]); }
+    if (rnd() < 0.5) lamp(ctx, x + 1.6, Z, 0, 0);
+  }
   // 高架の下の道(町の外へ続く)
   for (let x = -half; x < half; x += 40) {
     if (x >= TOWN.ext[0] && x + 40 <= TOWN.ext[2]) continue;
-    B.flat(M.asphalt, x + 20, 0.012, Z, 40, 12);
-    for (let k = 2; k < 40; k += 7) { B.flat(M.paint, x + k + 1.75, 0.022, Z - 3, 3.5, 0.16, { col: [0.92, 0.92, 0.9] }); B.flat(M.paint, x + k + 1.75, 0.022, Z + 3, 3.5, 0.16, { col: [0.92, 0.92, 0.9] }); }
+    B0.flat(M.asphalt, x + 20, 0.012, Z, 40, 12);
+    for (let k = 2; k < 40; k += 7) { B0.flat(M.paint, x + k + 1.75, 0.022, Z - 3, 3.5, 0.16, { col: [0.92, 0.92, 0.9] }); B0.flat(M.paint, x + k + 1.75, 0.022, Z + 3, 3.5, 0.16, { col: [0.92, 0.92, 0.9] }); }
     ctx.occupy(x, Z - 8, x + 40, Z + 8);
   }
   ctx.mapRect(-half, Z - W, half, Z + W, '#6a6862');
