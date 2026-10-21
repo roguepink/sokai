@@ -11,7 +11,12 @@ import { dampAngle, angleDiff } from './util.js';
 import { WEAPONS } from './weapon-defs.js';
 import { buildModel } from './weapon-models.js';
 import { Proj, GRAV } from './weapon-proj.js';
-import { hurt, area, cone, LOW } from './weapon-hit.js';
+import { P2 } from './weapon-proj2.js';
+import { hurt, area, cone, LOW, HIT } from './weapon-hit.js';
+import { Extra } from './weapon-extra.js';
+import { Summon, RAINBOW } from './weapon-summon.js';
+import { VM } from './weapon-view.js';
+import { Score } from './score.js';
 
 export { WEAPONS };
 
@@ -23,6 +28,27 @@ const _mz = new THREE.Vector3();
 const _hits = [], _near = [], _list = [], _cand = new Array(K).fill(null), _cs = new Float64Array(K);
 let _stamp = 1;
 const _sp = {};
+const _pt = { x: 0, z: 0, d: 0 };
+// フィーバー(無双モード)中の 強くした武器の写し
+function boost(w) {
+  const f = { ...w, fever: true };
+  f.rate = w.rate * (w.continuous ? 1.35 : 1.6);
+  if (w.rateMin) f.rateMin = w.rateMin * 1.6;
+  for (const k of ['dmg', 'hitDmg', 'blast', 'boltDmg', 'dps']) if (w[k]) f[k] = w[k] * 1.5;
+  if (w.radius) f.radius = w.radius * 1.3;
+  if (w.pellets > 1) f.pellets = Math.ceil(w.pellets * 1.5);
+  if (w.salvo) f.salvo = w.salvo + 4;
+  if (w.count) f.count = w.count + 2;
+  if (w.bombs) f.bombs = w.bombs + 5;
+  if (w.bolts) f.bolts = w.bolts + 5;
+  if (w.chain) f.chain = w.chain + 6;
+  if (w.max) f.max = w.max + 2;
+  if (w.pierce) f.pierce = w.pierce + 3;
+  if (w.bounces) f.bounces = w.bounces + 3;
+  if (w.hops) f.hops = w.hops + 2;
+  f.color = 0xffd040;
+  return f;
+}
 function inView(e) {
   const p = Engine.project(e.x, 1, e.z, _sp);
   return !!p && p.x > 10 && p.x < innerWidth - 10 && p.y > 10 && p.y < innerHeight - 10;
@@ -35,6 +61,10 @@ export const Weapons = {
   get spinReady() { return Math.max(0, Math.min(1, 1 - this._spinCool / SPIN_COOL)); },
   spinCooldown: SPIN_COOL,
   target: null,             // いま狙っている敵(UI で印を出すなど)
+  crossTarget: null,        // 肩越し・一人称: 照準(画面のまん中)の下にいる敵(なければ null)
+  close: false,             // 肩越し・一人称のとき true
+  fever: false,             // フィーバー(無双モード)中
+  _fw: [], _hmT: 0, _smCool: 0, _rb: 0, _fxT: 0,
   aimAngle: 0,              // 狙いの向き(facing と同じ決まり)
   spinUp: 0,                // ミニガンの回転(0..1)
   _cool: 0, _melee: 0, _spinCool: 0, _spinBuf: 0, _tick: 0, _evT: 0, _decT: 0, _alt: 0, _slashDir: 1,
@@ -42,14 +72,20 @@ export const Weapons = {
 
   init(scene) {
     this._models = WEAPONS.map((w) => buildModel(w.id));
+    this._fw = WEAPONS.map(boost);
     Proj.init(scene);
+    Summon.init(scene);
+    P2.puddle = (w, x, z, r) => Summon.puddle(w, x, z, r);
+    VM.init(Engine.renderer);
     this._hold();
+    Events.on('feverStart', () => this._feverNova());
   },
 
   reset() {
     this._cool = 0; this._melee = 0; this._spinCool = 0; this._spinBuf = 0; this.spinUp = 0; this._tick = 0;
-    this.target = null; this._aoeE = null; this.aimAngle = 0;
-    Proj.reset();
+    this.target = null; this._aoeE = null; this.aimAngle = 0; this.crossTarget = null;
+    Proj.reset(); Summon.reset(); Extra.reset(); VM.reset();
+    HIT.n = 0; HIT.kill = 0; HIT.step = 0; HIT.crit = false; HIT.boss = false;
     this._hold();
   },
 
@@ -58,6 +94,7 @@ export const Weapons = {
     this.spinUp = 0;
     this._cool = Math.min(this._cool, 0.05);
     this._hold();
+    VM.setWeapon(this.index);
     const p = Player.pos;
     if (FX.rings) {
       FX.ring(p.x, p.z, 0.3, 1.6, 0.25, this.current.color, 0.18, 3, 1);
@@ -71,7 +108,14 @@ export const Weapons = {
   update(dt, input, player) {
     const d = input.consumeWeaponDelta(); if (d) this.select(this.index + d);
     const s = input.consumeWeaponSelect(); if (s >= 0 && s < WEAPONS.length) this.select(s);
-    const w = this.current;
+    this.close = Engine.viewMode !== 'top';
+    const fps = Engine.viewMode === 'fps';
+    VM.active = fps;
+    FX.muzzleScale = fps ? 0.4 : 1;
+    this.fever = !!Score.feverActive;
+    VM._fever = this.fever ? 1 : 0;
+    const w = this.fever ? this._fw[this.index] : this.current;
+    HIT.step = 0;
 
     this._aim(dt, input, player, w);
     this._sword(dt, player);
@@ -86,7 +130,9 @@ export const Weapons = {
     player.aiming = firing;
     if (w.spinUp) this.spinUp = firing ? Math.min(1, this.spinUp + dt / w.spinUp) : Math.max(0, this.spinUp - dt * 1.2);
     this._cool -= dt; this._evT -= dt; this._decT -= dt;
+    Extra.orbIdle += dt;
     if (firing) {
+      if (w.designator) Extra.designate(this, w, player, this._muzzle(player, w, _mz), Math.sin(this.aimAngle), -Math.cos(this.aimAngle));
       if (w.continuous) this._stream(w, dt, player);
       else {
         const rate = w.spinUp ? w.rateMin + (w.rate - w.rateMin) * this.spinUp * this.spinUp : w.rate;
@@ -97,7 +143,53 @@ export const Weapons = {
     } else { if (this._cool < 0) this._cool = 0; this._tick = 0; }
 
     Proj.update(dt);
+    Summon.update(dt, player, firing && w.kind === 'drone');
     this._animModel(dt, w);
+    if (this.fever) this._feverFx(dt, player);
+    this._afterHits(dt);
+  },
+
+  // 当たった印(hitMarker)をまとめて出す / 一度にたくさん倒したら 少しだけスロー
+  _afterHits(dt) {
+    this._hmT -= dt; this._smCool -= dt;
+    if (HIT.n && (HIT.kill || this._hmT <= 0)) {
+      Events.emit('hitMarker', { crit: HIT.crit, kill: HIT.kill > 0, kills: HIT.kill, boss: HIT.boss });
+      this._hmT = 0.06;
+      HIT.n = 0; HIT.kill = 0; HIT.crit = false; HIT.boss = false;
+    }
+    if (HIT.step >= 14 && this._smCool <= 0) {
+      this._smCool = 9;
+      Engine.slowMo(0.45, 0.3);
+      Events.emit('weaponSfx', { name: 'slowmo', kills: HIT.step });
+    }
+  },
+
+  // フィーバー中: 足もとに金色の輪・まわりに光の粒
+  _feverFx(dt, player) {
+    const p = player.pos, t = performance.now() * 0.001;
+    if (!this.close || Engine.viewMode === 'tps') FX.ring(p.x, p.z, 0.9, 1.25 + Math.sin(t * 8) * 0.1, -1, 0xffc840, 0.18, 2.2, 0.9, 0, 0.08);
+    this._fxT -= dt;
+    if (this._fxT <= 0) {
+      this._fxT = 0.05;
+      const a = rnd() * Math.PI * 2, r = this.close ? 1.8 + rnd() * 1.5 : 0.6 + rnd() * 0.7;
+      FX.spark(p.x + Math.cos(a) * r, 0.2 + rnd() * 1.6, p.z + Math.sin(a) * r, 0, 2 + rnd() * 2, 0, 0.6, 0.06, RAINBOW[(this._rb++) % RAINBOW.length], 5, 0xffd040, 2, 0, -2, 1, 0);
+    }
+  },
+
+  // フィーバーが始まった瞬間: 金色の大爆発(まわりの敵を ふき飛ばす)
+  _feverNova() {
+    const p = Player.pos;
+    const kills = area(p.x, p.z, 14, 500, 52, 'spin', true, true);
+    // 一人称・肩越しでは 目の前が真っ白にならないように、主人公の所の爆発は出さず 輪と光の粒だけ
+    if (!this.close) FX.explosion(p.x, p.z, 4, 'gold');
+    FX.ring(p.x, p.z, 1, 22, 0.8, 0xffd040, 1, 2, 1, 0);
+    if (!this.close) FX.ring(p.x, p.z, 0.5, 16, 0.6, 0xffffff, 0.25, 1.6, 0.8, 0, 1);
+    const r0 = this.close ? 2.5 : 0;
+    for (let i = 0; i < FX.q(60); i++) { const a = rnd() * Math.PI * 2, s = 10 + rnd() * 18; FX.spark(p.x + Math.cos(a) * r0, 1.2, p.z + Math.sin(a) * r0, Math.cos(a) * s, 2 + rnd() * 8, Math.sin(a) * s, 0.7, 0.07, RAINBOW[i % RAINBOW.length], 6, 0xffd040, 2, 0.03, 8, 1.6); }
+    FX.flash(p.x, 4, p.z, 0xffd040, 90, 40, 0.5);
+    Engine.shake(1.4); Engine.slowMo(0.5, 0.3);
+    if (Engine.viewMode === 'fps') VM.spin(0xffd040);
+    Events.emit('spin', { x: p.x, z: p.z, kills, fever: true });
   },
 
   // ================= 狙い =================
@@ -107,7 +199,7 @@ export const Weapons = {
     const ml = Math.hypot(input.move.x, input.move.z);
     const mx = ml > 0.2 ? input.move.x / ml : 0, mz = ml > 0.2 ? input.move.z / ml : 0;
     const ax = Math.sin(this.aimAngle), az = -Math.cos(this.aimAngle);
-    const R = w.kind === 'flame' || w.kind === 'freeze' ? 17 : 36;
+    const R = w.kind === 'flame' || w.kind === 'freeze' || w.near ? 17 : 36;
     const list = Zombies.list;
     let n = 0;
     for (let i = 0; i < list.length; i++) {
@@ -139,12 +231,20 @@ export const Weapons = {
     this.target = tgt;
 
     let want = this.aimAngle;
-    if (Engine.viewMode !== 'top') {
-      // 肩越し・一人称: 見ている向きに撃つ。すぐ近くの敵にだけ 少し吸いつく(狙いの手伝い)
+    this.crossTarget = null;
+    if (this.close) {
+      // 肩越し・一人称: 照準(画面のまん中)の近くの敵に 吸いつく(ボス優先)。押している間は 視点も少し引っぱる
       want = Engine.lookYaw;
-      this.target = null;
-      const t2 = tgt && Math.abs(angleDiff(Engine.lookYaw, Math.atan2(tgt.x - px, -(tgt.z - pz)))) < 0.12 ? tgt : null;
-      if (t2) { want = Math.atan2(t2.x - px, -(t2.z - pz)); this.target = t2; }
+      const t2 = this._crossAssist(px, pz, w);
+      this.target = t2;
+      this._aoeE = null;            // 照準のある所に撃つ(かたまり狙いはしない)
+      if (t2) {
+        want = Math.atan2(t2.x - px, -(t2.z - pz));
+        if (input.fire) {
+          const k = Math.min(1, dt * (t2.boss ? 7 : 5));
+          Engine.look(angleDiff(Engine.lookYaw, want) * k * 0.6, 0);
+        }
+      }
       this.aimAngle = want;
       player.aimDir.set(Math.sin(want), 0, -Math.cos(want));
       return;
@@ -153,6 +253,71 @@ export const Weapons = {
     else if (ml > 0.2) want = Math.atan2(mx, -mz);
     this.aimAngle = dampAngle(this.aimAngle, want, tgt ? 22 : 12, dt);
     player.aimDir.set(Math.sin(this.aimAngle), 0, -Math.cos(this.aimAngle));
+  },
+
+  // 照準の近くの敵(画面の上での距離で選ぶ)。crossTarget(照準の真下の敵)も ここで決める
+  _crossAssist(px, pz, w) {
+    const W = innerWidth, H = innerHeight, cx = W / 2, cy = H / 2, mn = Math.min(W, H);
+    const cone = mn * 0.13, cam = Engine.camera;
+    const focal = H / (2 * Math.tan((cam.fov * Math.PI) / 360));
+    const vx = Engine.viewDir.x, vz = Engine.viewDir.z;
+    const range = Math.max(18, Math.min(70, w.range || 40));
+    const list = Zombies.list;
+    let best = null, bs = 1e9, cross = null, cs = 1e9;
+    for (let i = 0; i < list.length; i++) {
+      const e = list[i];
+      if (!e.alive) continue;
+      const dx = e.x - px, dz = e.z - pz, d2 = dx * dx + dz * dz;
+      if (d2 > range * range) continue;
+      const d = Math.sqrt(d2) || 0.01;
+      if ((dx * vx + dz * vz) < d * 0.55) continue;      // 前にいる敵だけ
+      const sc = (e.def && e.def.scale) || 1;
+      const p = Engine.project(e.x, (1.1 + (e.boss ? 0.6 : 0)) * sc + (e.y || 0), e.z, _sp);
+      if (!p) continue;
+      const ds = Math.hypot(p.x - cx, p.y - cy);
+      // 照準の真下か(敵の見かけの大きさ)
+      const depth = Math.max(0.5, d + (Engine.viewMode === 'tps' ? 4 : 0));
+      const rad = Math.max(12, (e.r * 1.4 + (e.boss ? 0.8 : 0)) * sc * focal / depth);
+      if (ds < rad && d < cs) { cs = d; cross = e; }
+      const lim = e.boss ? cone * 1.7 : cone;
+      if (ds > lim) continue;
+      const score = ds / cone + d * 0.012 - (e.boss ? 0.8 : 0) + (e === this.target ? -0.25 : 0);
+      if (score < bs && World.segmentHit(px, pz, e.x, e.z, LOW) >= 0.97) { bs = score; best = e; }
+    }
+    this.crossTarget = cross || best;
+    return best;
+  },
+
+  // 狙う地点: 敵のかたまり > 狙っている敵 > (肩越し・一人称)目線が地面に当たる所 > 前に def m
+  _aimPoint(w, player, dx, dz, def, minD, maxD) {
+    const px = player.pos.x, pz = player.pos.z;
+    const t = this._aoeE || this.target;
+    let d = def, ux = dx, uz = dz;
+    if (t) { const ex = t.x - px, ez = t.z - pz; d = Math.hypot(ex, ez) || 1; if (!this.close) { ux = ex / d; uz = ez / d; } }
+    else if (this.close) {
+      const pit = Engine.lookPitch, cy = Engine.camera.position.y;
+      d = pit < -0.03 ? cy / Math.tan(-pit) + (Engine.viewMode === 'tps' ? -3.5 : 0) : def + pit * 60;
+    }
+    d = Math.max(minD, Math.min(maxD, d));
+    // 壁の手前まで
+    const wt = World.segmentHit(px, pz, px + ux * d, pz + uz * d, LOW);
+    if (wt < 1) d = Math.max(1.5, d * wt - 0.6);
+    _pt.x = px + ux * d; _pt.z = pz + uz * d; _pt.d = d;
+    return _pt;
+  },
+
+  // 一人称・肩越し: 照準の線が この距離のときの高さ(弾の光の線の終わり)
+  _rayY(dist) {
+    if (!this.close) return 1.2;
+    const cam = Engine.camera.position;
+    const back = Engine.viewMode === 'tps' ? 4 : 0;
+    return Math.max(0.05, Math.min(4, cam.y + Math.tan(Engine.lookPitch) * (dist + back)));
+  },
+  // 下を向いているとき、弾が地面に当たるまでの距離(上を向いているときは そのまま)
+  _groundRange(range) {
+    if (!this.close || this.target || Engine.lookPitch > -0.04) return range;
+    const back = Engine.viewMode === 'tps' ? 4 : 0;
+    return Math.max(3, Math.min(range, Engine.camera.position.y / Math.tan(-Engine.lookPitch) - back));
   },
 
   // 候補の中で、まわりに いちばん敵が多いもの
@@ -174,6 +339,7 @@ export const Weapons = {
   // 銃口の位置(二丁拳銃は 左右こうたいに)。手に持った銃の 本当の銃口(weapon-models.js の tips)から出す
   _muzzle(player, w, out) {
     const alt = w.dual ? (this._alt ^= 1) : 0;
+    if (Engine.viewMode === 'fps') return VM.muzzleWorld(out, 1.5, alt);
     const mdl = this._models[this.index], tips = mdl && mdl.userData.tips;
     if (tips && player.aiming && mdl.parent && !(player._spin > 0)) {
       mdl.updateWorldMatrix(true, false);
@@ -198,6 +364,7 @@ export const Weapons = {
   _fire(w, player) {
     const m = this._muzzle(player, w, _mz);
     const dx = Math.sin(this.aimAngle), dz = -Math.cos(this.aimAngle);
+    if (w.fever) w.color = RAINBOW[(this._rb++) % RAINBOW.length];
     this._emitFire(w, m, false);
     switch (w.kind) {
       case 'bullet': this._bullets(w, player, m, dx, dz); break;
@@ -209,37 +376,59 @@ export const Weapons = {
       case 'lightning': this._lightning(w, player, m, dx, dz); break;
       case 'plasma': this._plasma(w, player, m, dx, dz); break;
       case 'blackhole': this._blackhole(w, player, m, dx, dz); break;
+      default: if (Extra.fire(this, w, player, m, dx, dz) === false) return;
     }
     player.recoil(w.recoil);
     if (w.shake) Engine.shake(w.shake);
+    if (Engine.viewMode === 'fps') {
+      VM.kick(w.recoil * 0.9);
+      if (w.kind !== 'hammer' && w.kind !== 'emp' && w.kind !== 'drone' && w.kind !== 'airstrike' && w.kind !== 'meteor')
+        VM.muzzleFlash(w.color, w.flash || (w.recoil > 0.8 ? 2 : 1));
+    }
   },
 
   // 弾(マシンガン・ショットガン・スナイパーなど): すぐ当たる。敵をつらぬく(pierce)。壁で止まる
   _bullets(w, player, m, dx0, dz0) {
     const px = player.pos.x, pz = player.pos.z;
-    for (let i = 0; i < w.pellets; i++) {
-      const a = this.aimAngle + (rnd() - 0.5) * 2 * w.spread;
+    const n = w.pellets + (w.fever && w.pellets === 1 ? 2 : 0);   // フィーバー: 左右にも 1 発ずつ
+    const R0 = this._groundRange(w.range), fps = Engine.viewMode === 'fps';
+    for (let i = 0; i < n; i++) {
+      const side = w.pellets === 1 && i > 0 ? (i === 1 ? -0.07 : 0.07) : 0;
+      const a = this.aimAngle + side + (rnd() - 0.5) * 2 * w.spread;
       const dx = Math.sin(a), dz = -Math.cos(a);
-      const wt = World.segmentHit(px, pz, px + dx * w.range, pz + dz * w.range, LOW);
-      let range = w.range * wt, wall = wt < 1;
+      const wt = World.segmentHit(px, pz, px + dx * R0, pz + dz * R0, LOW);
+      let range = R0 * wt, wall = wt < 1, ey = -1;
       Zombies.raycast(px, pz, dx, dz, range, _hits);
       let pierced = 0;
       for (let k = 0; k < _hits.length; k++) {
         const h = _hits[k], e = h.e;
         if (!e.alive) continue;
         const crit = !!w.crit && rnd() < w.crit;
+        const sc = (e.def && e.def.scale) || 1;
         hurt(e, w.dmg * (crit ? 2.5 : 1) * (pierced ? 0.85 : 1), dx, dz, w.force, w.id, crit);
-        FX.blood(e.x - dx * 0.3, 1.2, e.z - dz * 0.3, dx, dz, w.pellets > 1 ? 0.35 : crit ? 1 : 0.55);
-        FX.spark(e.x - dx * 0.45, 1.25, e.z - dz * 0.45, 0, 0, 0, 0.06, crit ? 0.6 : 0.35, 0xffffff, 3, w.color, 2, 0, 0, 0, 0);
-        if (++pierced >= w.pierce) { range = h.t; wall = false; break; }
+        FX.blood(e.x - dx * 0.3, 1.2 * sc, e.z - dz * 0.3, dx, dz, w.pellets > 1 ? 0.35 : crit ? 1 : 0.55);
+        FX.spark(e.x - dx * 0.45, 1.25 * sc, e.z - dz * 0.45, 0, 0, 0, 0.06, crit ? 0.6 : 0.35, 0xffffff, 3, w.color, 2, 0, 0, 0, 0);
+        if (++pierced >= w.pierce) { range = h.t; wall = false; ey = 1.15 * sc + (e.y || 0); break; }
       }
       _hits.length = 0;
       const ex = px + dx * range, ez = pz + dz * range;
-      FX.tracer(m.x, m.y, m.z, ex, 1.2, ez, w.color, 0.06, w.tracerW || (w.pellets > 1 ? 0.05 : 0.075));
-      if (wall) FX.impact(ex - dx * 0.05, 1.2, ez - dz * 0.05, dx, dz, w.color);
+      if (ey < 0) ey = this.close ? this._rayY(range) : 1.2;
+      const tw = (w.tracerW || (w.pellets > 1 ? 0.05 : 0.075)) * (w.fever ? 1.6 : 1) * (fps ? 0.7 : 1);
+      FX.tracer(m.x, m.y, m.z, ex, ey, ez, w.color, 0.06, tw);
+      if (wall) {
+        FX.impact(ex - dx * 0.05, ey, ez - dz * 0.05, dx, dz, w.color);
+        if (World.damage) World.damage(ex, ez, 0.4, w.dmg, { cause: w.id });
+      } else if (this.close && range < R0 - 0.1 && pierced === 0) {
+        FX.impact(ex, 0.08, ez, dx, dz, w.color);          // 下を向いて撃った: 地面に当たる
+      } else if (this.close && R0 < w.range && pierced === 0) {
+        FX.impact(ex, 0.08, ez, dx, dz, w.color);
+      }
     }
     FX.muzzle(m.x, m.y, m.z, dx0, dz0, w.color, w.flash || 1);
-    if (w.casing) FX.casing(m.x - dx0 * (w.muz + 0.45), m.y + 0.05, m.z - dz0 * (w.muz + 0.45), dx0, dz0, w.casing);
+    if (w.casing) {
+      if (fps) { const rx = -dz0, rz = dx0; FX.casing(m.x - dx0 * 0.6 + rx * 0.1, m.y + 0.05, m.z - dz0 * 0.6 + rz * 0.1, dx0, dz0, w.casing); }
+      else FX.casing(m.x - dx0 * (w.muz + 0.45), m.y + 0.05, m.z - dz0 * (w.muz + 0.45), dx0, dz0, w.casing);
+    }
     if (w.pellets > 1 || w.id === 'sniper') {
       for (let k = 0; k < 2; k++) FX.smoke(m.x + dx0 * 0.5, m.y, m.z + dz0 * 0.5, 0.3, 0.7, 0xa09a92, dx0 * (3 + k * 2), 0.5, dz0 * (3 + k * 2), 0.45);
     }
@@ -279,7 +468,7 @@ export const Weapons = {
     }
     FX.muzzle(m.x, m.y, m.z, dx, dz, 0x9ad8ff, 2.2);
     FX.ring(m.x, m.z, 0.2, 3, 0.3, 0x80c8ff, 0.3, 4, 1, 0, m.y - 0.2);
-    if (wt < 1) { FX.impact(ex - dx * 0.1, 1.2, ez - dz * 0.1, dx, dz, 0xbfe6ff); FX.flash(ex - dx * 0.5, 2.5, ez - dz * 0.5, 0x80c0ff, 40, 10, 0.25); }
+    if (wt < 1) { FX.impact(ex - dx * 0.1, 1.2, ez - dz * 0.1, dx, dz, 0xbfe6ff); FX.flash(ex - dx * 0.5, 2.5, ez - dz * 0.5, 0x80c0ff, 40, 10, 0.25); if (World.damage) World.damage(ex, ez, 1.2, w.dmg, { cause: 'rail' }); }
     FX.flash(m.x, 2.8, m.z, 0x80c0ff, 50, 14, 0.25);
     if (kills >= 4) Engine.hitStop(0.045);
   },
@@ -287,13 +476,11 @@ export const Weapons = {
   // 手榴弾(山なりに投げる・はねて爆発)/ グレネードランチャー(低い山なり・当たって爆発)
   _throw(w, player, m, dx, dz, impact) {
     const px = player.pos.x, pz = player.pos.z;
-    const t = this._aoeE || this.target;
-    let tx = t ? t.x : px + dx * 14, tz = t ? t.z : pz + dz * 14;
-    let ddx = tx - px, ddz = tz - pz, d = Math.hypot(ddx, ddz) || 1;
-    const dc = Math.max(4, Math.min(w.range, d));
-    tx = px + (ddx / d) * dc + (rnd() - 0.5) * 2.4; tz = pz + (ddz / d) * dc + (rnd() - 0.5) * 2.4;
-    const f = player.facing;
-    const sx = impact ? m.x : px + Math.cos(f) * 0.4, sy = impact ? m.y : 1.9, sz = impact ? m.z : pz + Math.sin(f) * 0.4;
+    const pt = this._aimPoint(w, player, dx, dz, 14, 4, w.range);
+    const dc = pt.d;
+    const tx = pt.x + (rnd() - 0.5) * 2.4, tz = pt.z + (rnd() - 0.5) * 2.4;
+    const f = player.facing, fps = Engine.viewMode === 'fps';
+    const sx = impact || fps ? m.x : px + Math.cos(f) * 0.4, sy = impact || fps ? m.y : 1.9, sz = impact || fps ? m.z : pz + Math.sin(f) * 0.4;
     const T = impact ? 0.2 + dc * 0.016 : 0.48 + dc * 0.02;
     const vx = (tx - sx) / T, vz = (tz - sz) / T, vy = (0.13 - sy + 0.5 * GRAV * T * T) / T;
     const p = Proj.spawn(impact ? 'launcher' : 'grenade', w, sx, sy, sz, vx, vy, vz, px, pz);
@@ -307,9 +494,11 @@ export const Weapons = {
   // ロケット
   _rocket(w, player, m, dx, dz) {
     const px = player.pos.x, pz = player.pos.z;
-    const p = Proj.spawn('rocket', w, m.x, m.y + 0.1, m.z, dx * 22, 0, dz * 22, px, pz);
-    if (p) { p.tx = dx; p.tz = dz; p.spd = 22; }
-    FX.muzzle(m.x, m.y, m.z, dx, dz, 0xffa050, 2);
+    if (w.spread) { const a = this.aimAngle + (rnd() - 0.5) * 2 * w.spread; dx = Math.sin(a); dz = -Math.cos(a); }
+    const p = Proj.spawn('rocket', w, m.x, m.y + (w.small ? 0 : 0.1), m.z, dx * 22, 0, dz * 22, px, pz);
+    if (p) { p.tx = dx; p.tz = dz; p.spd = 22; if (this.close && !this.target) p.slope = Math.max(-0.5, Math.min(0.1, Math.tan(Engine.lookPitch))); }
+    FX.muzzle(m.x, m.y, m.z, dx, dz, 0xffa050, w.small ? 1.1 : 2);
+    if (w.small) { FX.smoke(px - dx * 0.9, 1.5, pz - dz * 0.9, 0.3, 0.7, 0xa8a29a, -dx * 6, 0.5, -dz * 6, 0.45); return; }
     // 後ろへの噴射(バックブラスト)
     for (let k = 0; k < 4; k++) FX.smoke(px - dx * 0.9, 1.5, pz - dz * 0.9, 0.45, 0.9 + rnd() * 0.4, 0xa8a29a, -dx * (5 + rnd() * 5) + (rnd() - 0.5) * 2, 0.6, -dz * (5 + rnd() * 5) + (rnd() - 0.5) * 2, 0.55);
     FX.flame(px - dx * 0.7, 1.5, pz - dz * 0.7, -dx * 9, 0, -dz * 9, 0.5, 0.18);
@@ -411,7 +600,9 @@ export const Weapons = {
     this._emitFire(w, m, true);
     player.recoil(w.recoil);
     if (w.shake) Engine.shake(w.shake);
+    if (Engine.viewMode === 'fps') { VM.kick(w.recoil * 0.6); if (w.kind === 'laser' || w.kind === 'flame' || w.kind === 'freeze') VM.muzzleFlash(w.color, 0.5); }
     if (w.kind === 'laser') this._laser(w, m, dx, dz, player, tick);
+    else if (w.kind === 'chainsaw' || w.kind === 'orbital') Extra.stream(this, w, dt, player, m, dx, dz, tick);
     else this._spray(w, m, dx, dz, player, tick);
   },
 
@@ -471,15 +662,16 @@ export const Weapons = {
     const px = player.pos.x, pz = player.pos.z;
     const wt = World.segmentHit(px, pz, px + dx * w.range, pz + dz * w.range, LOW);
     const reach = w.range * wt;
-    const ex = px + dx * reach, ez = pz + dz * reach;
-    const fl = 0.9 + rnd() * 0.2;
-    FX.beam(m.x, m.y, m.z, ex, 1.2, ez, w.color, 0.42 * fl, -1, 2.4);
-    FX.beam(m.x, m.y, m.z, ex, 1.2, ez, 0xff9aa8, 0.12, -1, 5);
+    const ex = px + dx * reach, ez = pz + dz * reach, ey = this._rayY(reach);
+    const fl = 0.9 + rnd() * 0.2, lw = Engine.viewMode === 'fps' ? 0.6 : 1;
+    FX.beam(m.x, m.y, m.z, ex, ey, ez, w.color, 0.42 * fl * lw, -1, 2.4);
+    FX.beam(m.x, m.y, m.z, ex, ey, ez, 0xff9aa8, 0.12 * lw, -1, 5);
+    if (tick && wt < 1 && World.damage) World.damage(ex, ez, 0.6, w.dmg, { cause: 'laser' });
     FX.glow(m.x, m.y, m.z, 0.55 * fl, w.color, 4);
     FX.glow(m.x, m.y, m.z, 0.22, 0xffffff, 4, 2);
     FX.muzzleLight(m.x + dx, m.y + 0.4, m.z + dz, w.color, 8);
     if (wt < 1) {
-      FX.glow(ex - dx * 0.1, 1.2, ez - dz * 0.1, 0.9 * fl, w.color, 3);
+      FX.glow(ex - dx * 0.1, ey, ez - dz * 0.1, 0.9 * fl, w.color, 3);
       for (let k = 0; k < 2; k++) FX.spark(ex - dx * 0.1, 1.2, ez - dz * 0.1, -dx * 4 + (rnd() - 0.5) * 8, rnd() * 6, -dz * 4 + (rnd() - 0.5) * 8, 0.3, 0.05, 0xffd0a0, 6, 0xff3010, 2);
       if (rnd() < 0.2 * FX.quality) FX.smoke(ex - dx * 0.3, 1.3, ez - dz * 0.3, 0.3, 0.8, 0x4a4442, 0, 1.2, 0, 0.4);
     }
@@ -519,7 +711,8 @@ export const Weapons = {
       for (let k = 0; k < 3; k++) FX.spark(e.x, 1.2, e.z, dx / d * 6 + (rnd() - 0.5) * 6, 1 + rnd() * 4, dz / d * 6 + (rnd() - 0.5) * 6, 0.25, 0.05, 0xd8f4ff, 6, 0x4ab0ff, 2);
     }
     _near.length = 0;
-    FX.slash(px, 1.15, pz, ang, 3.9, 1.7, MELEE_R + 0.6, 0x4ab0ff, 0.2, this._slashDir, this._slashDir * 0.2, 1.6, 0.75, 0.25);
+    FX.slash(px, 1.15, pz, ang, 3.9, 1.7, MELEE_R + 0.6, this.fever ? 0xffc840 : 0x4ab0ff, 0.2, this._slashDir, this._slashDir * 0.2, 1.6, 0.75, 0.25);
+    if (Engine.viewMode === 'fps') VM.slash(this._slashDir, this.fever ? 0xffc840 : 0x4ab0ff);
     if (kills >= 3) Engine.hitStop(0.025);
     Engine.shake(0.12);
     Events.emit('melee', { x: px, z: pz, kills });
@@ -551,6 +744,8 @@ export const Weapons = {
     FX.debris(px, 0.3, pz, 16, 10, 0x5a5048, 0.16, 2);
     FX.decal(px, pz, 2.4, 'scorch', 8);
     FX.flash(px, 3.5, pz, 0x80c8ff, 22, 22, 0.35);
+    if (Engine.viewMode === 'fps') VM.spin(this.fever ? 0xffc840 : 0x48b8ff);
+    if (World.damage) World.damage(px, pz, R, SPIN_DMG * 0.3, { cause: 'spin' });
     Engine.shake(1.1);
     Engine.hitStop(0.09);
     Events.emit('spin', { x: px, z: pz, kills });
@@ -564,5 +759,8 @@ export const Weapons = {
     if (u.spinner) u.spinner.rotation.z += dt * (1 + this.spinUp * 45);
     if (u.rings) { u.rings[0].rotation.y += dt * 4; u.rings[1].rotation.z += dt * 6; }
     if (u.orb) u.orb.scale.setScalar(1 + Math.sin(performance.now() * 0.03) * 0.15);
+    if (u.disc) u.disc.rotation.y += dt * 25;
+    if (u.star) u.star.rotation.y += dt * 10;
+    if (u.chain) u.chain.position.y = 0.03 + (Math.random() - 0.5) * 0.006;
   },
 };
