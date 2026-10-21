@@ -5,6 +5,7 @@ import { CONFIG } from './config.js';
 import { World } from './world.js';
 import { damp, dampAngle } from './util.js';
 import { lathe, sstep } from './zombie-models.js';
+import { mergeByMaterial } from './weapon-models.js';
 
 const P = CONFIG.PLAYER;
 
@@ -275,6 +276,14 @@ function buildHero() {
     knees.push(kn);
   }
   g.traverse((o) => { if (o.isMesh) o.receiveShadow = false; });
+  // 同じ関節・同じ材質の部品を 1 つにまとめる(72 個 → 30 個くらい。影の分も へるのでスマホで軽い)
+  mergeByMaterial(g, new Set([bladeMesh, glow]));
+  // 小さい部品・マフラーは 影を作らない(影の描く回数をへらす。見た目はほぼ同じ)
+  g.traverse((o) => {
+    if (!o.isMesh || !o.castShadow) return;
+    o.geometry.computeBoundingSphere();
+    if (o.material === scarfM || o.geometry.boundingSphere.radius < 0.075) o.castShadow = false;
+  });
   g.userData.parts = { hips, torso, chest, head, legL, legR, kneeL: knees[0], kneeR: knees[1], armL, armR, foreL, foreR, sword, blade: bladeMesh, glow, gunMount, scarf };
   return g;
 }
