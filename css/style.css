@@ -332,3 +332,76 @@ body.pc #hud .weapon-name { bottom: calc(var(--sab) + 172px); }
   .hud-zone { font-size: 16px; }
 }
 #hud.paused .banner, #hud.paused .sub-banner, #hud.paused .pop-layer, #hud.paused .boss-arrow, #hud.paused .hud-zone, #hud.paused .rot-hint { visibility: hidden; }
+
+/* ================= 第2弾: 無双モード・出来事・チャレンジ ================= */
+/* 無双ゲージ(横画面: 下のまんなか / 縦画面: 上の点数の下) */
+.hud-fever { position: absolute; left: 50%; bottom: calc(var(--sab) + 10px); transform: translateX(-50%); width: min(32vw, 280px);
+  display: flex; align-items: center; gap: 6px; font-size: 13px; transition: width .3s; }
+.fv-label { font-size: 14px; color: var(--gold); letter-spacing: .1em; white-space: nowrap; }
+.fv-bar { position: relative; flex: 1; height: 10px; border-radius: 6px; background: rgba(0,0,0,.55); border: 1.5px solid rgba(255,255,255,.55); overflow: hidden; }
+.fv-bar i { position: absolute; inset: 0; transform-origin: 0 50%; transform: scaleX(0); background: linear-gradient(90deg, #ff7a1f, #ffd23f); }
+.hud-fever b { min-width: 36px; text-align: right; font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.hud-fever.near .fv-bar { box-shadow: 0 0 10px rgba(255,210,63,.8); animation: fvNear .45s infinite alternate; }
+@keyframes fvNear { to { border-color: var(--gold); } }
+.hud-fever.on { width: min(44vw, 380px); }
+.hud-fever.on .fv-label { animation: rainbow .6s linear infinite; font-size: 16px; }
+.hud-fever.on .fv-bar { height: 14px; border-color: #fff6b0; box-shadow: 0 0 16px rgba(255,210,63,1); }
+.hud-fever.on .fv-bar i { background: linear-gradient(90deg, #ff3b6b, #ffd23f, #5fff8a, #5fe0ff, #ff3b6b); background-size: 200% 100%; animation: fvFlow .6s linear infinite; }
+.hud-fever.on b { color: var(--gold); font-size: 14px; }
+@keyframes fvFlow { to { background-position: -200% 0; } }
+
+/* 無双モード中: 画面のふちが金色に脈打つ */
+.fever-tint { position: absolute; inset: 0; opacity: 0; pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 42%, rgba(255,170,20,.62) 100%), linear-gradient(rgba(255,200,60,.07), rgba(255,200,60,.07)); transition: opacity .4s; }
+#hud.fever .fever-tint { opacity: 1; animation: fvTint .45s ease-in-out infinite alternate; }
+@keyframes fvTint { from { opacity: .5; } to { opacity: 1; } }
+#hud.fever .hud-score b { color: var(--gold); }
+
+/* 大量撃破のスロー(キルカム): 画面の上下に 映画みたいな黒い帯 */
+#hud::before, #hud::after { content: ''; position: absolute; left: 0; right: 0; height: 0; background: rgba(0,0,0,.75); z-index: -1; }
+#hud::before { top: 0; } #hud::after { bottom: 0; }
+#hud.killcam::before, #hud.killcam::after { animation: kcBar 1.3s ease-in-out both; }
+@keyframes kcBar { 0% { height: 0; } 15%, 70% { height: 8vh; } 100% { height: 0; } }
+
+/* 時間限定チャレンジ(左上のミニマップの下) */
+.hud-challenge { position: absolute; top: calc(100% + 4px); left: 0; width: max-content; min-width: 128px; max-width: 200px; padding: 4px 9px 6px;
+  border-radius: 12px; background: rgba(0,0,0,.6); border: 2px solid #5fe0ff; text-align: left; line-height: 1.15; animation: chIn .4s cubic-bezier(.2,1.5,.4,1); }
+@keyframes chIn { from { transform: scale(.4); opacity: 0; } }
+.hud-challenge small { display: block; font-size: 11px; color: #9ff0ff; white-space: normal; }
+.hud-challenge b { font-size: 19px; font-variant-numeric: tabular-nums; }
+.hud-challenge em { float: right; font-style: normal; font-size: 15px; color: var(--gold); margin-top: 3px; font-variant-numeric: tabular-nums; }
+.ch-bar { height: 5px; border-radius: 3px; background: rgba(255,255,255,.15); overflow: hidden; margin-top: 2px; }
+.ch-bar i { display: block; height: 100%; background: #5fe0ff; transform-origin: 0 50%; transform: scaleX(0); }
+.hud-challenge.hurry em { color: #ff5a3a; animation: pulse .3s infinite alternate; }
+
+/* 出来事・無双モードの大きな文字 */
+.banner.fever b { color: var(--gold); font-size: min(60px, 12vh, 10vw); text-shadow: var(--stroke), 0 0 30px rgba(255,160,0,1); }
+.banner.fever.on b { animation: rainbow .5s linear infinite; }
+.banner.fever small { font-size: 20px; color: #fff; }
+.banner.supply b { color: var(--gold); } .banner.supply small { color: #fff; }
+.banner.golden b { color: #ffe680; text-shadow: var(--stroke), 0 0 24px rgba(255,220,80,1); } .banner.golden small { color: #fff; }
+.banner.airstrike b { color: #ff6a4a; } .banner.airstrike small { color: #fff; }
+.banner.challenge b { color: #5fe0ff; } .banner.challenge small { font-size: 20px; color: #fff; }
+.banner.discover b { color: #7dff9a; font-size: min(34px, 7vh, 7vw); } .banner.discover small { color: #fff; }
+.sub-banner.pb b { color: #7dff6b; }
+.pop.pts.shield { color: #9fd8ff; font-size: 17px; }
+
+.set-row .view-open { font-size: 15px; padding: 7px 16px; border-width: 1px; }
+
+/* 結果: このプレイの記録 */
+.res-extra { grid-template-columns: repeat(3, auto); }
+.res-extra b { font-size: 16px; } .res-extra b small { font-size: 11px; opacity: .8; font-weight: 700; }
+
+@media (max-height: 430px) {
+  .hud-fever { width: min(30vw, 250px); bottom: calc(var(--sab) + 6px); }
+  .hud-fever.on { width: min(40vw, 330px); }
+  .banner.fever b { font-size: min(40px, 7.5vw); } .banner.fever small, .banner.challenge small { font-size: 15px; }
+  .banner.discover b { font-size: min(26px, 5.5vw); }
+  .hud-challenge b { font-size: 16px; }
+}
+@media (orientation: portrait) {
+  .hud-fever { left: calc(var(--sal) + 12px); bottom: calc(var(--sab) + 272px); transform: none; width: 52vw; }
+  .hud-fever.on { width: 52vw; }
+  .banner.fever b { font-size: min(44px, 11vw); }
+  .res-extra { grid-template-columns: repeat(2, auto); }
+}

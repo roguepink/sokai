@@ -45,6 +45,7 @@
     <li><b>🔥</b>右を 押すと 撃つ</li>
     <li><b>🗡️</b>近くは 自動で 斬る</li>
     <li><b>🌀</b>回転斬りで 一掃</li>
+    <li><b>💨</b>ダッシュ(すばやく2回で叩きつけ)</li>
   </ul>
 </div>
 
@@ -54,6 +55,7 @@
   <div class="set-row"><span>音楽</span><div class="seg" data-set="music"><button type="button" data-v="on">オン</button><button type="button" data-v="off">オフ</button></div></div>
   <div class="set-row"><span>ぶるぶる</span><div class="seg" data-set="vibrate"><button type="button" data-v="on">オン</button><button type="button" data-v="off">オフ</button></div></div>
   <div class="set-row"><span>画質</span><div class="seg" data-set="quality"><button type="button" data-v="low">低</button><button type="button" data-v="mid">中</button><button type="button" data-v="high">高</button></div></div>
+  <div class="set-row view-row"><span>視点</span><button class="view-open" type="button">👁 えらぶ</button></div>
   <p class="set-note">動きが重いときは 画質を「低」に。変えると 読みこみ直します</p>
   <button id="btnSetBack" class="big" type="button">もどる</button>
 </div>
@@ -64,6 +66,7 @@
   <button id="btnResume" class="big" type="button">つづける</button>
   <div class="row">
     <button id="btnPauseSettings" type="button">⚙ 設定</button>
+    <button class="view-open" type="button">👁 視点</button>
     <button id="btnQuit" type="button">おわる</button>
   </div>
 </div>
@@ -79,6 +82,7 @@
     <div><small>ボス撃破</small><b id="resultBoss">0</b></div>
     <div><small>プレイ時間</small><b id="resultTime">0:00</b></div>
   </div>
+  <div class="res-grid res-extra hidden" id="resultExtra"></div>
   <p class="res-best">ベスト <b id="resultBest">0</b></p>
   <div class="row">
     <button id="btnAgain" class="big" type="button">もういっかい</button>

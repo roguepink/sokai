@@ -4,6 +4,7 @@
 //   異形アボミネーション … 腕が 6 本・頭が 3 つの肉のかたまり。腕でなぎはらい、体から はうゾンビを産む
 //   処刑人ブッチャー … 大なた を持った 大男。ときどき 猛ダッシュで突っこむ
 //   大這い屍クローラー … 6m の巨大な はう屍。8 本の手足で走り、飛びかかる
+//   (第2弾: 変異ゴリラ・女王ハイブ・ゾンビ装甲車 は boss-extra.js)
 // 倒すと: 大爆発のような血しぶき・体がばらばらに飛ぶ・スロー・大きな画面ゆれ。
 import * as THREE from 'three';
 import { World } from './world.js';
@@ -13,6 +14,7 @@ import { Events } from './events.js';
 import { Flow } from './zombie-flow.js';
 import { Gore } from './zombie-gore.js';
 import { lathe, sstep } from './zombie-models.js';
+import { EXTRA_TYPES, EXTRA_AIS, EXTRA_BUILDERS, FALL, installProjectiles } from './boss-extra.js';
 
 // 体力: 主人公が強すぎて数秒で倒れていたので 2 倍(テスト係A)。それでも 数秒〜10 秒くらいで倒せる
 export const BOSS_TYPES = {
@@ -20,8 +22,9 @@ export const BOSS_TYPES = {
   abomination: { boss: true, hp: 4400, speed: 3.0, r: 1.8, points: 1500, scale: 2.0, color: 0x7a5a5a, name: '異形アボミネーション', anim: 'boss' },
   butcher:     { boss: true, hp: 4800, speed: 2.5, r: 1.3, points: 1500, scale: 1.7, color: 0x6a4a3a, name: '処刑人ブッチャー', anim: 'boss' },
   crawlerKing: { boss: true, hp: 3800, speed: 5.6, r: 1.6, points: 1500, scale: 2.0, color: 0x9a9080, name: '大這い屍クローラー', anim: 'boss' },
+  ...EXTRA_TYPES,
 };
-export const BOSS_ORDER = ['tyrant', 'butcher', 'abomination', 'crawlerKing'];
+export const BOSS_ORDER = ['tyrant', 'gorilla', 'butcher', 'queen', 'abomination', 'tank', 'crawlerKing'];
 
 const R = (a, b) => a + Math.random() * (b - a);
 const sin = Math.sin, cos = Math.cos, max = Math.max, min = Math.min;
@@ -35,6 +38,7 @@ export const Bosses = {
 
   init(scene, Z) {
     this._scene = scene; this._Z = Z;
+    installProjectiles(this);
     for (const t of Object.keys(BOSS_TYPES)) this._pool[t] = [build(t)];
   },
 
@@ -42,6 +46,7 @@ export const Bosses = {
     for (const m of this._active) this._free(m);
     this._active.length = 0;
     this._blasts.length = 0;
+    if (this._resetProjs) this._resetProjs();
   },
 
   // 最初のフレームで ボスの材質を先に準備しておく(出たときに固まらないように)
@@ -85,6 +90,7 @@ export const Bosses = {
   },
 
   _free(m) {
+    if (m.car) { m.holding = false; m.car.visible = false; }
     // ばらばらにした部位を 元にもどす
     for (const p of m.pieces) {
       const h = p.userData.home;
@@ -133,7 +139,7 @@ export const Bosses = {
     if (d < minD) { e.x = px - dx / d * minD; e.z = pz - dz / d * minD; }
     World.collideCircle(e, e.r * 0.8);
     // 向き
-    if (e.state !== 'leap' && e.state !== 'charge') {
+    if (e.state !== 'leap' && e.state !== 'charge' && !def.vehicle) {
       const want = d < 12 ? Math.atan2(dx, -dz) : (e.spd > 0.3 ? Math.atan2(e.vx, -e.vz) : e.face);
       let da = (want - e.face) % (Math.PI * 2);
       if (da > Math.PI) da -= Math.PI * 2; else if (da < -Math.PI) da += Math.PI * 2;
@@ -189,6 +195,7 @@ export const Bosses = {
   // 倒れているボス・衝撃波の処理(zombies.js の update から毎ステップ)
   step(dt) {
     if (!this._compiled && ++this._frames > 20) this._precompile();
+    if (this._stepProjs) this._stepProjs(dt);
     for (let i = this._blasts.length - 1; i >= 0; i--) {
       const b = this._blasts[i];
       if ((b.t -= dt) > 0) continue;
@@ -201,7 +208,7 @@ export const Bosses = {
       m.deadT += dt;
       // 残った体は くずれ落ちる
       const k = min(1, m.deadT / 0.8), kk = k * k;
-      m.root.rotation.x = -m.fallAxis * 0 + kk * 1.45 * (m.type === 'crawlerKing' || m.type === 'abomination' ? 0.2 : 1);
+      m.root.rotation.x = kk * 1.45 * (FALL[m.type] != null ? FALL[m.type] : m.type === 'crawlerKing' || m.type === 'abomination' ? 0.2 : 1);
       m.root.rotation.z = kk * 0.3 * m.fallAxis;
       if (m.deadT > 6) m.root.position.y -= dt * 0.5;
       for (const d of m.debris) {
@@ -233,6 +240,7 @@ const _ice = new THREE.Color(0xbfe4ff);
 // 行動(ボスごと)。戻り値 = 進む速さ(-1 なら 速さは そのまま)
 // =====================================================================
 const AIS = {
+  ...EXTRA_AIS,
   // 巨人: 近づいたら 両こぶしを振り上げて 地面をたたく
   tyrant(B, e, m, dt, d, mx, mz, sp) {
     if (e.state === 'walk') {
@@ -431,6 +439,7 @@ function build(type) {
 
 const BONE = 0xd8cdb0;
 const BUILDERS = {
+  ...EXTRA_BUILDERS,
   // ---------------- 巨人タイラント(高さ 約 4.2m) ----------------
   tyrant(m) {
     const skin = newMat(m, { map: skinTex('#9a8a86', { stitches: 6, wounds: 14 }), color: 0xffffff });

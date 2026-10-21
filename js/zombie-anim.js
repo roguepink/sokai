@@ -1,9 +1,10 @@
 // キャラ係: ゾンビの動き(関節の角度を毎フレーム計算する)。
-// 関節: 0 腰 1 胴 2 頭 3 左肩 4 右肩 5 左ひじ 6 右ひじ 7 左股 8 右股 9 左ひざ 10 右ひざ。各 (x, y, z) の回転。
+// 関節: 0 腰 1 胴 2 頭 3 左肩 4 右肩 5 左ひじ 6 右ひじ 7 左股 8 右股 9 左ひざ 10 右ひざ 11 下あご。各 (x, y, z) の回転。
+// 下あごは x が - で 口が開く。
 // x が + で 腕・脚は前へ上がる / 胴・頭は後ろへそる。z が + で 先が右(+x)へ。
 // ルート(腰)の 高さのずれ ay・前後の傾き ap・左右の傾き ar も ここで決める。
-export const J = { PELVIS: 0, TORSO: 1, HEAD: 2, SHL: 3, SHR: 4, ELL: 5, ELR: 6, HIPL: 7, HIPR: 8, KNL: 9, KNR: 10 };
-export const NJ = 11;
+export const J = { PELVIS: 0, TORSO: 1, HEAD: 2, SHL: 3, SHR: 4, ELL: 5, ELR: 6, HIPL: 7, HIPR: 8, KNL: 9, KNR: 10, JAW: 11 };
+export const NJ = 12;
 export const HIP_H = 0.975;     // 立っているときの 腰の高さ(体の大きさ 1 のとき)
 
 const sin = Math.sin, cos = Math.cos, max = Math.max, min = Math.min, abs = Math.abs;
@@ -20,6 +21,19 @@ export function poseAlive(e, B) {
   else if (anim === 'brute') brute(e, P, B, s, c, k, t, sd);
   else if (anim === 'crawl') crawl(e, P, B, s, c, k, t, sd);
   else walk(e, P, B, s, c, k, t, sd, anim === 'bloat');
+  // 盾持ち: 左腕で盾をかまえる
+  if (e.def.shield && B.shield) {
+    set(P, J.SHL, 0.75, 0, -0.35); set(P, J.ELL, 1.35, 0, 0);
+    P[J.SHR * 3] = 0.5 + 0.2 * s; P[J.ELR * 3] = 0.6;
+  }
+  // 下あご: いつも少し開いて、近づくと ガチガチかむ / 攻撃で大きく開く
+  {
+    const near = e.dist < 5 ? 1 - e.dist / 5 : 0;
+    let j = 0.12 + 0.08 * sin(t * 1.7 + sd) + near * (0.25 + 0.2 * sin(t * 11 + sd));
+    if (e.atk > 0) j = 0.55 * sin(min(1, (1 - e.atk) * 1.6) * Math.PI) + 0.15;
+    if (e.flinch > 0) j += 0.3 * e.flinch;
+    P[J.JAW * 3] = -j; P[J.JAW * 3 + 1] = 0; P[J.JAW * 3 + 2] = 0.06 * sin(t * 0.9 + sd);
+  }
 
   // --- 共通の上がき ---
   // 攻撃(腕をふり上げて たたきつける)
@@ -52,7 +66,7 @@ export function poseAlive(e, B) {
     P[J.KNL * 3] -= 0.3 * w; P[J.KNR * 3] -= 0.3 * w; B.ay -= 0.05 * w;
   }
   // 燃えている(腕をふりまわす)
-  if (e.burn > 0 && anim !== 'crawl') {
+  if ((e.burn > 0 || e.def.fire) && anim !== 'crawl') {
     for (let i = 0; i < 2; i++) {
       const j = J.SHL + i, sg = i ? 1 : -1;
       P[j * 3] = 2.3 + 0.7 * sin(t * 11 + i * 2.1);
@@ -66,6 +80,25 @@ export function poseAlive(e, B) {
   if (e.shock > 0) {
     for (let i = 0; i < NJ * 3; i++) P[i] += (Math.random() - 0.5) * 0.5;
     B.ay += (Math.random() - 0.5) * 0.06;
+  }
+  // 跳ぶゾンビ: しゃがむ → 空中で 両腕をのばして 飛びかかる
+  if (e.leapS === 1) {
+    const w = min(1, e.leapT0 ? (e.leapT0 - e.leapT) / e.leapT0 * 2 : 1);
+    B.ay -= 0.3 * w; B.ap = 0.5 * w;
+    P[J.KNL * 3] = -1.5 * w; P[J.KNR * 3] = -1.5 * w; P[J.HIPL * 3] = 1.2 * w; P[J.HIPR * 3] = 1.2 * w;
+    P[J.SHL * 3] = -0.6; P[J.SHR * 3] = -0.6; P[J.HEAD * 3] = 0.5; P[J.JAW * 3] = -0.5;
+  } else if (e.leapS === 2 || (e.y > 0.25 && !e.fall)) {
+    B.ap = 0.35;
+    P[J.SHL * 3] = 2.3; P[J.SHR * 3] = 2.4; P[J.SHL * 3 + 2] = -0.35; P[J.SHR * 3 + 2] = 0.35;
+    P[J.ELL * 3] = 0.3; P[J.ELR * 3] = 0.25;
+    P[J.HIPL * 3] = 1.3; P[J.HIPR * 3] = 0.6; P[J.KNL * 3] = -1.9; P[J.KNR * 3] = -1.2;
+    P[J.HEAD * 3] = 0.45; P[J.JAW * 3] = -0.6;
+  }
+  // 空から落ちてくる: 手足をばたばた
+  if (e.fall && e.y > 0.1) {
+    for (const j of [J.SHL, J.SHR, J.HIPL, J.HIPR]) { P[j * 3] = 1.2 + 1.3 * sin(t * 13 + j); P[j * 3 + 2] = (j % 2 ? 1 : -1) * (0.5 + 0.4 * sin(t * 9 + j)); }
+    P[J.KNL * 3] = -0.8 + 0.6 * sin(t * 11); P[J.KNR * 3] = -0.8 + 0.6 * sin(t * 12);
+    P[J.JAW * 3] = -0.6; B.ap = 0.3 * sin(t * 3);
   }
   // 地面から はい出てくる
   if (e.rise > 0) {
@@ -172,4 +205,5 @@ export function deadPose(P, rnd = Math.random) {
     set(P, J.HIPL + i, R(-0.15, 0.45), 0, sg * R(0.05, 0.35));
     set(P, J.KNL + i, -R(0, 0.7), 0, 0);
   }
+  set(P, J.JAW, -R(0.15, 0.6), 0, R(-0.15, 0.15));   // 口が だらんと開く
 }

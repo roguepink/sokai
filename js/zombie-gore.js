@@ -15,15 +15,16 @@ const G = 22;                     // 重力(少し強め = 気持ちよく落ち
 const MAXCH = 420;                // 肉片・氷
 const MAXD = 300;                 // 血だまり
 
-const EXPLOSIVE = new Set(['grenade', 'launcher', 'rocket', 'missile', 'explosion', 'bloater', 'mine', 'nuke', 'airstrike', 'slam', 'barrel', 'boss', 'blackhole', 'bomb', 'c4', 'cluster']);
-const BLADE = new Set(['sword', 'melee', 'blade', 'katana', 'laser', 'saw', 'chainsaw', 'cleaver']);
-const FIRE = new Set(['fire', 'flame', 'burn', 'napalm', 'molotov', 'inferno']);
-const HEAVY = new Set(['sniper', 'rail', 'railgun', 'magnum', 'cannon']);
-const ELEC = new Set(['lightning', 'shock', 'tesla', 'electric']);
+const EXPLOSIVE = new Set(['grenade', 'launcher', 'rocket', 'missile', 'explosion', 'bloater', 'mine', 'nuke', 'airstrike', 'slam', 'barrel', 'boss', 'blackhole', 'bomb', 'c4', 'cluster',
+  'meteor', 'cannon', 'car', 'tank', 'prop', 'supply', 'stomp', 'leap', 'throw']);
+const BLADE = new Set(['sword', 'melee', 'blade', 'katana', 'laser', 'saw', 'chainsaw', 'cleaver', 'disc', 'shuriken', 'whip', 'beam']);
+const FIRE = new Set(['fire', 'flame', 'burn', 'napalm', 'molotov', 'inferno', 'acid']);
+const HEAVY = new Set(['sniper', 'rail', 'railgun', 'magnum', 'crossbow', 'hammer', 'nailgun']);
+const ELEC = new Set(['lightning', 'shock', 'tesla', 'electric', 'emp']);
 
 export function causeKind(cause) {
   if (!cause) return 'gun';
-  if (cause === 'spin') return 'spin';
+  if (cause === 'spin' || cause === 'dash') return 'spin';
   if (cause === 'shotgun') return 'shotgun';
   if (EXPLOSIVE.has(cause)) return 'boom';
   if (BLADE.has(cause)) return 'blade';
@@ -31,6 +32,7 @@ export function causeKind(cause) {
   if (HEAVY.has(cause)) return 'heavy';
   if (ELEC.has(cause)) return 'elec';
   if (cause === 'freeze' || cause === 'ice') return 'freeze';
+  if (cause === 'tornado' || cause === 'drone' || cause === 'gatling') return cause === 'tornado' ? 'spin' : 'gun';
   return 'gun';
 }
 
@@ -124,6 +126,10 @@ export const Gore = {
     Render.computeMats(B);
 
     if (kind === 'freeze') { this._shatter(e, B, dx, dz, F); return; }
+    // 盾を持ったまま倒れた: 盾も飛ぶ
+    if (B.shield && !(B.hide & BIT(P.SHIELD))) this.shieldOff(B, dx, dz, 0.6);
+    // 肩越し・一人称: 横から見て 気持ちよく見えるように、横向き・上向きの動きを足す
+    const close = Engine.viewMode && Engine.viewMode !== 'top';
 
     // 死体にする
     const s = B.s;
@@ -144,7 +150,8 @@ export const Gore = {
     // 「上が d の方へ倒れる」回転軸 = (dz, 0, -dx)
     const tip = (mag) => { ra.wx += dz * mag; ra.wz += -dx * mag; };
     const spinR = (mag) => { ra.wx += R(-mag, mag); ra.wy += R(-mag, mag); ra.wz += R(-mag, mag); };
-    const launch = (vh, vy) => { ra.vx += dx * vh * heavy; ra.vz += dz * vh * heavy; ra.vy += vy * heavy; };
+    const side = close ? R(-0.45, 0.45) : 0;
+    const launch = (vh, vy) => { ra.vx += (dx - dz * side) * vh * heavy; ra.vz += (dz + dx * side) * vh * heavy; ra.vy += vy * heavy * (close ? 1.25 : 1); };
     const fxy = 1.2 * s;
     const bloodAmt = lite ? 0.6 : 1;
 
@@ -260,18 +267,30 @@ export const Gore = {
     FX.burst({ x: rb.x, y: rb.y, z: rb.z, count: 26, color: 0x7a0606, speed: 5, up: 4, life: 0.8, size: 0.10, dirX: dx * 0.5, dirZ: dz * 0.5 });
   },
 
-  // 頭が飛ぶ(体から はなれて 転がる)
+  // 頭が飛ぶ(体から はなれて 転がる。下あごもいっしょ)
   _headOff(B, dx, dz, vh, vy) {
     if (B.hide & BIT(P.HEAD)) return;
-    this._gibFrom(B, P.HEAD, -1, 0.13, 0.11, true, dx * vh + R(-1.5, 1.5), vy, dz * vh + R(-1.5, 1.5), 12);
+    if (Engine.viewMode && Engine.viewMode !== 'top') vy *= 1.3;     // 目の高さで見ると 上へ飛ぶほうが見える
+    this._gibFrom(B, P.HEAD, B.hide & BIT(P.JAW) ? -1 : P.JAW, 0.13, 0.11, true, dx * vh + R(-1.5, 1.5), vy, dz * vh + R(-1.5, 1.5), 12);
     if (B.helmet && !(B.hide & BIT(P.HELMET))) this._gibFrom(B, P.HELMET, -1, 0.19, 0.13, true, dx * vh * 0.8 + R(-3, 3), vy + 2, dz * vh * 0.8 + R(-3, 3), 10);
-    B.hide |= BIT(P.HEAD) | BIT(P.HELMET);
+    if (B.mask && !(B.hide & BIT(P.MASK))) { const g = this._gibFrom(B, P.MASK, -1, 0.1, 0.06, true, dx * vh * 0.7 + R(-3, 3), vy + 1, dz * vh * 0.7 + R(-3, 3), 14); g.cap = false; }
+    B.hide |= BIT(P.HEAD) | BIT(P.HELMET) | BIT(P.JAW) | BIT(P.MASK);
+  },
+  // 盾が飛ぶ
+  shieldOff(B, dx, dz, k = 1) {
+    if (!B.shield || (B.hide & BIT(P.SHIELD))) return;
+    const g = this._gibFrom(B, P.SHIELD, -1, 0.16, 0.5, false, dx * 7 * k + R(-2, 2), R(4, 7) * k, dz * 7 * k + R(-2, 2), 9, 0.02, -0.36);
+    g.cap = false; g.r.th = 0.04; g.r.dn = g.r.up = 0.45;
+    B.hide |= BIT(P.SHIELD); B.shield = false;
   },
   // 頭がはじける(肉片になる)
   _popHead(B, dx, dz, lite) {
     if (B.hide & BIT(P.HEAD)) return;
     Render.partPoint(B, P.HEAD, 0.15, _v);
-    B.hide |= BIT(P.HEAD);
+    B.hide |= BIT(P.HEAD) | BIT(P.MASK);
+    // 下あごだけ残って ぶらさがる(または飛ぶ)
+    if (!(B.hide & BIT(P.JAW)) && rnd() < 0.5) { const g = this._gibFrom(B, P.JAW, -1, -0.04, 0.05, true, dx * 5 + R(-3, 3), R(4, 8), dz * 5 + R(-3, 3), 16); g.cap = false; }
+    B.hide |= BIT(P.JAW);
     if (B.helmet) { this._gibFrom(B, P.HELMET, -1, 0.19, 0.13, true, dx * 6 + R(-3, 3), R(6, 9), dz * 6 + R(-3, 3), 14); B.hide |= BIT(P.HELMET); }
     this.chunks(_v.x, _v.y, _v.z, lite ? 4 : 9, 7, 5, dx, dz);
     this.chunks(_v.x, _v.y, _v.z, lite ? 1 : 3, 6, 5, dx, dz, 0xd8ccb0, 0.6);
@@ -292,11 +311,11 @@ export const Gore = {
   },
 
   // 体の部位から ばらばらの部位を作る。cy = 中心の高さ(部位の中の座標)
-  _gibFrom(B, p, p2, cy, half, roll, vx, vy, vz, spin) {
+  _gibFrom(B, p, p2, cy, half, roll, vx, vy, vz, spin, cx = 0, cz = 0) {
     const g = Render.allocGib();
     g.used = true; g.n = p2 >= 0 ? 2 : 1;
     Render.partMatrix(B, p, _m);
-    Render.partPoint(B, p, cy, _v);
+    if (cx || cz) Render.partLocal(B, p, cx, cy, cz, _v); else Render.partPoint(B, p, cy, _v);
     _m.decompose(_v2, _q, _sv);
     const r = g.r;
     r.x = _v.x; r.y = _v.y; r.z = _v.z; r.q.copy(_q);
@@ -314,7 +333,7 @@ export const Gore = {
     g.skin[0] = B.skin[0]; g.skin[1] = B.skin[1]; g.skin[2] = B.skin[2];
     g.fx[0] = 0; g.fx[1] = B.fx[1]; g.fx[2] = B.fx[2]; g.fx[3] = 0;
     // 切り口(ちぎれた側)
-    g.cap = p !== P.HELMET;
+    g.cap = p !== P.HELMET && p !== P.SHIELD && p !== P.MASK && p !== P.JAW;
     if (g.cap) {
       const top = p === P.HEAD;
       _cm.compose(_v3.set(0, top ? -0.02 : 0.0, 0), _q2.setFromAxisAngle(_xA, top ? Math.PI : 0), _sv.set(top ? 0.055 : 0.06, 0.05, top ? 0.055 : 0.06));
