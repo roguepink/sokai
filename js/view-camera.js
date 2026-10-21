@@ -95,7 +95,7 @@ export const ViewCam = {
     Events.on('fire', (f) => {
       const w = f && f.weapon, s = (w && w.shake) || 0;
       if (f && f.continuous) this.kickPitch = Math.min(0.03, this.kickPitch + 0.0015);
-      else this.kickPitch = Math.min(0.06, this.kickPitch + 0.004 + s * 0.03);
+      else this.kickPitch = Math.min(0.05, this.kickPitch + (0.004 + s * 0.03) * Math.min(1, 12 / ((w && w.rate) || 10)));   // 連射が速い武器は 1 発を小さく
     });
   },
 
