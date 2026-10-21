@@ -20,6 +20,7 @@ export const Engine = {
   camDist: C.DIST,
   camDistWant: C.DIST,
   camPitch: C.PITCH,
+  street: 0,               // 高い建物にはさまれた道にいる(0..1。main が入れる)
   camYaw: 0,                // 0 = 北(-z)を上に見る。固定(スティックの向きと画面の向きをそろえるため)
   _shake: 0, _hitStop: 0, _slow: 0, _slowScale: 1,
   _fpsAcc: 0, _fpsN: 0, _lowFpsTime: 0,
@@ -64,7 +65,7 @@ export const Engine = {
     if (this.quality !== 'low') {
       this.composer = new EffectComposer(r);
       this.composer.addPass(new RenderPass(scene, this.camera));
-      this.bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.55, 0.5, 0.85);
+      this.bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.5, 0.45, 0.9);
       this.composer.addPass(this.bloom);
       this.composer.addPass(new OutputPass());
     }
@@ -109,8 +110,18 @@ export const Engine = {
   },
 
   // カメラをプレイヤーに追従させる
-  updateCamera(realDt, target, inside) {
-    const want = (inside ? C.INSIDE_DIST : C.DIST) * (this._zoomMult || 1);
+  updateCamera(realDt, target, inside, demo) {
+    // タイトルの見本プレイ: ゆっくり回りこみ、少し低い角度で 迫力を出す。プレイが始まったら北が上にもどす
+    if (demo) {
+      this.camYaw += realDt * 0.07;
+      this.camPitch = damp(this.camPitch, 0.78, 1.5, realDt);
+    } else {
+      if (this.camYaw) this.camYaw = 0;             // スティックの向き = 画面の向き にするため、すぐもどす
+      // 高い建物にはさまれた道では、真上に近い角度にして 壁で主人公がかくれないように(main が street を 0..1 で入れる)
+      this._street = damp(this._street || 0, inside ? 0 : this.street, 2.5, realDt);
+      this.camPitch = damp(this.camPitch, C.PITCH + 0.25 * this._street, 4, realDt);
+    }
+    const want = (inside ? C.INSIDE_DIST : C.DIST) * (this._zoomMult || 1) * (demo ? 1.12 + 0.08 * Math.sin(this.camYaw * 2.3) : 1 + 0.08 * (this._street || 0));
     this.camDist = damp(this.camDist, want, 3, realDt);
     this.camTarget.x = damp(this.camTarget.x, target.x, C.LERP, realDt);
     this.camTarget.z = damp(this.camTarget.z, target.z, C.LERP, realDt);
@@ -137,7 +148,7 @@ export const Engine = {
 
   render(realDt) {
     this._measureFps(realDt);
-    if (this.composer) this.composer.render(realDt);
+    if (this.composer && !this._noBloom) this.composer.render(realDt);
     else this.renderer.render(this.scene, this.camera);
   },
 
@@ -156,10 +167,22 @@ export const Engine = {
     if (this._fpsAcc >= 1) {
       this.fps = this._fpsN / this._fpsAcc;
       this._fpsAcc = 0; this._fpsN = 0;
-      if (this.fps < 40) this._lowFpsTime++; else this._lowFpsTime = Math.max(0, this._lowFpsTime - 1);
-      if (this._lowFpsTime >= 3 && (this._dprScale || 1) > 0.55) {
-        this._dprScale = (this._dprScale || 1) * 0.85;
+      if (document.hidden) return;
+      const sc = this._dprScale || 1;
+      if (this.fps < 40) { this._lowFpsTime++; this._goodFpsTime = 0; }
+      else { this._lowFpsTime = Math.max(0, this._lowFpsTime - 1); this._goodFpsTime = this.fps > 56 ? (this._goodFpsTime || 0) + 1 : 0; }
+      if (this._lowFpsTime >= 3 && sc > 0.55) {
+        // 遅い: 解像度を下げる
+        this._dprScale = Math.max(0.55, sc * 0.85);
         this._lowFpsTime = 0;
+        this.resize();
+      } else if (this._lowFpsTime >= 4 && sc <= 0.55 && this.composer && !this._noBloom) {
+        // それでも遅い: 光のにじみをやめる(いちばん重い画面効果)
+        this._noBloom = true; this._lowFpsTime = 0;
+      } else if (this._goodFpsTime >= 8 && sc < 1) {
+        // 余裕がもどった: 少しずつ戻す
+        this._dprScale = Math.min(1, sc * 1.08);
+        this._goodFpsTime = 0;
         this.resize();
       }
     }

@@ -75,7 +75,7 @@ export const Audio = {
 
   // 最初のタップで呼ぶ(ブラウザの決まり)
   unlock() {
-    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume().catch(() => {}); return; }
+    if (this.ctx) { if (this.ctx.state !== 'running') this.ctx.resume().catch(() => {}); return; }   // iPhone は 'interrupted' もある
     try {
       const c = this.ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
       // 仕上げのリミッター(音割れ防止)
@@ -129,6 +129,8 @@ export const Audio = {
   vibrate(p, force) {
     if (this._state !== 'play' && !force) return;
     try {
+      // まだ一度も画面にさわっていないときは ぶるぶるさせない(ブラウザがエラーを出す)
+      if (navigator.userActivation && !navigator.userActivation.hasBeenActive) return;
       const s = loadSettings();
       if (s.vibrate === false || !navigator.vibrate) return;
       const now = performance.now(); if (now - this._vibT < 150) return; this._vibT = now;

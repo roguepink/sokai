@@ -5,10 +5,11 @@ import { Score, jpNum } from './score.js';
 import { Weapons, WEAPONS } from './weapons.js';
 import { Engine, loadSettings, saveSettings } from './engine.js';
 import { Player } from './player.js';
+import { World } from './world.js';
 import { Audio } from './audio.js';
 import { Bosses } from './ui-boss.js';
 import { Minimap } from './ui-minimap.js';
-import { Popups, Banner, Confetti, flash } from './ui-fx.js';
+import { Popups, Banner, Confetti, flash, Avoid } from './ui-fx.js';
 
 const $ = (id) => document.getElementById(id);
 const fmt = (n) => Math.floor(n).toLocaleString();
@@ -26,6 +27,9 @@ export const UI = {
   _bossLag: 1, _bossKey: null, _bossPts: 0,
   _spinP: -1, _spinReady: false,
   _settingsFrom: null,
+  _subT: -9999, _subPrio: 0, _multiT: -9999, _multiN: 0, _multiPts: 0,
+  _zoneT: 0, _zone: '', _zoneWant: '', _zoneStable: 0, _zoneShownT: -9999, _zoneHideT: 0,
+  _barFitKey: '', _rotT: 0,
 
   init(root) {
     this.root = root;
@@ -54,9 +58,11 @@ export const UI = {
         <div class="combo-bar"><i id="hudComboBar"></i></div>
       </div>
       <div class="weapon-name" id="hudWeapon"></div>
+      <div class="hud-zone" id="hudZone"></div>
       <div class="banner" id="banner"><b></b><small></small></div>
       <div class="sub-banner" id="subBanner"></div>
       <div class="boss-arrow hidden" id="bossArrow"><i>▲</i><span>BOSS</span><small id="bossDist"></small></div>
+      <div class="rot-hint" id="rotHint">📱 横向きにすると 大きく遊べます</div>
       <button class="hud-pause" id="btnPause" type="button" aria-label="一時停止">Ⅱ</button>`;
     root.appendChild(hud);
     // 武器の列は、操作の層(スティック)より上に置く(さわれるように)
@@ -79,14 +85,15 @@ export const UI = {
       weapon: q('hudWeapon'), weaponBar: wbar,
       boss: q('hudBoss'), bossName: q('hudBossName'), bossFill: q('hudBossFill'), bossLag: q('hudBossLag'),
       bossArrow: q('bossArrow'), bossDist: q('bossDist'), vignette: q('vignette'),
-      sub: q('subBanner'), pause: q('btnPause'),
+      sub: q('subBanner'), pause: q('btnPause'), zone: q('hudZone'), rot: q('rotHint'),
       flash: $('flash'),
       spin: document.querySelector('.btn-spin'),
     };
 
     const low = Engine.quality === 'low';
-    this.dmg = new Popups(q('popLayer'), low ? 10 : 18, 'dmg');
-    this.pts = new Popups(q('popLayer'), low ? 8 : 14, 'pts');
+    // 飛び出す数字は 少なめ(多すぎると主人公のまわりが見えない)
+    this.dmg = new Popups(q('popLayer'), low ? 6 : Engine.quality === 'mid' ? 9 : 12, 'dmg');
+    this.pts = new Popups(q('popLayer'), low ? 6 : Engine.quality === 'mid' ? 9 : 11, 'pts');
     this.banner = new Banner(q('banner'));
     this.confetti = new Confetti($('confettiLayer'), low ? 28 : 56);
     Bosses.init();
@@ -108,7 +115,7 @@ export const UI = {
   show(v) {
     this.el.hud.classList.toggle('hidden', !v);
     this.el.weaponBar.classList.toggle('hidden', !v);
-    if (v) { Minimap.resize(); this._buildWeaponBar(); }
+    if (v) { Minimap.resize(); this._buildWeaponBar(); this._barFitKey = ''; }
   },
 
   // ---------------- イベント ----------------
@@ -120,12 +127,12 @@ export const UI = {
       const amt = h.amount || 0;
       if (amt < 4 && !h.crit) return;                   // 燃えている間の小さなダメージなどは出さない
       const now = performance.now();
-      const gap = Engine.quality === 'low' ? 110 : Engine.quality === 'mid' ? 70 : 45;
-      if (!h.crit && !h.boss && now - this._dmgT < gap) return;
-      if (this._dmgFrame >= 3) return;
+      const gap = Engine.quality === 'low' ? 160 : Engine.quality === 'mid' ? 110 : 80;
+      if (now - this._dmgT < (h.crit || h.boss ? gap * 0.5 : gap)) return;
+      if (this._dmgFrame >= 2) return;
       this._dmgT = now; this._dmgFrame++;
       const big = h.crit ? 'dmg crit' : h.boss ? 'dmg boss' : 'dmg';
-      this.dmg.spawn(h.x, (h.y || 1.2) + 0.4, h.z, h.crit ? fmt(amt) + '!' : fmt(amt), big, h.crit ? 1.35 : 1, h.crit ? 0.8 : 0.6, h.crit ? 60 : 40);
+      this.dmg.spawn(h.x, (h.y || 1.2) + 0.4, h.z, h.crit ? fmt(amt) + '!' : fmt(amt), big, h.crit ? 1.2 : 1, h.crit ? 0.65 : 0.5, h.crit ? 44 : 30);
     });
 
     Events.on('score', (s) => {
@@ -136,35 +143,45 @@ export const UI = {
       const now = performance.now();
       if (s.kind === 'kill') {
         this._comboBump = 1.35;
-        if (now - this._ptsT < (Engine.quality === 'low' ? 90 : 45)) return;
+        if (now - this._ptsT < (Engine.quality === 'low' ? 150 : Engine.quality === 'mid' ? 100 : 75)) return;
         this._ptsT = now;
-        const sz = p >= 10000 ? 1.5 : p >= 2000 ? 1.25 : 1;
-        this.pts.spawn(s.x, 2.0, s.z, '+' + fmt(p), 'pts', sz, 0.9, 55);
+        const sz = p >= 10000 ? 1.35 : p >= 2000 ? 1.15 : 1;
+        this.pts.spawn(s.x, 2.0, s.z, '+' + fmt(p), 'pts', sz, 0.8, 46);
       } else {
-        if (s.kind === 'multi' && s.count >= 5) return;   // 大きいまとめ倒しは、まんなかの文字で見せる
+        if (s.kind === 'multi' && s.count >= 6) return;   // 大きいまとめ倒しは、まんなかの文字で見せる
+        if (s.kind === 'milestone') return;
         const cls = s.kind === 'boss' ? 'pts boss' : 'pts multi';
         const txt = '+' + fmt(p);
         this.pts.spawn(s.x, 2.4, s.z, txt, cls, s.kind === 'boss' ? 2 : 1.5, s.kind === 'boss' ? 2.2 : 1.3, 80);
       }
     });
 
+    // まとめて倒した: 続けて来たら 1 行にまとめて数を足していく(何行も重ならない)
     Events.on('multiKill', (m) => {
-      if (this.paused || m.count < 5) return;
-      const n = m.count;
-      const word = n >= 30 ? '大量撃破!!' : n >= 15 ? 'まとめて撃破!' : n >= 8 ? 'まとめ倒し!' : '連続撃破!';
-      this._sub(`<b>${n}体</b> ${word} <em>+${fmt(m.points)}</em>`, n >= 15 ? 'big' : '');
+      if (this.paused || m.count < 6) return;
+      const now = performance.now();
+      if (now - this._multiT < 1000) { this._multiN += m.count; this._multiPts += m.points || 0; }
+      else { this._multiN = m.count; this._multiPts = m.points || 0; }
+      this._multiT = now;
+      const n = this._multiN;
+      const word = n >= 30 ? '大量撃破!!' : n >= 15 ? 'まとめて撃破!' : 'まとめ倒し!';
+      this._sub(`<b>${n}体</b> ${word} <em>+${fmt(this._multiPts)}</em>`, n >= 15 ? 'big' : '', 1);
     });
 
+    // 区切りの数: 小さいものは 下の 1 行、大きいものだけ 大きな文字
     Events.on('milestone', (m) => {
+      const bonus = m.bonus ? ' <em>+' + fmt(m.bonus) + '</em>' : '';
+      const small = (m.kind === 'kills' && m.value < 100) || (m.kind === 'combo' && m.value < 50);
+      if (small) { this._sub(`<b>${m.text}</b>${bonus}`, 'ms', 2); return; }
       const style = m.kind === 'combo' ? (m.value >= 200 ? 'massacre' : 'combo') : m.kind === 'kills' ? 'kills' : 'gold';
       const sub = m.bonus ? 'ボーナス +' + fmt(m.bonus) : '';
-      this.banner.show(m.text, sub, style, m.value >= 100 ? 1.9 : 1.4, 1);
-      if (m.value >= 100) flash(this.el.flash, m.kind === 'combo' ? '#ff3b6b' : '#ffd23f', 0.22, 300);
+      this.banner.show(m.text, sub, style, m.value >= 100 ? 1.7 : 1.4, 1);
+      if (m.value >= 100) flash(this.el.flash, m.kind === 'combo' ? '#ff3b6b' : '#ffd23f', 0.18, 300);
     });
 
     Events.on('newRecord', () => {
       this.banner.show('最高記録 更新!', 'NEW RECORD', 'record', 2.4, 3);
-      flash(this.el.flash, '#ffe680', 0.55, 600);
+      flash(this.el.flash, '#ffe680', 0.4, 500);
       this.confetti.burst();
       this.el.scoreBox.classList.add('record');
       this._scoreBump = 1.6;
@@ -180,7 +197,7 @@ export const UI = {
     Events.on('bossDown', (b) => {
       const pts = this._bossPts; this._bossPts = 0;
       this.banner.show('ボス撃破!', pts ? '+' + fmt(pts) + ' 点' : (b.name || ''), 'bossdown', 2.4, 3);
-      flash(this.el.flash, '#fff3b0', 0.6, 700);
+      flash(this.el.flash, '#fff3b0', 0.38, 450);
       if (Score.active) this.confetti.burst(Engine.quality === 'low' ? 16 : 30);
     });
 
@@ -190,12 +207,14 @@ export const UI = {
     });
 
     Events.on('comboEnd', (c) => {
-      if (c.combo >= 30) this._sub(`コンボ <b>${fmt(c.combo)}</b> 達成!`, '');
+      if (c.combo >= 30) this._sub(`コンボ <b>${fmt(c.combo)}</b> 達成!`, '', 0);
     });
 
     Events.on('start', () => {
       this._resetHud();
       this.banner.show('スタート!', 'ゾンビをなぎ倒せ!', 'start', 1.5, 2);
+      this._zoneShownT = -9999; this._zoneT = 1.2;                // 少したってから 今いる場所を出す
+      if (innerHeight > innerWidth) this._rotHint();
     });
     Events.on('reset', () => { this._resetHud(); this._titleRecords(); });
     Events.on('pause', () => {
@@ -218,15 +237,65 @@ export const UI = {
     this.el.boss.classList.add('hidden');
     this.el.bossArrow.classList.add('hidden');
     this.el.sub.classList.remove('on');
+    this._subT = -9999; this._multiT = -9999;
+    this._zone = ''; this._zoneWant = ''; this.el.zone.classList.remove('on');
+    this.el.rot.classList.remove('on');
     this._weapon(false);
   },
 
-  _sub(html, cls) {
-    const s = this.el.sub;
+  // 下の 1 行(まとめ倒し・小さな区切り)。いつも 1 行だけ。出ている間は、大事なほう(prio)を優先し、
+  // すぐ次が来たら 文字だけ入れかえる(動きを最初からやり直さない = ちらつかない)
+  _sub(html, cls, prio = 1) {
+    const s = this.el.sub, now = performance.now(), age = now - this._subT;
+    if (age < 700 && prio < this._subPrio) return;
     s.innerHTML = html;
-    s.className = 'sub-banner ' + (cls || '');
-    void s.offsetWidth;
-    s.classList.add('on');
+    if (age < 380) { s.className = 'sub-banner on ' + (cls || ''); }
+    else {
+      s.className = 'sub-banner ' + (cls || '');
+      void s.offsetWidth;
+      s.classList.add('on');
+      this._subT = now;
+    }
+    this._subPrio = prio;
+  },
+
+  // 縦向きのとき、横向きをすすめる(数秒だけ)
+  _rotHint() {
+    const r = this.el.rot;
+    r.classList.remove('on'); void r.offsetWidth; r.classList.add('on');
+  },
+
+  // 今いる場所の名前(変わったときだけ、少しのあいだ出す)
+  _updateZone(dt) {
+    if ((this._zoneT -= dt) > 0) return;
+    this._zoneT = 0.3;
+    let name = '';
+    try { name = typeof World.zoneName === 'function' ? World.zoneName(Player.pos.x, Player.pos.z) : ''; } catch (e) { name = ''; }
+    if (!name) return;
+    if (name !== this._zoneWant) { this._zoneWant = name; this._zoneStable = 0; return; }
+    if (name === this._zone) return;
+    // 同じ場所に 0.6 秒いたら 出す(境目を行ったり来たりしても ちらつかない)
+    if ((this._zoneStable += 0.3) < 0.6) return;
+    const now = performance.now();
+    if (now - this._zoneShownT < 2500) return;
+    this._zone = name; this._zoneShownT = now;
+    const z = this.el.zone;
+    z.textContent = '📍 ' + name;
+    z.classList.remove('on'); void z.offsetWidth; z.classList.add('on');
+  },
+
+  // 右上の武器の列が、点数とぶつからない幅にする(点数のけたが増えたときと、画面の大きさが変わったとき)
+  _fitWeaponBar() {
+    const bar = this.el.weaponBar, W = innerWidth, H = innerHeight;
+    const key = W + 'x' + H + ':' + this._lastScoreTxt.length;
+    if (key === this._barFitKey) return;
+    this._barFitKey = key;
+    if (H > W) { bar.style.maxWidth = ''; return; }
+    const sr = this.el.score.getBoundingClientRect(), br = bar.getBoundingClientRect();
+    const right = br.right || (W - 62);
+    // 点数の右はし(いちばん大きくふくらんだとき)+ すきま
+    const scoreRight = W / 2 + Math.max(sr.width / 2, 90) * 1.12 + 10;
+    bar.style.maxWidth = Math.max(92, Math.floor(right - scoreRight)) + 'px';
   },
 
   // ---------------- 武器 ----------------
@@ -279,7 +348,7 @@ export const UI = {
       if (target - this._disp < 1) this._disp = target;
     } else this._disp = target;
     const txt = fmt(this._disp);
-    if (txt !== this._lastScoreTxt) { el.score.textContent = txt; this._lastScoreTxt = txt; }
+    if (txt !== this._lastScoreTxt) { el.score.textContent = txt; this._lastScoreTxt = txt; this._fitWeaponBar(); }
     this._scoreBump += (1 - this._scoreBump) * (1 - Math.exp(-10 * dt));
     el.score.style.transform = `scale(${this._scoreBump.toFixed(3)})`;
 
@@ -303,7 +372,15 @@ export const UI = {
     Bosses.update(gdt);
     this._updateBoss(dt);
 
+    // 数字をよける場所: 主人公のまわり・上の点数の帯・右下のボタン
+    const hp = Engine.project(Player.pos.x, 1.0, Player.pos.z, _pt2);
+    Avoid.hx = hp ? hp.x : -999; Avoid.hy = hp ? hp.y : -999;
+    if ((this._avoidT = (this._avoidT || 0) - dt) <= 0) {        // 大きさを測るのは ときどき(重くしない)
+      this._avoidT = 0.5;
+      Avoid.top = (Bosses.list.length ? el.boss.getBoundingClientRect().bottom : el.scoreBox.getBoundingClientRect().bottom) + 4;
+    }
     this.dmg.update(gdt); this.pts.update(gdt);
+    if (!this.paused) this._updateZone(dt);
     this._dmgFrame = 0;
     this.banner.update(dt);
     if (!this.paused) Minimap.update(dt);
@@ -382,7 +459,9 @@ export const UI = {
     // 左上のミニマップ・右上の武器の列・右下のボタンにかぶらないように
     if (x < 130 && y < 160) { if (uy < -0.5) x = 130; else y = 160; }
     if (x > W - 330 && y < 70) y = 70;
-    if (x > W - 300 && y > H - 150) { if (ux > 0.5) y = H - 150; else x = W - 300; }
+    const BW = W > H ? 290 : 250, BH = W > H ? 230 : 330;   // 右下のボタン(撃つ・回転斬り・武器)の場所
+    if (x > W - BW && y > H - BH) { if (ux > 0.5 && uy < 0.5) y = H - BH; else x = W - BW; }
+    if (W > H && x > W - 200 && y > 50 && y < H - BH) x = W - 200;   // 右の コンボ・武器の名前 にかぶらない
     el.bossArrow.style.transform = `translate3d(${x.toFixed(0)}px,${y.toFixed(0)}px,0) translate(-50%,-50%)`;
     el.bossArrow.firstChild.style.transform = `rotate(${Math.atan2(ux, -uy).toFixed(3)}rad)`;
     el.bossDist.textContent = Math.round(l) + 'm';
@@ -468,6 +547,6 @@ export const UI = {
     requestAnimationFrame(tick);
   },
 };
-const _pt = {};
+const _pt = {}, _pt2 = {};
 
 export { jpNum };

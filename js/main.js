@@ -14,6 +14,7 @@ import { FX } from './fx.js';
 import { Score } from './score.js';
 import { UI } from './ui.js';
 import { Audio } from './audio.js';
+import { Flow } from './zombie-flow.js';
 
 export const Game = {
   state: 'title',           // 'title'(見本プレイ) | 'play' | 'paused' | 'result'
@@ -23,18 +24,29 @@ export const Game = {
 
 const $ = (id) => document.getElementById(id);
 
-function boot() {
+// 読みこみ中の帯(どこまで進んだか)。重い準備の合間に 1 フレーム返して、帯を動かす
+const nextFrame = () => new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
+const bootT = window.__boot = {};
+function progress(p, label) {
+  const bar = $('loadBar'), txt = $('loadText');
+  if (bar) bar.style.transform = `scaleX(${p.toFixed(2)})`;
+  if (txt && label) txt.textContent = label;
+}
+async function step_(name, p, label, fn) {
+  progress(p, label);
+  await nextFrame();
+  const t = performance.now();
+  fn();
+  bootT[name] = Math.round(performance.now() - t);
+}
+
+async function boot() {
   const root = $('app');
-  Engine.init(root);
-  World.init(Engine.scene);
-  Player.init(Engine.scene);
-  Zombies.init(Engine.scene);
-  FX.init(Engine.scene);
-  Weapons.init(Engine.scene);
-  Score.init();
-  Input.init(root);
-  UI.init(root);
-  Audio.init();
+  await step_('engine', 0.05, '準備中…', () => Engine.init(root));
+  await step_('world', 0.12, '町をつくっています…', () => World.init(Engine.scene));
+  await step_('chars', 0.55, 'ゾンビを集めています…', () => { Player.init(Engine.scene); Zombies.init(Engine.scene); });
+  await step_('weapons', 0.72, '武器をそろえています…', () => { FX.init(Engine.scene); Weapons.init(Engine.scene); });
+  await step_('ui', 0.8, 'もうすぐ…', () => { Score.init(); Input.init(root); UI.init(root); Audio.init(); });
 
   $('btnPlay').addEventListener('click', (e) => { e.currentTarget.blur(); start(e); });
   $('btnResume').addEventListener('click', (e) => { e.currentTarget.blur(); resume(); });
@@ -44,11 +56,29 @@ function boot() {
   UI.el.pause.addEventListener('click', (e) => { e.currentTarget.blur(); pause(); });
   addEventListener('keydown', (e) => { if (e.key === 'Escape' || e.key === 'p') { Game.state === 'play' ? pause() : Game.state === 'paused' && resume(); } });
   document.addEventListener('visibilitychange', () => { if (document.hidden && Game.state === 'play') pause(); });
+  // 音: 最初にさわるまでは鳴らさない。さわったら(タブから戻ったあとも)目を覚ます
+  const wake = () => { if (Audio.ctx) Audio.unlock(); else if (Game.state === 'play') Audio.unlock(); };
+  addEventListener('pointerdown', wake, true);
+  addEventListener('keydown', wake, true);
 
   resetRun();
   Input.auto = true;        // タイトルの後ろは見本プレイ
+  // 光と材質の準備(シェーダー)を先にすませる。最初の爆発やボスで 固まらないように
+  progress(0.88, '光の準備…');
+  await nextFrame();
+  const t = performance.now();
+  try {
+    step(CONFIG.DT); Engine.updateCamera(0.016, Player.pos, false, true);
+    const r = Engine.renderer;
+    if (r.compileAsync) await Promise.race([r.compileAsync(Engine.scene, Engine.camera), new Promise((ok) => setTimeout(ok, 4000))]);
+    else r.compile(Engine.scene, Engine.camera);
+    Engine.render(0.016);
+  } catch (e) { console.warn('precompile', e); }
+  bootT.compile = Math.round(performance.now() - t);
+  progress(1, '');
   $('loading').classList.add('hidden');
   $('title').classList.remove('hidden');
+  Game.titleT = 0;
   if (HASH.has('play')) start();
   requestAnimationFrame(loop);
 }
@@ -60,7 +90,7 @@ function resetRun() {
 }
 
 function start(ev) {
-  Audio.unlock();
+  if (ev && ev.isTrusted) Audio.unlock();     // 音はさわったときだけ(#play の確認用では鳴らさない)
   resetRun();
   Game.state = 'play'; Game.demo = false; Score.active = true;
   Input.auto = HASH.has('auto');
@@ -107,7 +137,7 @@ function finish() {
 function toTitle() {
   $('result').classList.add('hidden');
   resetRun();
-  Game.state = 'title'; Game.demo = true; Input.auto = true; Score.active = false;
+  Game.state = 'title'; Game.demo = true; Input.auto = true; Score.active = false; Game.titleT = 0;
   $('title').classList.remove('hidden');
 }
 
@@ -126,12 +156,30 @@ function loop(now) {
       while (acc >= CONFIG.DT && steps < 6) { step(CONFIG.DT); acc -= CONFIG.DT; steps++; }
       if (steps === 6) acc = 0;
     }
-    Engine.updateCamera(real, Player.pos, !!World.inside);
+    if ((streetT -= real) <= 0) { streetT = 0.3; Engine.street = streetCheck(Player.pos.x, Player.pos.z); }
+    Engine.updateCamera(real, Player.pos, !!World.inside, Game.state === 'title');
     if (Game.state !== 'title') UI.update(real);
     Engine.render(real);
     if (Game.state === 'play' && (saveT += real) > 5) { saveT = 0; Score.save(); }
+    // 1 フレームの計算にかかった時間(ミリ秒。確認用。16 をこえるとカクつく)
+    const cost = performance.now() - now;
+    stats.ms = Math.round((stats.ms * 0.95 + cost * 0.05) * 10) / 10;
     stats.fps = Math.round(Engine.fps); stats.zombies = Zombies.count(); stats.kills = Score.kills; stats.score = Score.score; stats.state = Game.state;
   } catch (e) { console.error(e); }
+}
+
+// 主人公とカメラの間(画面の手前 = 南)に 高い壁があるか。あれば 1(カメラを真上に近づける)
+let streetT = 0;
+function streetCheck(px, pz) {
+  const B = World.boxes; if (!B || World.inside) return 0;
+  let hit = 0;
+  for (let i = 0; i < B.length; i++) {
+    const b = B[i];
+    if (b.h < 6 || b.maxZ < pz + 1 || b.minZ > pz + 11 || b.maxX < px - 6 || b.minX > px + 6) continue;
+    if (b.maxX - b.minX < 2 && b.maxZ - b.minZ < 2) continue;     // 細い柱・街灯は数えない
+    hit = 1; break;
+  }
+  return hit;
 }
 
 function step(dt) {
@@ -146,11 +194,10 @@ function step(dt) {
 }
 
 // 確認用に外から見られる数字
-const stats = window.__stats = { fps: 0, zombies: 0, kills: 0, score: 0, state: '' };
-window.__game = { Game, Engine, Player, Zombies, Weapons, World, Score, Director, FX, Input, start, pause, resume, finish };
+const stats = window.__stats = { ms: 0, fps: 0, zombies: 0, kills: 0, score: 0, state: '' };
+window.__game = { Game, Engine, Flow, Audio, UI, Player, Zombies, Weapons, World, Score, Director, FX, Input, start, pause, resume, finish };
 
-try { boot(); }
-catch (e) {
+boot().catch((e) => {
   console.error(e);
-  const l = $('loading'); if (l) l.textContent = 'うまく起動できませんでした。もう一度開いてください。';
-}
+  const l = $('loadText'); if (l) l.textContent = 'うまく起動できませんでした。もう一度開いてください。';
+});

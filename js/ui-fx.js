@@ -38,10 +38,17 @@ export class Popups {
       const sc = Engine.project(p.x, p.y, p.z, _pt);
       if (!sc) { p.el.style.opacity = '0'; continue; }
       // 最初にぽんと大きく → ふつう。上に上がって最後に消える
-      const pop = t < 0.12 ? 1.7 - (t / 0.12) * 0.7 : 1;
+      const pop = t < 0.12 ? 1.5 - (t / 0.12) * 0.5 : 1;
       const up = (1 - (1 - t) * (1 - t)) * p.rise;
-      const op = t > 0.6 ? 1 - (t - 0.6) / 0.4 : 1;
-      p.el.style.transform = `translate3d(${(sc.x + p.jx * t).toFixed(1)}px,${(sc.y - up).toFixed(1)}px,0) translate(-50%,-50%) scale(${(pop * p.s).toFixed(3)})`;
+      let op = t > 0.55 ? 1 - (t - 0.55) / 0.45 : 1;
+      const x = sc.x + p.jx * t, y = sc.y - up;
+      // 上の点数の帯・右下のボタンの上には出さない。主人公の真上は うすく(まわりが見えるように)
+      if (y < Avoid.top || (x > innerWidth - 270 && y > innerHeight - 220)) op = 0;
+      else {
+        const dx = x - Avoid.hx, dy = y - Avoid.hy, d2 = dx * dx + dy * dy;
+        if (d2 < Avoid.r * Avoid.r) op *= 0.25 + 0.75 * Math.sqrt(d2) / Avoid.r;
+      }
+      p.el.style.transform = `translate3d(${x.toFixed(1)}px,${y.toFixed(1)}px,0) translate(-50%,-50%) scale(${(pop * p.s).toFixed(3)})`;
       p.el.style.opacity = op.toFixed(2);
     }
   }
@@ -49,6 +56,8 @@ export class Popups {
   clear() { for (const p of this.items) { p.on = false; p.el.style.opacity = '0'; } }
 }
 const _pt = {};
+// 数字をよける場所(UI が毎フレーム入れる): 主人公の画面の位置(hx, hy)と半径 r、上の帯の下はし top
+export const Avoid = { hx: -999, hy: -999, r: 70, top: 70 };
 
 // ---------- まんなかの大きな文字 ----------
 // 大事なもの(ボス・記録)は割りこむ。ふつうのもの(区切りの数)は順番待ち。
