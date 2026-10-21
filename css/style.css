@@ -400,8 +400,8 @@ body.pc #hud .weapon-name { bottom: calc(var(--sab) + 172px); }
   .hud-challenge b { font-size: 16px; }
 }
 @media (orientation: portrait) {
-  .hud-fever { bottom: auto; top: calc(var(--sat) + 68px); width: 44vw; }
-  .hud-fever.on { width: 56vw; }
+  .hud-fever { left: calc(var(--sal) + 12px); bottom: calc(var(--sab) + 272px); transform: none; width: 52vw; }
+  .hud-fever.on { width: 52vw; }
   .banner.fever b { font-size: min(44px, 11vw); }
   .res-extra { grid-template-columns: repeat(2, auto); }
 }

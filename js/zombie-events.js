@@ -414,7 +414,7 @@ export const Happenings = {
       const dur = 25, goal = Math.max(15, Math.min(60, Math.round(rate * 4 / 5) * 5));
       c = { kind: 'blade', text: `${dur}秒で 剣と回転斬りで ${goal}体!`, goal, dur };
     } else {
-      const dur = 25, goal = Math.max(12, Math.min(40, Math.round(rate * 0.8)));
+      const dur = 25, goal = Math.max(20, Math.min(60, Math.round(rate * 1.3)));
       c = { kind: 'multi', text: `一度に ${goal}体 まとめて倒せ!`, goal, dur };
     }
     c.count = 0; c.t = c.dur; c.best = 0;

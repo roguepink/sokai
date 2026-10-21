@@ -541,7 +541,7 @@ export const UI = {
     const dx = e.x - Player.pos.x, dz = e.z - Player.pos.z, l = Math.hypot(dx, dz) || 1;
     const ux = dx / l, uy = dz / l;                      // カメラは北が上なので、そのまま画面の向き
     const TOP = innerHeight > innerWidth ? 200 : 120;      // 上は点数・ボスの体力の下まで
-    const hw = W / 2 - M, hh = uy < 0 ? H / 2 - TOP : H / 2 - M;
+    const hw = W / 2 - M, hh = uy < 0 ? H / 2 - TOP : H / 2 - M - 26;   // 下は 無双ゲージの上まで
     const t = Math.min(hw / Math.abs(ux || 1e-6), hh / Math.abs(uy || 1e-6));
     let x = W / 2 + ux * t, y = H / 2 + uy * t;
     // 左上のミニマップ・右上の武器の列・右下のボタンにかぶらないように
