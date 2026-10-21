@@ -181,7 +181,7 @@ export const UI = {
 
     Events.on('newRecord', () => {
       this.banner.show('最高記録 更新!', 'NEW RECORD', 'record', 2.4, 3);
-      flash(this.el.flash, '#ffe680', 0.55, 600);
+      flash(this.el.flash, '#ffe680', 0.4, 500);
       this.confetti.burst();
       this.el.scoreBox.classList.add('record');
       this._scoreBump = 1.6;
@@ -197,7 +197,7 @@ export const UI = {
     Events.on('bossDown', (b) => {
       const pts = this._bossPts; this._bossPts = 0;
       this.banner.show('ボス撃破!', pts ? '+' + fmt(pts) + ' 点' : (b.name || ''), 'bossdown', 2.4, 3);
-      flash(this.el.flash, '#fff3b0', 0.6, 700);
+      flash(this.el.flash, '#fff3b0', 0.38, 450);
       if (Score.active) this.confetti.burst(Engine.quality === 'low' ? 16 : 30);
     });
 
