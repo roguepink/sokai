@@ -42,6 +42,7 @@ export class Music {
 
   start(mode = 'normal') {
     const t = this.ctx.currentTime;
+    this._gen = (this._gen || 0) + 1;          // 止める予約を取り消す
     this.wantMode = this.mode = mode;
     if (!this.playing) {
       this.playing = true; this.step = 0; this.bar = 0; this.next = t + 0.05;
@@ -53,8 +54,8 @@ export class Music {
   stop(fade = 0.5) {
     this._fade(0, fade);
     if (this.timer) {
-      const tm = this.timer;
-      setTimeout(() => { if (this.timer === tm && this.out.gain.value < 0.01) { clearInterval(tm); this.timer = null; this.playing = false; } }, fade * 1000 + 100);
+      const gen = this._gen;
+      setTimeout(() => { if (this._gen === gen && this.timer) { clearInterval(this.timer); this.timer = null; this.playing = false; } }, fade * 1000 + 100);
     }
   }
 

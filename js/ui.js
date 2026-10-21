@@ -53,13 +53,17 @@ export const UI = {
         <div class="combo-label"><span>COMBO</span><em id="hudMult">×1</em></div>
         <div class="combo-bar"><i id="hudComboBar"></i></div>
       </div>
-      <div class="weapon-bar" id="weaponBar"></div>
       <div class="weapon-name" id="hudWeapon"></div>
       <div class="banner" id="banner"><b></b><small></small></div>
       <div class="sub-banner" id="subBanner"></div>
       <div class="boss-arrow hidden" id="bossArrow"><i>▲</i><span>BOSS</span><small id="bossDist"></small></div>
       <button class="hud-pause" id="btnPause" type="button" aria-label="一時停止">Ⅱ</button>`;
     root.appendChild(hud);
+    // 武器の列は、操作の層(スティック)より上に置く(さわれるように)
+    const wbar = document.createElement('div');
+    wbar.className = 'weapon-bar hidden';
+    wbar.id = 'weaponBar';
+    root.appendChild(wbar);
 
     // 画面全体の演出(結果画面の上にも出す)
     const fxl = document.createElement('div');
@@ -72,7 +76,7 @@ export const UI = {
       hud, score: q('hudScore'), scoreBox: q('hudScoreBox'), best: q('hudBest'), pace: q('hudPace'), paceBox: q('hudPaceBox'),
       kills: q('hudKills'), time: q('hudTime'),
       combo: q('hudCombo'), comboN: q('hudComboN'), mult: q('hudMult'), comboBar: q('hudComboBar'),
-      weapon: q('hudWeapon'), weaponBar: q('weaponBar'),
+      weapon: q('hudWeapon'), weaponBar: wbar,
       boss: q('hudBoss'), bossName: q('hudBossName'), bossFill: q('hudBossFill'), bossLag: q('hudBossLag'),
       bossArrow: q('bossArrow'), bossDist: q('bossDist'), vignette: q('vignette'),
       sub: q('subBanner'), pause: q('btnPause'),
@@ -103,6 +107,7 @@ export const UI = {
 
   show(v) {
     this.el.hud.classList.toggle('hidden', !v);
+    this.el.weaponBar.classList.toggle('hidden', !v);
     if (v) { Minimap.resize(); this._buildWeaponBar(); }
   },
 
