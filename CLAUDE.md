@@ -44,7 +44,8 @@
 `group` / `collideCircle(p{x,z}, r)` 壁から押し出す / `segmentHit(x0,z0,x1,z1)` → 0..1(弾が壁に当たる所)/
 `blockedAt(x,z,r)` / `buildingAt(x,z)` → 建物 or null / `inside`(プレイヤーのいる建物)/ `spawnPoint(cx,cz,minD,maxD)` → {x,z}|null /
 `nav` = { w, h, ox, oz, size, blocked: Uint8Array }(1m マスの壁地図。道さがし用)/ `addBox(minX,minZ,maxX,maxZ,{h,mat,mesh,building})` /
-`update(dt, player)` / `half` / `boxes` / `buildings`
+`update(dt, player)` / `half` / `boxes` / `buildings` / `zoneAt(x,z)` → 'town'|'forest'|... /
+`minimapImage()` → 上から見た地図の canvas(北が上、マップ全体)。UI のミニマップ用(なければ UI は自分で描く)
 
 ### Player(player.js)
 `pos`(Vector3)`vel` `facing` `aimDir`(XZ 単位ベクトル。武器係が決める)`aiming` `radius` `mesh` /
@@ -55,8 +56,15 @@
 `queryCircle(x,z,r,out)` / `nearest(x,z,maxDist,dirX,dirZ,cosMin)` / `raycast(x,z,dx,dz,maxDist,out)` → [{e,t}] 近い順 /
 `damage(e, amount, {dirX,dirZ,force,cause,crit})` → 倒したら true / `damageCircle(x,z,r,amount,{force,cause,falloff})` → 倒した数 / `TYPES`
 
+**敵の状態(武器係が入れて、キャラ係が動き・見た目・ダメージに反映する)**
+- `e.stun`(秒)ひるみ / `e.frozen`(秒)凍って止まる・青白い。凍ったまま倒れたら「砕ける」倒れ方 /
+  `e.burn`(秒)+ `e.burnDps` 燃える(キャラ係が `damage(e, burnDps*dt, {cause:'fire'})` と炎の粒)/ `e.shock`(秒)しびれて震える
+- ボスは `e.boss = true`、`e.name`(日本語の名前)を持つ。UI は `e.hp / e.maxHp` で体力バーを出す
+
 ### Weapons(weapons.js)
-`WEAPONS`(配列 {id,name,icon,...})/ `index` / `current` / `select(i)` / `update(dt,input,player)` / `spin(player)`
+`WEAPONS`(配列 {id, name(日本語), icon(絵文字), sound, ...})/ `index` / `current` / `select(i)` / `update(dt,input,player)` / `spin(player)` /
+`spinReady`(0..1 回転斬りの溜まり具合。1 で使える)
+`sound` は音係と共通の名前: 'mg' 'minigun' 'pistol' 'shotgun' 'sniper' 'rail' 'grenade' 'launcher' 'rocket' 'missile' 'flame' 'laser' 'lightning' 'plasma' 'freeze' 'blackhole'
 
 ### FX(fx.js)
 `burst({x,y,z,count,color,speed,up,life,size,grav,drag,dirX,dirZ,spread})` / `blood(x,y,z,dirX,dirZ,amount)` / `explosion(x,z,radius)` /
@@ -80,6 +88,8 @@ PC: WASD/矢印=移動、スペース/クリック=撃つ、Shift/E=回転斬り
 | `explosion` | {x,z,radius} | 武器 |
 | `weaponChange` | {weapon,index} | 武器 |
 | `bossSpawn` / `bossDeath` | {name,x,z,e} | キャラ |
+| `horde` | {count, text} 大群が来る | キャラ(出現係) |
+| `zombieAttack` | {x,z} ゾンビが主人公をなぐった(主人公は無傷。見た目と音だけ) | キャラ |
 | `score` | {points,x,z,combo,mult} | 点数 |
 | `newRecord` | {best} | 点数 |
 | `start` `pause` `resume` `finish` `reset` | | main |
