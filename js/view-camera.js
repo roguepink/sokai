@@ -138,7 +138,7 @@ export const ViewCam = {
       if (jump) { this.pivot.copy(target); this._pivotOk = true; this.boom = 1; }
       this.pivot.x = damp(this.pivot.x, target.x, T.LAG, dt);
       this.pivot.z = damp(this.pivot.z, target.z, T.LAG, dt);
-      this.pivot.y = damp(this.pivot.y, target.y, 9, dt);
+      this.pivot.y = damp(this.pivot.y, target.y * 0.5, 9, dt);   // 跳んだときは 半分だけ ついていく(高く跳んだ感じ)
       const back = T.BACK * (1 - (1 - T.FIRE_BACK) * this.aimK), side = T.SIDE * (1 - 0.2 * this.aimK);
       const px = this.pivot.x, pz = this.pivot.z, py = this.pivot.y + T.PIVOT - this.dip;
       // 肩: 体の横が壁なら 肩を引っこめる
@@ -210,50 +210,82 @@ export const ViewCam = {
     if (!this.shot) {
       if (this._cineClock < this._cineNext) return false;
       const n = this._crowd(target, Z);
-      if (n < 6) { this._cineNext = this._cineClock + 1; return false; }
-      const kinds = ['low', 'shoulder', 'side', 'wide'];
-      this.shot = { kind: kinds[this._cineIdx++ % kinds.length], t: 0, dur: 5.2 + Math.random() * 1.5, boom: 1 };
-      this.startBlend(cam, 0.75);
+      if (n < 10) { this._cineNext = this._cineClock + 1; return false; }
+      // 壁にじゃまされない 撮り方を えらぶ(種類 × 左右)
+      this.pivot.copy(target); this.pivot.y = 0;
+      const kinds = ['side', 'low', 'rear', 'wide'];
+      let pick = null;
+      for (let j = 0; j < kinds.length && !pick; j++) {
+        const kind = kinds[(this._cineIdx + j) % kinds.length];
+        for (const f of Math.random() < 0.5 ? [1, -1] : [-1, 1]) {
+          const sh = { kind, t: 0, flip: f };
+          if (this._shotK(sh) > 0.75) { pick = sh; this._cineIdx += j + 1; break; }
+        }
+      }
+      if (!pick) { this._cineNext = this._cineClock + 1; return false; }
+      this.shot = Object.assign(pick, { dur: 5 + Math.random() * 1.5, boom: 1 });
+      this.startBlend(cam, 0.8);
     }
     const s = this.shot;
     s.t += dt;
     if (s.t > s.dur) { this.shot = null; this.startBlend(cam, 0.9); this._cineNext = this._cineClock + 8 + Math.random() * 4; return false; }
-    // 大群のいる向きを ゆっくり追う
+    // 大群のいる向きを ゆっくり追う。主人公の位置も なめらかに(ゆれない)
     if (((s.t * 4) | 0) !== (((s.t - dt) * 4) | 0)) this._crowd(target, Z);
+    this.pivot.x = damp(this.pivot.x, target.x, 5, dt); this.pivot.z = damp(this.pivot.z, target.z, 5, dt);
+    this.pivot.y = damp(this.pivot.y, target.y * 0.6, 5, dt);
+    const P = this.pivot;
     this._springs(dt);
-    const cy0 = this._crowdYaw, t = s.t;
-    const at = (a, d) => { _p.set(target.x + Math.sin(a) * d, 0, target.z - Math.cos(a) * d); return _p; };
-    let cx, cz, cy, lx, ly, lz, fov = 56, roll = 0;
-    if (s.kind === 'low') {          // 主人公を 下から見上げる(後ろに大群)
-      at(cy0 + Math.PI + 0.6 + t * 0.07, 4.3 - t * 0.12); cx = _p.x; cz = _p.z; cy = 0.45;
-      at(cy0, 3); lx = target.x * 0.7 + _p.x * 0.3; lz = target.z * 0.7 + _p.z * 0.3; ly = 1.55; fov = 58; roll = -0.04;
-    } else if (s.kind === 'shoulder') {   // 主人公の肩ごしに 押しよせる大群
-      at(cy0 + Math.PI + 0.32, 3.4); cx = _p.x; cz = _p.z; cy = 1.05;
-      at(cy0, 14); lx = _p.x; lz = _p.z; ly = 1.2; fov = 62;
-    } else if (s.kind === 'side') {        // 真横から(主人公 対 大群)
-      at(cy0 + Math.PI / 2, 7 - t * 0.25); cx = _p.x; cz = _p.z; cy = 1.0;
-      at(cy0, 4); lx = _p.x; lz = _p.z; ly = 1.3; fov = 54; roll = 0.05;
-    } else {                               // 地面すれすれの 引きの絵(ゆっくり回る)
-      at(cy0 + Math.PI + 1.1 + t * 0.16, 10.5); cx = _p.x; cz = _p.z; cy = 0.3;
-      lx = target.x; lz = target.z; ly = 1.9; fov = 60;
-    }
-    // 壁の手前で止める(主人公の頭から)
-    const k = boomK(target.x, target.z, cx, cz, cy - 0.15);
+    const k = this._shotK(s);
     s.boom = s.t < dt * 1.5 ? k : damp(s.boom, k, k < s.boom ? 30 : 4, dt);
-    cx = target.x + (cx - target.x) * s.boom; cz = target.z + (cz - target.z) * s.boom;
-    cam.position.set(cx, cy + target.y, cz);
+    const c = this._sc;
+    const cx = P.x + (c.cx - P.x) * s.boom, cz = P.z + (c.cz - P.z) * s.boom;
+    cam.position.set(cx, c.cy + P.y, cz);
     cam.up.set(0, 1, 0);
-    cam.lookAt(lx, ly + target.y, lz);
-    if (roll) cam.rotateZ(roll);
+    cam.lookAt(c.lx, c.ly + P.y, c.lz);
+    if (c.roll) cam.rotateZ(c.roll);
     if (E._shake > 0) {
       const sh = E._shake * E._shake * 0.03, tt = (this.shakeT += dt * 31);
       cam.rotateX(sh * Math.sin(tt * 1.7)); cam.rotateY(sh * Math.sin(tt * 1.3 + 1));
       E._shake = Math.max(0, E._shake - dt * 2.2);
     }
     this.hideHero = false; this.heroFade = 1;
-    this._fov = fov * (innerWidth < innerHeight ? 1.3 : 1) + this.fovKick * 0.6;
+    this._fov = c.fov * (innerWidth < innerHeight ? 1.3 : 1) + this.fovKick * 0.6;
     this._near = 0.15;
     return true;
+  },
+
+  // 撮り方 s の カメラの位置と見る点を this._sc に入れ、壁で どこまで行けるか(0..1)を返す
+  _sc: { cx: 0, cy: 0, cz: 0, lx: 0, ly: 0, lz: 0, fov: 56, roll: 0 },
+  _shotK(s) {
+    const P = this.pivot, c = this._sc, cy0 = this._crowdYaw, t = s.t, f = s.flip;
+    const at = (a, d) => { _p.set(P.x + Math.sin(a) * d, 0, P.z - Math.cos(a) * d); return _p; };
+    // 主人公は 画面のはし(左右 1/3)に置く。まん中は タイトルの文字があるので
+    let side = 0.55;
+    c.roll = 0;
+    if (s.kind === 'side') {               // 真横から: 主人公 と 押しよせる大群
+      at(cy0 + f * Math.PI / 2, 9 - t * 0.3); c.cx = _p.x; c.cz = _p.z; c.cy = 0.9;
+      at(cy0, 7); c.lx = (P.x + _p.x) / 2; c.lz = (P.z + _p.z) / 2; c.ly = 1.3; c.fov = 52; c.roll = 0.03 * f; side = 0;
+    } else if (s.kind === 'low') {         // 下から見上げる(後ろに大群)
+      at(cy0 + Math.PI + 0.5 * f + t * 0.06 * f, 6.2 - t * 0.2); c.cx = _p.x; c.cz = _p.z; c.cy = 0.4;
+      c.lx = P.x; c.lz = P.z; c.ly = 1.7; c.fov = 56; c.roll = -0.04 * f; side = 0.8;
+    } else if (s.kind === 'rear') {        // 後ろの低い所から、大群に向かう主人公
+      at(cy0 + Math.PI + 0.35 * f, 7.5); c.cx = _p.x; c.cz = _p.z; c.cy = 0.6;
+      at(cy0, 12); c.lx = P.x * 0.6 + _p.x * 0.4; c.lz = P.z * 0.6 + _p.z * 0.4; c.ly = 1.3; c.fov = 60; side = 0.3;
+    } else {                               // 地面すれすれの 引きの絵(ゆっくり回る)
+      at(cy0 + Math.PI + 1.1 * f + t * 0.14 * f, 12); c.cx = _p.x; c.cz = _p.z; c.cy = 0.3;
+      c.lx = P.x; c.lz = P.z; c.ly = 2.0; c.fov = 58; side = 0.7;
+    }
+    if (side) {                            // 見る点を 横へずらす(主人公が はしに来る)
+      const dx = c.lx - c.cx, dz = c.lz - c.cz;
+      c.lx += -dz * side * f; c.lz += dx * side * f;
+    }
+    // 壁(2.5m 以上)の手前まで。車などの中に カメラが入るなら もう少し寄る
+    let k = boomK(P.x, P.z, c.cx, c.cz, 2.5);
+    for (let i = 0; i < 4 && World.blockedAt; i++) {
+      if (!World.blockedAt(P.x + (c.cx - P.x) * k, P.z + (c.cz - P.z) * k, 0.3)) break;
+      k *= 0.8;
+    }
+    return k;
   },
   endShot(cam) { if (this.shot) { this.shot = null; this.startBlend(cam, 0.6); } this._cineClock = 0; this._cineNext = 7; },
 

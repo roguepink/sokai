@@ -17,6 +17,7 @@ import { Audio } from './audio.js';
 import { Flow } from './zombie-flow.js';
 import { Look } from './view-look.js';
 import { ViewHud } from './view-hud.js';
+import { ViewCam } from './view-camera.js';
 
 export const Game = {
   state: 'title',           // 'title'(見本プレイ) | 'play' | 'paused' | 'result'
@@ -235,7 +236,7 @@ function step(dt) {
 
 // 確認用に外から見られる数字
 const stats = window.__stats = { ms: 0, fps: 0, zombies: 0, kills: 0, score: 0, state: '' };
-window.__game = { Game, Engine, Look, ViewHud, Flow, Audio, UI, Player, Zombies, Weapons, World, Score, Director, FX, Input, start, pause, resume, finish };
+window.__game = { Game, Engine, Look, ViewHud, ViewCam, Flow, Audio, UI, Player, Zombies, Weapons, World, Score, Director, FX, Input, start, pause, resume, finish };
 
 boot().catch((e) => {
   console.error(e);

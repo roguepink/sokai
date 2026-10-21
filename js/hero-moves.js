@@ -33,13 +33,14 @@ export const Moves = {
   get ready() { return Math.max(0, 1 - this.dashCool / M.DASH_COOL); },
 
   init(scene) {
+    // 光の帯 2 本(肩の高さ = 剣の光 / ひざの高さ)。細い帯なので 画面を ふさがない
     const g = new THREE.BufferGeometry();
-    this._tp = new Float32Array(N * 2 * 3);
-    this._tc = new Float32Array(N * 2 * 3);
+    this._tp = new Float32Array(N * 4 * 3);
+    this._tc = new Float32Array(N * 4 * 3);
     g.setAttribute('position', new THREE.BufferAttribute(this._tp, 3).setUsage(THREE.DynamicDrawUsage));
     g.setAttribute('color', new THREE.BufferAttribute(this._tc, 3).setUsage(THREE.DynamicDrawUsage));
     const idx = [];
-    for (let i = 0; i < N - 1; i++) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+    for (let s = 0; s < 2; s++) for (let i = 0; i < N - 1; i++) { const a = s * N * 2 + i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
     g.setIndex(idx);
     this._hist = [];
     for (let i = 0; i < N; i++) this._hist.push({ x: 0, y: 0, z: 0, t: -9 });
@@ -181,7 +182,12 @@ export const Moves = {
       FX.ring(x, z, 0.5, R * 1.25, 0.45, 0xffd28a, 0.9, 2.6, 1);
       FX.ring(x, z, 0.3, R * 0.8, 0.3, 0x8ad8ff, 0.5, 3, 1, 0.25);
     }
-    FX.debris(x, 0.3, z, FX.q(22), 13, 0x5a5048, 0.18, 2);
+    // がれき: 主人公のまわり 4 か所から(一人称で 目の前を ふさがないように 少なめ・前の方だけ)
+    const fps = Engine.viewMode === 'fps';
+    for (let j = 0; j < 4; j++) {
+      const a = Engine.lookYaw + (j - 1.5) * (fps ? 0.5 : Math.PI / 2), r = fps ? 3.2 : 2.2;
+      FX.debris(x + Math.sin(a) * r, 0.3, z - Math.cos(a) * r, FX.q(fps ? 3 : 6), 12, 0x5a5048, 0.18, 2);
+    }
     const n = FX.q(26);
     for (let i = 0; i < n; i++) {
       const a = (i / n) * Math.PI * 2 + rnd() * 0.2, s = 9 + rnd() * 7;
@@ -214,15 +220,18 @@ export const Moves = {
     }
     const H = this._hist, now = this._time, tp = this._tp, tc = this._tc;
     let alive = false;
-    for (let i = 0; i < N; i++) {
-      const h = H[i], age = now - h.t;
-      const a = Math.max(0, 1 - age / 0.32) * (1 - i / N);
-      if (a > 0) alive = true;
-      const o = i * 6, lo = 0.35 + (1 - a) * 0.5, hi = 1.75 - (1 - a) * 0.35;
-      tp[o] = h.x; tp[o + 1] = h.y + lo; tp[o + 2] = h.z;
-      tp[o + 3] = h.x; tp[o + 4] = h.y + hi; tp[o + 5] = h.z;
-      const r = 0.25 * a, gg = 0.65 * a, b = 1.0 * a;
-      tc[o] = r; tc[o + 1] = gg; tc[o + 2] = b; tc[o + 3] = r * 1.4; tc[o + 4] = gg * 1.2; tc[o + 5] = b;
+    const BAND = [[1.18, 1.5], [0.42, 0.62]];
+    for (let s = 0; s < 2; s++) {
+      const [lo0, hi0] = BAND[s], k = s ? 0.55 : 1;
+      for (let i = 0; i < N; i++) {
+        const h = H[i], age = now - h.t, q = 1 - i / N;
+        const a = Math.max(0, 1 - age / 0.28) * q * q * 0.75 * k;
+        if (a > 0) alive = true;
+        const o = (s * N * 2 + i * 2) * 3, w = (hi0 - lo0) * (0.4 + 0.6 * q) * 0.5, mid = (lo0 + hi0) * 0.5;
+        tp[o] = h.x; tp[o + 1] = h.y + mid - w; tp[o + 2] = h.z;
+        tp[o + 3] = h.x; tp[o + 4] = h.y + mid + w; tp[o + 5] = h.z;
+        tc[o] = 0.25 * a; tc[o + 1] = 0.6 * a; tc[o + 2] = a; tc[o + 3] = 0.45 * a; tc[o + 4] = 0.8 * a; tc[o + 5] = a;
+      }
     }
     this._trail.visible = alive && Engine.viewMode !== 'fps';
     if (alive) { this._trail.geometry.attributes.position.needsUpdate = true; this._trail.geometry.attributes.color.needsUpdate = true; }

@@ -79,7 +79,7 @@ body.pc .btn-dash::after { content: 'F(2回で叩きつけ)'; }
 .view-hint small { font-size: 11px; font-weight: 800; opacity: .85; margin-top: 3px; }
 .view-hint em { font-style: normal; color: var(--gold); }
 .view-hint b { font-size: 30px; }
-.view-hint.look { right: calc(var(--sar) + 70px); top: 34%; }
+.view-hint.look { right: calc(var(--sar) + 70px); top: 21%; }
 .view-hint.slam { left: calc(var(--sal) + 14px); top: 46%; white-space: nowrap; }
 .view-hint b.swipe { display: inline-block; animation: swipe 1.1s ease-in-out infinite; }
 @keyframes swipe { 0%, 100% { transform: translateX(-16px); } 50% { transform: translateX(16px); } }
