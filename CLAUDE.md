@@ -41,6 +41,19 @@
 - **イベント(出来事)**: 出現係が起こす。イベント `worldEvent {kind, text, x, z}`(物資投下・金色ゾンビ・空爆・大行進 など)
 - **新しい音の名前**(音係が作る): 'chainsaw' 'hammer' 'crossbow' 'airstrike' 'cannon' 'disc' 'drone' 'tornado' 'meteor' 'acid' 'nailgun' 'emp' 'shuriken' 'whip' 'beam' 'gatling'
 
+### 第2弾で増えた主な API(詳しくは各ファイルの先頭のコメント)
+- Engine: `fovKick(deg)` `setRoll(rad)` `landDip(a)` `settings{sens,autoTurn,invertY}`。視点のカメラは `view-camera.js`、向き操作は `view-look.js`、照準・当たった印・視点パネルは `view-hud.js`
+- Player: `moves{dashing,airborne,busy,ready}`(ダッシュ・叩きつけは `hero-moves.js`)。跳ぶと `pos.y` が上がる
+- Input: `consumeDash()` `consumeSlam()` `consumeViewHold()`。キー F/C = ダッシュ、G = 叩きつけ、V = 視点、B = 視点の設定
+- Weapons: 31種(`weapon-defs.js` / `weapon-extra.js`)。一人称の手元の武器は `weapon-view.js`(`scene.onAfterRender` で描く。置きかえるときは つなぐこと)。`crossTarget`
+- Score: `fever feverActive addFever(v) startFever(sec) boost(mult,sec) bonus(pts,x,z) stats favoriteWeapon()`
+- Director: `happen(kind)`(supply golden march airstrike bossrush tsunami skyfall challenge discover)`spawnBoss(type,x,z,hpMul)` `bossTypes()`
+- World: `timeOfDay`(0 = 昼, 0.25 = 夕, 0.5 = 真夜中, 0.75 = 夜明け、1周 7分)`weather` `night` `wet` `setTime(t)` `setWeather(w,instant)` `damage(x,z,r,amount,{cause})` `hitLine(...)` `explode(x,z,r,amount)` `props`。マップは 1200m(川・港・遊園地・空港・基地・墓地・農場)
+- イベント(追加): `hitMarker {crit,kill}` `dash` `dashHit` `slamJump` `slam` `feverStart` `feverEnd` `worldEvent` `worldChange` `propExplode` `propBreak` `lightning` `heliPass` `distantBoom` `crows` `personalBest` `shieldBreak` `zombieLeap` `zombieLand` `giantStep` `bossAct` `weaponSfx {name}` `viewChange {mode,prev}`
+
+## 公開のしかた
+- `main` が GitHub Pages で公開中(https://roguepink.github.io/sokai/)。**`main` に入れる = 公開**。大きな更新は別の枝(例 `round2`)でまとめて、ノブさんに見せて OK をもらってから `main` へ
+
 ## 座標・単位
 - 1 = 1m。x = 右(東)、z = 手前(南)、y = 上。マップの中心 (0,0)、一辺 `CONFIG.WORLD_SIZE`
 - 向き(facing)は 0 = 北(-z)、PI/2 = 東(+x)。向きベクトル = (sin f, -cos f)。メッシュは rotation.y = -facing
