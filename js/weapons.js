@@ -491,11 +491,11 @@ export const Weapons = {
       if (d > 1.6 + e.r && (dx * fx + dz * fz) / d < -0.3) continue;
       if (d > 1.2 && World.segmentHit(px, pz, e.x, e.z) < 0.97) continue;
       if (hurt(e, MELEE_DMG, dx / d, dz / d, 16, 'sword')) kills++;
-      FX.spark(e.x - dx / d * 0.3, 1.2, e.z - dz / d * 0.3, 0, 0, 0, 0.08, 0.55, 0xd8f4ff, 4, 0x4ab0ff, 2, 0, 0, 0, 0);
+      FX.spark(e.x - dx / d * 0.3, 1.2, e.z - dz / d * 0.3, 0, 0, 0, 0.07, 0.32, 0xd8f4ff, 2, 0x4ab0ff, 1, 0, 0, 0, 0);
       for (let k = 0; k < 3; k++) FX.spark(e.x, 1.2, e.z, dx / d * 6 + (rnd() - 0.5) * 6, 1 + rnd() * 4, dz / d * 6 + (rnd() - 0.5) * 6, 0.25, 0.05, 0xd8f4ff, 6, 0x4ab0ff, 2);
     }
     _near.length = 0;
-    FX.slash(px, 1.15, pz, ang, 3.9, 1.7, MELEE_R + 0.6, 0x4ab0ff, 0.2, this._slashDir, this._slashDir * 0.2, 2.2, 0.75, 0.25);
+    FX.slash(px, 1.15, pz, ang, 3.9, 1.7, MELEE_R + 0.6, 0x4ab0ff, 0.2, this._slashDir, this._slashDir * 0.2, 1.6, 0.75, 0.25);
     if (kills >= 3) Engine.hitStop(0.025);
     Engine.shake(0.12);
     Events.emit('melee', { x: px, z: pz, kills });
