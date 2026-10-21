@@ -5,17 +5,20 @@
    - ゲームを直しただけなら VERSION は そのままでいい
    - FILES(覚えるファイル)を足したり消したりしたら VERSION を 1つ上げる(古い覚えを 一斉に捨てる)
    - FILES に書き忘れたファイルも、ページが「読みこんだもの一覧」を送ってくるので覚えられる(index.html) */
-const VERSION = 'sokai-v2';
+const VERSION = 'sokai-v3';
 const FILES = [
-  './', 'index.html', 'manifest.webmanifest', 'css/style.css',
+  './', 'index.html', 'manifest.webmanifest', 'css/style.css', 'css/view.css',
   'icon-192.png', 'icon-512.png', 'maskable-512.png', 'apple-touch-icon.png',
-  'js/audio-bgm.js', 'js/audio.js', 'js/boss.js', 'js/config.js', 'js/director.js', 'js/engine.js', 'js/events.js',
-  'js/fx-shaders.js', 'js/fx.js', 'js/input.js', 'js/main.js', 'js/player.js', 'js/score.js',
-  'js/ui-boss.js', 'js/ui-fx.js', 'js/ui-minimap.js', 'js/ui.js', 'js/util.js',
-  'js/weapon-defs.js', 'js/weapon-hit.js', 'js/weapon-models.js', 'js/weapon-proj.js', 'js/weapons.js',
-  'js/world-build.js', 'js/world-interiors.js', 'js/world-nature.js', 'js/world-props.js', 'js/world-tex.js',
-  'js/world-town.js', 'js/world-zones.js', 'js/world.js',
-  'js/zombie-anim.js', 'js/zombie-flow.js', 'js/zombie-gore.js', 'js/zombie-models.js', 'js/zombie-render.js', 'js/zombies.js',
+  'js/audio-bgm.js', 'js/audio-sfx2.js', 'js/audio-world.js', 'js/audio.js', 'js/boss-extra.js', 'js/boss.js',
+  'js/config.js', 'js/director.js', 'js/engine.js', 'js/events.js', 'js/fx-shaders.js', 'js/fx.js',
+  'js/hero-moves.js', 'js/input.js', 'js/main.js', 'js/player.js', 'js/score.js', 'js/ui-boss.js',
+  'js/ui-fx.js', 'js/ui-minimap.js', 'js/ui-weapons.js', 'js/ui.js', 'js/util.js', 'js/view-camera.js',
+  'js/view-hud.js', 'js/view-look.js', 'js/weapon-defs.js', 'js/weapon-extra.js', 'js/weapon-hit.js', 'js/weapon-models.js',
+  'js/weapon-proj.js', 'js/weapon-proj2.js', 'js/weapon-summon.js', 'js/weapon-view.js', 'js/weapons.js', 'js/world-air.js',
+  'js/world-break.js', 'js/world-build.js', 'js/world-fun.js', 'js/world-harbor.js', 'js/world-interiors.js', 'js/world-life.js',
+  'js/world-nature.js', 'js/world-outer.js', 'js/world-props.js', 'js/world-props2.js', 'js/world-sky.js', 'js/world-tex.js',
+  'js/world-town.js', 'js/world-zones.js', 'js/world.js', 'js/zombie-anim.js', 'js/zombie-events.js', 'js/zombie-flow.js',
+  'js/zombie-gore.js', 'js/zombie-models.js', 'js/zombie-render.js', 'js/zombies.js',
   'vendor/three/build/three.module.min.js', 'vendor/three/build/three.core.js',
   'vendor/three/addons/utils/BufferGeometryUtils.js', 'vendor/three/addons/math/SimplexNoise.js',
   'vendor/three/addons/postprocessing/Pass.js', 'vendor/three/addons/postprocessing/EffectComposer.js',
