@@ -140,7 +140,7 @@ button.big:active { transform: translateY(4px); box-shadow: 0 2px 0 #8a2a00; }
 @keyframes rainbow { 0% { color: #ff3b6b; } 25% { color: #ffd23f; } 50% { color: #5fff8a; } 75% { color: #5fe0ff; } 100% { color: #ff3b6b; } }
 
 /* 武器の列(上の右。さわって選べる) */
-.weapon-bar { position: fixed; z-index: 13; text-shadow: var(--stroke); top: calc(var(--sat) + 8px); right: calc(var(--sar) + 62px); max-width: calc(50vw - 170px); display: flex; gap: 4px;
+.weapon-bar { position: fixed; z-index: 13; text-shadow: var(--stroke); top: calc(var(--sat) + 8px); right: calc(var(--sar) + 114px); max-width: calc(50vw - 170px); display: flex; gap: 4px;
   overflow-x: auto; scrollbar-width: none; pointer-events: auto; touch-action: pan-x; padding: 2px; border-radius: 12px; }
 .weapon-bar::-webkit-scrollbar { display: none; }
 .wbtn { position: relative; flex: 0 0 auto; width: 44px; height: 44px; padding: 0; border-radius: 10px; font-size: 23px; line-height: 1;
@@ -332,3 +332,14 @@ body.pc #hud .weapon-name { bottom: calc(var(--sab) + 172px); }
   .hud-zone { font-size: 16px; }
 }
 #hud.paused .banner, #hud.paused .sub-banner, #hud.paused .pop-layer, #hud.paused .boss-arrow, #hud.paused .hud-zone, #hud.paused .rot-hint { visibility: hidden; }
+
+/* ---- 視点の切りかえ(見下ろし / 肩越し / 一人称) ---- */
+.look-zone { position: absolute; right: 0; top: 0; bottom: 0; width: 45%; pointer-events: auto; touch-action: none; }
+.btn-view { top: calc(var(--sat) + 8px); right: calc(var(--sar) + 64px); width: 44px; height: 44px; font-size: 16px;
+  flex-direction: column; background: rgba(0,0,0,.45); border: 2px solid rgba(255,255,255,.45); }
+.btn-view small { font-size: 9px; line-height: 1; }
+body.pc .btn-view::after { content: 'V'; position: absolute; bottom: -14px; font-size: 10px; opacity: .7; }
+/* 一人称・肩越しのときの照準 */
+#crosshair { position: fixed; left: 50%; top: 50%; width: 22px; height: 22px; margin: -11px 0 0 -11px; z-index: 9; pointer-events: none;
+  border: 2px solid rgba(255,255,255,.8); border-radius: 50%; box-shadow: 0 0 6px rgba(0,0,0,.6); }
+#crosshair::after { content: ''; position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px 0 0 -2px; background: #ff5a1f; border-radius: 50%; }

@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { CONFIG } from './config.js';
 import { World } from './world.js';
+import { Engine } from './engine.js';
 import { damp, dampAngle } from './util.js';
 import { lathe, sstep } from './zombie-models.js';
 import { mergeByMaterial } from './weapon-models.js';
@@ -31,17 +32,27 @@ export const Player = {
   update(dt, input) {
     // 移動(壁で止まる・すべる)
     const sp = P.SPEED;
-    this.vel.x = damp(this.vel.x, input.move.x * sp, 14, dt);
-    this.vel.z = damp(this.vel.z, input.move.z * sp, 14, dt);
+    // 肩越し・一人称: スティックの上 = 見ている向きへ進む
+    let mx = input.move.x, mz = input.move.z;
+    const close = Engine.viewMode !== 'top';
+    if (close) {
+      const y = Engine.lookYaw, fx = Math.sin(y), fz = -Math.cos(y), rx = Math.cos(y), rz = Math.sin(y);
+      const a = mx, b = -mz;
+      mx = rx * a + fx * b; mz = rz * a + fz * b;
+    }
+    this.vel.x = damp(this.vel.x, mx * sp, 14, dt);
+    this.vel.z = damp(this.vel.z, mz * sp, 14, dt);
     this.pos.x += this.vel.x * dt; this.pos.z += this.vel.z * dt;
     World.collideCircle(this.pos, this.radius);
 
     // 向き: 撃っている間は狙いの方、それ以外は進む方
     const moving = Math.hypot(this.vel.x, this.vel.z) > 0.5;
     let want = this.facing;
-    if (this.aiming) want = Math.atan2(this.aimDir.x, -this.aimDir.z);
+    if (close) want = Engine.lookYaw;            // 肩越し・一人称: いつも見ている向き
+    else if (this.aiming) want = Math.atan2(this.aimDir.x, -this.aimDir.z);
     else if (moving) want = Math.atan2(this.vel.x, -this.vel.z);
-    this.facing = dampAngle(this.facing, want, 18, dt);
+    this.facing = close ? want : dampAngle(this.facing, want, 18, dt);
+    this.mesh.visible = Engine.viewMode !== 'fps';   // 一人称では自分の体は見せない(武器係が手元の武器を出す)
 
     this._animate(dt, moving);
   },

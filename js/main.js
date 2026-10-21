@@ -3,7 +3,7 @@
 import { CONFIG } from './config.js';
 import { HASH } from './util.js';
 import { Events } from './events.js';
-import { Engine } from './engine.js';
+import { Engine, loadSettings } from './engine.js';
 import { Input } from './input.js';
 import { World } from './world.js';
 import { Player } from './player.js';
@@ -97,6 +97,7 @@ function start(ev) {
   Input.enabled = true;
   ['title', 'pauseMenu', 'result'].forEach((id) => $(id).classList.add('hidden'));
   Input.setVisible(true); UI.show(true);
+  Engine.setViewMode(loadSettings().view || 'top', Player.facing, false);
   Events.emit('start', {});
   // 最初のタップのあとに全画面(Android の Chrome。だめでもそのまま遊べる)
   if (ev && ev.isTrusted) try {
@@ -134,9 +135,17 @@ function finish() {
   $('result').classList.remove('hidden');
   Events.emit('finish', { score: Score.score, kills: Score.kills, best: Score.best, newRecord: Score.newRecord });
 }
+// PC: 肩越し・一人称のときに画面をクリックすると、マウスで向きを変えられる(Esc でもどる)
+addEventListener('mousedown', (e) => {
+  if (Game.state === 'play' && Engine.viewMode !== 'top' && !Input.touchUsed && !e.target.closest('button') && !document.pointerLockElement) {
+    try { const p = Engine.renderer.domElement.requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch (err) {}
+  }
+});
+
 function toTitle() {
   $('result').classList.add('hidden');
   resetRun();
+  Engine.setViewMode('top', 0, false);
   Game.state = 'title'; Game.demo = true; Input.auto = true; Score.active = false; Game.titleT = 0;
   $('title').classList.remove('hidden');
 }
@@ -149,6 +158,7 @@ function loop(now) {
     const real = Math.min((now - last) / 1000, CONFIG.MAX_FRAME); last = now;
     const running = Game.state === 'play' || Game.state === 'title';
     Input.update(real);
+    if (Game.state === 'play') handleView();
     if (running) {
       Engine.stepTime(real);
       acc += real * Engine.timeScale;
@@ -180,6 +190,24 @@ function streetCheck(px, pz) {
     hit = 1; break;
   }
   return hit;
+}
+
+// 視点の切りかえ(見下ろし → 肩越し → 一人称 → 見下ろし)と、指・マウスで向きを変える
+const VIEWS = ['top', 'tps', 'fps'];
+const _look = { x: 0, y: 0 };
+function handleView() {
+  const ch = $('crosshair');
+  if (ch) ch.classList.toggle('hidden', Engine.viewMode === 'top' || Game.state !== 'play');
+  if (Input.consumeView()) {
+    const next = VIEWS[(VIEWS.indexOf(Engine.viewMode) + 1) % VIEWS.length];
+    Engine.setViewMode(next, Player.facing);
+    if (next === 'top' && document.pointerLockElement) document.exitPointerLock();
+  }
+  Input.consumeLook(_look);
+  if (Engine.viewMode !== 'top') {
+    const sens = document.pointerLockElement ? 0.0026 : 0.0062;
+    Engine.look(_look.x * sens, -_look.y * sens * 0.8);
+  }
 }
 
 function step(dt) {

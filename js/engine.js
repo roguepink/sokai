@@ -5,6 +5,8 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { CONFIG } from './config.js';
+import { World } from './world.js';
+import { Events } from './events.js';
 import { damp, hashValue } from './util.js';
 
 const C = CONFIG.CAMERA;
@@ -21,6 +23,11 @@ export const Engine = {
   camDistWant: C.DIST,
   camPitch: C.PITCH,
   street: 0,               // 高い建物にはさまれた道にいる(0..1。main が入れる)
+  // 視点: 'top' = 見下ろし(いつもの) / 'tps' = 肩越し(三人称) / 'fps' = 主人公の目線(一人称)
+  viewMode: 'top',
+  lookYaw: 0,               // tps/fps で見ている向き(facing と同じ決まり: 0 = 北)
+  lookPitch: 0,             // tps/fps の上下(+ = 上を見る)
+  viewDir: new THREE.Vector3(0, 0, -1),   // 見ている向き(XZ、長さ1)。top のときは北
   camYaw: 0,                // 0 = 北(-z)を上に見る。固定(スティックの向きと画面の向きをそろえるため)
   _shake: 0, _hitStop: 0, _slow: 0, _slowScale: 1,
   _fpsAcc: 0, _fpsN: 0, _lowFpsTime: 0,
@@ -84,7 +91,8 @@ export const Engine = {
     this.renderer.domElement.style.height = h + 'px';
     this.camera.aspect = w / h;
     // 縦長の画面では広めに見せる
-    this.camera.fov = w < h ? C.FOV * 1.35 : C.FOV;
+    const baseFov = this.viewMode === 'top' ? C.FOV : 70;
+    this.camera.fov = w < h ? baseFov * 1.35 : baseFov;
     this.camera.updateProjectionMatrix();
     if (this.composer) {
       this.composer.setPixelRatio(dpr);
@@ -109,8 +117,26 @@ export const Engine = {
     this.timeScale = 1;
   },
 
+  // 視点を切りかえる(イベント viewChange {mode} を出す)。保存もする
+  setViewMode(mode, yaw, save = true) {
+    if (!['top', 'tps', 'fps'].includes(mode) || mode === this.viewMode) return;
+    this.viewMode = mode;
+    if (yaw !== undefined) this.lookYaw = yaw;
+    this.lookPitch = mode === 'fps' ? -0.05 : -0.12;
+    if (save) { const s = loadSettings(); s.view = mode; saveSettings(s); }
+    this.resize();
+    Events.emit('viewChange', { mode });
+  },
+  // tps/fps: 指やマウスで向きを変える(ラジアン)
+  look(dYaw, dPitch) {
+    this.lookYaw += dYaw;
+    this.lookPitch = Math.max(-1.1, Math.min(0.9, this.lookPitch + dPitch));
+  },
+
   // カメラをプレイヤーに追従させる
   updateCamera(realDt, target, inside, demo) {
+    if (!demo && this.viewMode !== 'top') return this._updateCloseCamera(realDt, target);
+    this.viewDir.set(0, 0, -1);
     // タイトルの見本プレイ: ゆっくり回りこみ、少し低い角度で 迫力を出す。プレイが始まったら北が上にもどす
     if (demo) {
       this.camYaw += realDt * 0.07;
@@ -142,6 +168,37 @@ export const Engine = {
     }
     cam.lookAt(this.camTarget);
     // 影はプレイヤーの周りだけ計算する
+    this.sun.position.set(target.x + 30, 60, target.z + 20);
+    this.sun.target.position.set(target.x, 0, target.z);
+  },
+
+  // 肩越し・一人称のカメラ
+  _updateCloseCamera(realDt, target) {
+    const cam = this.camera, y = this.lookYaw, p = this.lookPitch;
+    const fx = Math.sin(y), fz = -Math.cos(y);           // 前
+    const rx = Math.cos(y), rz = Math.sin(y);            // 右
+    this.viewDir.set(fx, 0, fz);
+    const cp = Math.cos(p), sp = Math.sin(p);
+    if (this.viewMode === 'fps') {
+      cam.position.set(target.x + fx * 0.15, target.y + 1.68, target.z + fz * 0.15);
+    } else {
+      // 右肩の後ろ。壁があれば 近づく
+      const back = 4.2, side = 0.75, up = 2.0;
+      const hx = target.x + rx * side, hz = target.z + rz * side;
+      let bx = -fx * back * cp, bz = -fz * back * cp;
+      const t = World.segmentHit(target.x, target.z, hx + bx, hz + bz, 2.2);
+      const k = Math.max(0.25, t * 0.92);
+      this._tpsK = damp(this._tpsK || 1, k, t < 1 ? 30 : 6, realDt);
+      cam.position.set(hx + bx * this._tpsK, target.y + up - sp * back * 0.6 * this._tpsK, hz + bz * this._tpsK);
+      this.camTarget.copy(target);   // 見下ろしにもどったとき とばないように
+    }
+    if (this._shake > 0) {
+      const s = this._shake * this._shake * 0.25;
+      cam.position.x += (Math.random() - 0.5) * s; cam.position.y += (Math.random() - 0.5) * s; cam.position.z += (Math.random() - 0.5) * s;
+      this._shake = Math.max(0, this._shake - realDt * 2.2);
+    }
+    _v.set(cam.position.x + fx * cp * 10, cam.position.y + sp * 10, cam.position.z + fz * cp * 10);
+    cam.lookAt(_v);
     this.sun.position.set(target.x + 30, 60, target.z + 20);
     this.sun.target.position.set(target.x, 0, target.z);
   },

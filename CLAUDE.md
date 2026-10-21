@@ -22,6 +22,25 @@
 - js ファイルを足したら `sw.js` の FILES に足して VERSION を上げる
 - アドレスの印: `#play`(すぐ始まる)/ `#auto`(自動で動いて撃つ)/ `q=low|mid|high`(画質)。例 `#play&auto&q=low`
 
+## 第2弾(2026-10-22 ノブさんの追加依頼)
+「武器をあと10種類ほど / 視点の切りかえ(一人称も)/ 爽快になる仕組みをどんどん追加 / ステージがない分、広大なエリア・見た目の迫力・ちょっとした変化を多く」
+
+### 視点(engine.js / input.js / main.js / player.js)
+- `Engine.viewMode` = 'top'(見下ろし・いつもの)| 'tps'(肩越し)| 'fps'(一人称)。`Engine.setViewMode(mode, yaw, save)` → イベント `viewChange {mode}`
+- `Engine.lookYaw`(見ている向き。facing と同じ決まり)`Engine.lookPitch`(+ = 上)`Engine.viewDir`(XZ の前向き)`Engine.look(dYaw,dPitch)`
+- tps/fps: スティックの上 = 見ている向きへ進む。右半分(.look-zone)や撃つボタンをなぞると向きが変わる。PC はクリックでマウスロック。V キー / 👁ボタンで切りかえ
+- fps では `Player.mesh.visible = false`。武器係が手元の武器(ビューモデル)を出す。照準は #crosshair(main が出し入れ)
+- タイトルの見本プレイは いつも top。プレイ開始で保存した視点にもどる
+
+### 第2弾の約束(新しく足すもの)
+- **フィーバー(無双モード)**: `Score.fever`(0..1 のゲージ)`Score.feverActive`(true の間 強くなる)、イベント `feverStart` / `feverEnd`。
+  武器係は `Score.feverActive` のとき 撃つ速さ・威力・見た目を上げる
+- **こわせる物**: `World.damage(x, z, r, amount, {cause})` — 車・ドラム缶・ガスタンク・ガラスなどに当たると こわれる/爆発する。
+  爆発したら World が `FX.explosion` と `Zombies.damageCircle` を呼び、イベント `propExplode {x,z,radius,kind}` を出す。武器係は弾・爆発のたびに呼ぶ
+- **時間と天気**: World が `timeOfDay`(0..1, 0.5 = 真夜中 などは World が決める)と `weather`('clear'|'rain'|'storm'|'fog'...)を持ち、変わったらイベント `worldChange {timeOfDay, weather, text}`
+- **イベント(出来事)**: 出現係が起こす。イベント `worldEvent {kind, text, x, z}`(物資投下・金色ゾンビ・空爆・大行進 など)
+- **新しい音の名前**(音係が作る): 'chainsaw' 'hammer' 'crossbow' 'airstrike' 'cannon' 'disc' 'drone' 'tornado' 'meteor' 'acid' 'nailgun' 'emp' 'shuriken' 'whip' 'beam' 'gatling'
+
 ## 座標・単位
 - 1 = 1m。x = 右(東)、z = 手前(南)、y = 上。マップの中心 (0,0)、一辺 `CONFIG.WORLD_SIZE`
 - 向き(facing)は 0 = 北(-z)、PI/2 = 東(+x)。向きベクトル = (sin f, -cos f)。メッシュは rotation.y = -facing

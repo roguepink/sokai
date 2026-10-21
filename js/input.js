@@ -11,6 +11,8 @@ export const Input = {
   weaponSelect: -1,         // 番号で直接えらぶ(使ったら -1 に)
   aim: null,                // PC のマウスで狙う場所 {x, z}(画面→地面に直すのは main)。なければ自動で狙う
   mouse: null,              // 画面上のマウス位置 {x, y}
+  look: { x: 0, y: 0 },     // 向きを変える量(px。肩越し・一人称で使う)。使ったら consumeLook
+  view: false,              // 視点の切りかえボタン(押した瞬間だけ)
   auto: HASH.has('auto'),   // 自動操作
   enabled: false,           // プレイ中だけ true
   touchUsed: false,
@@ -72,6 +74,35 @@ export const Input = {
     fireBtn.addEventListener('pointercancel', endFire);
 
     tapButton(this.el.querySelector('.btn-spin'), () => { this.spin = true; });
+    tapButton(this.el.querySelector('.btn-view'), () => { this.view = true; });
+
+    // --- 右半分: なぞると向きを変える(肩越し・一人称のとき) ---
+    const lookZone = this.el.querySelector('.look-zone');
+    let lookId = null, lx = 0, ly = 0;
+    lookZone.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'mouse') { if (e.button === 0) this._mouseDown = true; return; }
+      if (lookId !== null) return;
+      e.preventDefault(); lookZone.setPointerCapture(e.pointerId);
+      lookId = e.pointerId; lx = e.clientX; ly = e.clientY;
+    });
+    lookZone.addEventListener('pointermove', (e) => {
+      if (e.pointerId !== lookId) return;
+      this.look.x += e.clientX - lx; this.look.y += e.clientY - ly; lx = e.clientX; ly = e.clientY;
+    });
+    const endLook = (e) => { if (e.pointerId === lookId) lookId = null; };
+    lookZone.addEventListener('pointerup', endLook); lookZone.addEventListener('pointercancel', endLook);
+    // 撃つボタンを押したまま 指をすべらせても 向きを変えられる
+    const fb = this.el.querySelector('.btn-fire');
+    let fx = 0, fy = 0;
+    fb.addEventListener('pointerdown', (e) => { fx = e.clientX; fy = e.clientY; });
+    fb.addEventListener('pointermove', (e) => {
+      if (e.pointerId !== this._firePointer) return;
+      this.look.x += e.clientX - fx; this.look.y += e.clientY - fy; fx = e.clientX; fy = e.clientY;
+    });
+    // PC: マウスを動かすと向きを変える(画面をクリックするとマウスが消える。Esc でもどる)
+    addEventListener('mousemove', (e) => {
+      if (document.pointerLockElement) { this.look.x += e.movementX; this.look.y += e.movementY; }
+    });
     tapButton(this.el.querySelector('.btn-next'), () => { this.weaponDelta = 1; });
     tapButton(this.el.querySelector('.btn-prev'), () => { this.weaponDelta = -1; });
 
@@ -96,6 +127,7 @@ export const Input = {
       const k = e.key.toLowerCase();
       this._keys.add(k);
       if (k === 'shift' || k === 'e') this.spin = true;
+      if (k === 'v') this.view = true;
       if (k === 'q') this.weaponDelta = -1;
       if (k === 'r' || k === 'tab') { this.weaponDelta = 1; e.preventDefault(); }
       if (/^[0-9]$/.test(k)) this.weaponSelect = k === '0' ? 9 : +k - 1;
@@ -125,6 +157,8 @@ export const Input = {
     this.fire = this._firePointer !== null || k.has(' ') || k.has('j') || (this._mouseDown && !this.touchUsed);
   },
 
+  consumeLook(out) { out.x = this.look.x; out.y = this.look.y; this.look.x = 0; this.look.y = 0; return out; },
+  consumeView() { const v = this.view; this.view = false; return v; },
   consumeSpin() { const s = this.spin; this.spin = false; return s; },
   consumeWeaponDelta() { const d = this.weaponDelta; this.weaponDelta = 0; return d; },
   consumeWeaponSelect() { const s = this.weaponSelect; this.weaponSelect = -1; return s; },
@@ -155,11 +189,13 @@ function buildControls(root) {
   el.id = 'controls';
   el.className = 'hidden';
   el.innerHTML = `
+    <div class="look-zone"></div>
     <div class="stick-zone"></div>
     <div class="stick-base"></div>
     <div class="stick-knob"></div>
     <button class="btn btn-prev" type="button" aria-label="前の武器">◀</button>
     <button class="btn btn-next" type="button" aria-label="次の武器">▶</button>
+    <button class="btn btn-view" type="button" aria-label="視点の切りかえ">👁<small>視点</small></button>
     <button class="btn btn-spin" type="button" aria-label="回転斬り"><span>回転<br>斬り</span></button>
     <button class="btn btn-fire" type="button" aria-label="撃つ"><span>撃つ</span></button>`;
   root.appendChild(el);

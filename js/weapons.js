@@ -7,7 +7,7 @@ import { Player } from './player.js';
 import { FX } from './fx.js';
 import { Engine } from './engine.js';
 import { Events } from './events.js';
-import { dampAngle } from './util.js';
+import { dampAngle, angleDiff } from './util.js';
 import { WEAPONS } from './weapon-defs.js';
 import { buildModel } from './weapon-models.js';
 import { Proj, GRAV } from './weapon-proj.js';
@@ -139,6 +139,16 @@ export const Weapons = {
     this.target = tgt;
 
     let want = this.aimAngle;
+    if (Engine.viewMode !== 'top') {
+      // 肩越し・一人称: 見ている向きに撃つ。すぐ近くの敵にだけ 少し吸いつく(狙いの手伝い)
+      want = Engine.lookYaw;
+      this.target = null;
+      const t2 = tgt && Math.abs(angleDiff(Engine.lookYaw, Math.atan2(tgt.x - px, -(tgt.z - pz)))) < 0.12 ? tgt : null;
+      if (t2) { want = Math.atan2(t2.x - px, -(t2.z - pz)); this.target = t2; }
+      this.aimAngle = want;
+      player.aimDir.set(Math.sin(want), 0, -Math.cos(want));
+      return;
+    }
     if (tgt) want = Math.atan2(tgt.x - px, -(tgt.z - pz));
     else if (ml > 0.2) want = Math.atan2(mx, -mz);
     this.aimAngle = dampAngle(this.aimAngle, want, tgt ? 22 : 12, dt);
