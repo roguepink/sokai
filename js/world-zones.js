@@ -1,6 +1,6 @@
 // マップ係: 住宅街(西)と 工場地帯(東)。
 import * as THREE from 'three';
-import { placeTree } from './world-props.js';
+import { placeTree, placeFence } from './world-props.js';
 import { house } from './world-interiors.js';
 import { decal, pool, lamp, tower } from './world-town.js';
 
@@ -77,20 +77,8 @@ export function genSuburb(ctx) {
   }
 }
 
-// 白い木の柵(x 方向 or z 方向)
-export function fence(ctx, xa, za, xb, zb, col = [0.9, 0.88, 0.82]) {
-  const { B, M } = ctx;
-  const alongX = Math.abs(xb - xa) > Math.abs(zb - za);
-  const L = alongX ? xb - xa : zb - za;
-  for (let s = 0; s <= L; s += 1.5) {
-    const x = alongX ? xa + s : xa, z = alongX ? za : za + s;
-    B.box(M.plain, x - 0.06, 0, z - 0.06, x + 0.06, 1.1, z + 0.06, { col });
-  }
-  for (const y of [0.4, 0.85]) {
-    if (alongX) B.box(M.plain, xa, y, za - 0.03, xb, y + 0.1, za + 0.03, { col }); else B.box(M.plain, xa - 0.03, y, za, xa + 0.03, y + 0.1, zb, { col });
-  }
-  if (alongX) ctx.solid(xa, za - 0.1, xb, za + 0.1, 1.1); else ctx.solid(xa - 0.1, za, xa + 0.1, zb, 1.1);
-}
+// 白い木の柵(こわせる。world-props.js の placeFence)
+export function fence(ctx, xa, za, xb, zb, col = [0.9, 0.88, 0.82]) { placeFence(ctx, xa, za, xb, zb, col); }
 
 // ---------------- 工場地帯 ----------------
 export function genIndustrial(ctx) {
@@ -179,9 +167,12 @@ export function genIndustrial(ctx) {
   }
   for (let k = 0; k < 8; k++) { const x = 210 + rnd() * 90, z = 192 + rnd() * 18; if (ctx.isFree(x, z, 1.5)) ctx.prop(rnd() < 0.5 ? 'tires' : 'rubble', x, z, rnd() * 6); }
   // 東の端の壁
-  B.box(M.concrete, 396, 0, -215, 400, 4.5, 215, { col: [0.6, 0.58, 0.55] });
-  for (let z = -213; z < 214; z += 3) B.box(M.plain, 396.2, 4.5, z - 0.05, 396.4, 5.6, z + 0.05, { col: [0.25, 0.25, 0.25] });
-  ctx.solid(396, -215, 400, 215, 4.5);
+  // (港への道のところは門があいている)
+  for (const [za, zb] of [[-215, -47], [-33, 33], [47, 215]]) {
+    B.box(M.concrete, 396, 0, za, 400, 4.5, zb, { col: [0.6, 0.58, 0.55] });
+    for (let z = za + 2; z < zb - 1; z += 3) B.box(M.plain, 396.2, 4.5, z - 0.05, 396.4, 5.6, z + 0.05, { col: [0.25, 0.25, 0.25] });
+    ctx.solid(396, za, 400, zb, 4.5);
+  }
   // 道端の小物
   for (let k = 0; k < 30; k++) {
     const x = 196 + rnd() * 196, z = -205 + rnd() * 410;

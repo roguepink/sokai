@@ -87,6 +87,14 @@ export class Builder {
     this.face(b, x0, y, z1, 1, 0, 0, 0, 0, -1, sx, sz, uv[0], uv[1], uv[2], uv[3], col, rot);
   }
 
+  // 天井(下向きの板)。上から見ると見えない(裏側)ので、見下ろしの邪魔にならない
+  ceil(mat, x0, y, z0, x1, z1, o = {}) {
+    const col = col3(o.col, this._col);
+    const b = this.bucket(mat, (x0 + x1) / 2, (z0 + z1) / 2);
+    const s = (mat && mat.userData.s) || [4, 4];
+    this.face(b, x0, y, z0, 1, 0, 0, 0, 0, 1, x1 - x0, z1 - z0, x0 / s[0], z0 / s[1], x1 / s[0], z1 / s[1], col, null);
+  }
+
   // 縦の板(看板・窓の光など)。p0 = 左下、向き(nx,nz) は表の向き
   wall(mat, x, y, z, nx, nz, w, h, o = {}) {
     const col = col3(o.col, this._col);
@@ -170,7 +178,7 @@ export class Instancer {
   constructor(chunk = 80, half = 400) { this.chunk = chunk; this.half = half; this.kinds = new Map(); this.thin = 1; }
 
   define(name, geo, mat, { cast = true, recv = true, decor = false } = {}) {
-    this.kinds.set(name, { geo, mat, cast, recv, decor, chunks: new Map(), n: 0 });
+    this.kinds.set(name, { name, geo, mat, cast, recv, decor, chunks: new Map(), n: 0 });
   }
 
   // 置く: 位置・Y 回転・大きさ(数 or [x,y,z])・色。o.rx/o.rz で傾き
@@ -195,6 +203,7 @@ export class Instancer {
       for (const c of k.chunks.values()) {
         const n = c.m.length / 16;
         const mesh = new THREE.InstancedMesh(k.geo, k.mat, n);
+        mesh.name = 'inst:' + k.name;
         mesh.instanceMatrix.array.set(c.m);
         if (c.hasCol) mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(c.c), 3);
         mesh.castShadow = k.cast; mesh.receiveShadow = k.recv;

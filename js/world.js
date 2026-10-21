@@ -13,12 +13,18 @@ import { defineProps, placeProp } from './world-props.js';
 import { genTown, TOWN } from './world-town.js';
 import { genBuildings } from './world-interiors.js';
 import { genNature, LAKES } from './world-nature.js';
+import { Sky } from './world-sky.js';
+import { Brk } from './world-break.js';
+import { Life } from './world-life.js';
+import { defineProps2 } from './world-props2.js';
+import { outerZone, OUTER_NAMES, OUTER_GROUND, OUTER_MAP, OUT } from './world-outer.js';
+import { Events } from './events.js';
 
 const CELL = 8;           // ぶつかり判定の区画の大きさ(m)
 const NAV = 1;            // 道さがし地図の1マス(m)
-const CHUNK = 80;         // 見た目をまとめる区画(m)
+const CHUNK = 100;        // 見た目をまとめる区画(m)
 const OCC = 2;            // 「もう何か置いた」地図の1マス(m)
-const MAP_PX = 512;       // ミニマップの大きさ
+const MAP_PX = 1024;       // ミニマップの大きさ
 
 export const World = {
   group: new THREE.Group(),
@@ -49,7 +55,7 @@ export const World = {
     const S = CONFIG.WORLD_SIZE, h = this.half;
     const q = Engine.quality;
     const M = this.M = makeMaterials(Engine.renderer, q);
-    const B = new Builder(CHUNK, h), I = new Instancer(CHUNK, h);
+    const B = new Builder(CHUNK, h), I = new Instancer(CHUNK, h), CB = new Builder(CHUNK * 2, h), SB = new Builder(400, h);
     I.thin = q === 'low' ? 0.45 : q === 'mid' ? 0.8 : 1;
     // ミニマップ
     const mc = document.createElement('canvas'); mc.width = mc.height = MAP_PX;
@@ -59,7 +65,7 @@ export const World = {
     const occ = new Uint8Array((S / OCC) * (S / OCC)), ow = S / OCC;
     const self = this;
     const ctx = {
-      W: this, B, I, M, q, half: h, rnd: seeded(12345),
+      W: this, B, I, M, CB, SB, q, half: h, rnd: seeded(12345),
       // 壁(見た目は別に作る)
       solid(x0, z0, x1, z1, hh = 3, building = null) { return self.addBox(Math.min(x0, x1), Math.min(z0, z1), Math.max(x0, x1), Math.max(z0, z1), { h: hh, mesh: false, building }); },
       mapRect(x0, z0, x1, z1, color) { mx.fillStyle = color; mx.fillRect((x0 + h) * k, (z0 + h) * k, Math.max(1, (x1 - x0) * k), Math.max(1, (z1 - z0) * k)); },
@@ -81,8 +87,10 @@ export const World = {
       zoneAt: (x, z) => self.zoneAt(x, z),
     };
     this._ctx = ctx;
+    Brk.init(this);
     defineProps(ctx);
-    this._atmosphere();
+    defineProps2(ctx);
+    Sky.init(this, M);
     if (q !== 'low') this._embers(q === 'high' ? 420 : 260);
     this._ground(ctx, mx, k);
     genTown(ctx);
@@ -95,6 +103,11 @@ export const World = {
     this.addBox(h, -h, h + 2, h, { h: 4, mesh: false });
     B.finish(this.group);
     I.finish(this.group);
+    CB.finish(this.group, { cast: false, recv: false });
+    SB.finish(this.group, { cast: false });
+    Brk.finish(this.group);
+    this._sky = Sky;
+    Life.init(this);
     // 建物の印をミニマップの上に
     for (const b of this.buildings) {
       if (b.small) continue;
@@ -102,28 +115,6 @@ export const World = {
       mx.strokeRect((b.minX + h) * k, (b.minZ + h) * k, (b.maxX - b.minX) * k, (b.maxZ - b.minZ) * k);
     }
     this._ctx = null;
-  },
-
-  // 空気感: 夕暮れ(オレンジと紫)。ゾンビが見やすい明るさは残す
-  _atmosphere() {
-    const sc = Engine.scene;
-    const fogCol = new THREE.Color(0x464256);
-    if (sc.fog) sc.fog.color.copy(fogCol);
-    // 空(ドーム): 地平線がオレンジ、上が紫〜群青
-    const c = document.createElement('canvas'); c.width = 4; c.height = 256;
-    const x = c.getContext('2d'), g = x.createLinearGradient(0, 0, 0, 256);
-    g.addColorStop(0, '#1b1a33'); g.addColorStop(0.45, '#4a3560'); g.addColorStop(0.75, '#b0566a'); g.addColorStop(0.9, '#e89a5c'); g.addColorStop(1, '#4b3b4c');
-    x.fillStyle = g; x.fillRect(0, 0, 4, 256);
-    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
-    sc.background = fogCol;
-    const dome = new THREE.Mesh(new THREE.SphereGeometry(380, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2 + 0.15),
-      new THREE.MeshBasicMaterial({ map: t, side: THREE.BackSide, fog: false, depthWrite: false }));
-    dome.renderOrder = -10;
-    dome.onBeforeRender = (r, s, cam) => { dome.position.set(cam.position.x, 0, cam.position.z); dome.updateMatrixWorld(); };
-    dome.frustumCulled = false;
-    this.group.add(dome);
-    if (Engine.hemi) { Engine.hemi.color.set(0x9aa4d2); Engine.hemi.groundColor.set(0x3d3631); Engine.hemi.intensity = 1.15; }
-    if (Engine.sun) { Engine.sun.color.set(0xffd2ae); Engine.sun.intensity = 2.25; }
   },
 
   // 空気中を舞う 火の粉と灰(動きはシェーダーの中だけ。毎フレームの計算なし)
@@ -171,8 +162,9 @@ export const World = {
     for (let i = 0; i < noise.length; i++) noise[i] = nz();
     const colAt = (x, z) => {
       const zn = this.zoneAt(x, z);
-      const ix = Math.min(100, Math.max(0, Math.round((x + h) / G))), iz = Math.min(100, Math.max(0, Math.round((z + h) / G)));
+      const ix = Math.round((x + h) / G) % 101, iz = Math.round((z + h) / G) % 101;
       const n = 0.82 + noise[iz * 101 + ix] * 0.36;
+      if (OUTER_GROUND[zn]) { const c = OUTER_GROUND[zn]; return [c[0] * n, c[1] * n, c[2] * n]; }
       if (zn === 'forest') return [0.47 * n, 0.45 * n, 0.3 * n];
       if (zn === 'industrial') return [0.5 * n, 0.5 * n, 0.5 * n];
       if (zn === 'park' || zn === 'suburb') return [0.36 * n, 0.5 * n, 0.27 * n];
@@ -181,7 +173,9 @@ export const World = {
     const T = TOWN.ext;
     for (let z = -h; z < h; z += G) for (let x = -h; x < h; x += G) {
       if (x >= T[0] && x + G <= T[2] && z >= T[1] && z + G <= T[3]) continue;   // 町の中は道路が敷いてある
-      if (x >= T[2] && z >= -208 && z + G <= 208) continue;                       // 工場地帯はコンクリート(world-zones.js)
+      if (x >= T[2] && x + G <= 400 && z >= -208 && z + G <= 208) continue;      // 工場地帯はコンクリート(world-zones.js)
+      if (x >= OUT.SEA - 0.01 || (z >= OUT.river.z0 && z + G <= OUT.river.z1 && x < OUT.SEA)) continue;   // 海・川
+      if (x >= OUT.harbor[0] - 4 && z >= OUT.harbor[1] && z + G <= OUT.harbor[3]) continue;                // 港はコンクリート
       const b = B.bucket(M.ground, x + G / 2, z + G / 2), s = M.ground.userData.s;
       const c0 = colAt(x, z + G), c1 = colAt(x + G, z + G), c2 = colAt(x + G, z), c3 = colAt(x, z);
       const base = b.v;
@@ -196,7 +190,7 @@ export const World = {
     const S = CONFIG.WORLD_SIZE;
     for (let z = -h; z < h; z += 4) for (let x = -h; x < h; x += 4) {
       const zn = this.zoneAt(x + 2, z + 2);
-      mx.fillStyle = zn === 'forest' ? '#26361f' : zn === 'industrial' ? '#55524c' : zn === 'park' || zn === 'suburb' ? '#3f5a2c' : zn === 'lake' ? '#2d5a70' : '#3a3a3e';
+      mx.fillStyle = OUTER_MAP[zn] ? OUTER_MAP[zn] : zn === 'forest' ? '#26361f' : zn === 'industrial' ? '#55524c' : zn === 'park' || zn === 'suburb' ? '#3f5a2c' : zn === 'lake' ? '#2d5a70' : '#3a3a3e';
       mx.fillRect((x + h) * k, (z + h) * k, 4 * k + 0.5, 4 * k + 0.5);
     }
     void S;
@@ -204,10 +198,11 @@ export const World = {
 
   // 場所の種類: 'town' 町 / 'industrial' 工場地帯 / 'suburb' 住宅地 / 'park' 公園 / 'forest' 森 / 'lake' 湖
   zoneAt(x, z) {
+    if (Math.abs(x) > 400 || Math.abs(z) > 400 || (z < OUT.river.z1 && z > OUT.river.z0)) { const o = outerZone(x, z); if (o) return o; }
     for (const L of LAKES) { const dx = (x - L.x) / L.rx, dz = (z - L.z) / L.rz; if (dx * dx + dz * dz < 1) return 'lake'; }
     const T = TOWN.ext;
     if (x >= T[0] && x <= T[2] && z >= T[1] && z <= T[3]) return 'town';
-    if (x > T[2] && z > -215 && z < 215) return 'industrial';
+    if (x > T[2] && x <= 404 && z > -215 && z < 215) return 'industrial';
     if (x < T[0] && z > -150 && z < 290) return 'suburb';
     if (z > T[3] && Math.abs(x) <= T[2] && z < 372) return 'park';
     return 'forest';
@@ -216,7 +211,8 @@ export const World = {
   zoneName(x, z) {
     const b = this.buildingAt(x, z);
     if (b && b.name) return b.name;
-    return { town: 'ダウンタウン', industrial: '工場地帯', suburb: '住宅街', park: '公園', forest: '森', lake: '湖' }[this.zoneAt(x, z)] || '';
+    const zn = this.zoneAt(x, z);
+    return OUTER_NAMES[zn] || { town: 'ダウンタウン', industrial: '工場地帯', suburb: '住宅街', park: '公園', forest: '森', lake: '湖' }[zn] || '';
   },
   // 上から見た地図(北が上、マップ全体)。UI のミニマップ用。1px = WORLD_SIZE/512 m
   minimapImage() { return this._map; },
@@ -225,6 +221,17 @@ export const World = {
   addBuildingInfo(b) { this.buildings.push(b); return b; },
   // 主人公が test(x,z) の所にいる間、材質(mats)を うすくする(高架の下など)
   faders: [],
+  // 動く景色(観覧車・サーチライト …)。world-life.js が動かす
+  spinners: [],
+  addSpinner(s) { this.spinners.push(s); return s; },
+  // ずっと燃えている火(墜落機など)
+  addFire(x, y, z, size = 1, life = 9e9) { Brk.addFire(x, y, z, size, life); },
+  // その場所に ただよう霧(墓地など)
+  mists: [],
+  addMist(x, z, r) { this.mists.push({ x, z, r }); },
+  localMist(px, pz) { let m = 0; for (const o of this.mists) { const d = Math.hypot(px - o.x, pz - o.z); if (d < o.r) m = Math.max(m, 0.6 * Math.min(1, (o.r - d) / 40)); } return m * (0.4 + 0.6 * (this.night || 0)); },
+  // 電線の火花が出る所
+  sparkPoints: [],
   addFader(mats, test, minOp = 0.15) { this.faders.push({ mats, test, minOp, op: 1 }); },
 
   // 壁(ぶつかる箱)を登録する。mesh: false なら見た目は作らない(見た目は別に作るとき)
@@ -392,37 +399,45 @@ export const World = {
 
   // 道さがし(流れの地図)は zombie-flow.js が nav を使って計算する(ここには持たない)
 
-  // 毎フレーム: 入っている建物の屋根を消す・透かしの中心・水と炎のゆらぎ
+  // 毎フレーム: 入っている建物の屋根を消す(見下ろしのときだけ)・透かしの中心・水と炎のゆらぎ・空と天気・遠くの物を描かない
   update(dt, player) {
     this._time += dt;
     const px = player.pos.x, pz = player.pos.z;
     const b = this.buildingAt(px, pz);
+    const top = Engine.viewMode === 'top';
     const bs = this.buildings;
     for (let i = 0; i < bs.length; i++) {
       const bb = bs[i];
       if (!bb.roofs) continue;
-      const want = bb === b ? 0 : 1;
+      // 見下ろし: 中に入ると屋根と上の壁が消える。肩越し・一人称: 屋根(天井)はそのまま。影だけ落とさない(中が暗くなりすぎないように)
+      const want = bb === b && top ? 0 : 1;
       if (bb._op === undefined) bb._op = 1;
-      if (bb._op !== want) {
+      const shadowOff = bb === b && !top;
+      if (bb._op !== want || bb._sh !== shadowOff) {
         bb._op += Math.sign(want - bb._op) * Math.min(Math.abs(want - bb._op), dt * 5);
+        bb._sh = shadowOff;
         for (let j = 0; j < bb.roofs.length; j++) {
           const r = bb.roofs[j];
           r.material.opacity = bb._op * (r.userData.op ?? 1);
-          r.visible = bb._op > 0.02;
-          r.castShadow = bb._op > 0.5 && !r.userData.noCast;
+          r.userData.off = bb._op <= 0.02;
+          r.visible = !r.userData.off && !r.userData.culled;
+          r.castShadow = bb._op > 0.5 && !r.userData.noCast && !shadowOff;
         }
       }
     }
     this._cur = b;
     for (let i = 0; i < this.faders.length; i++) {
-      const f = this.faders[i], want = f.test(px, pz) ? f.minOp : 1;
+      const f = this.faders[i], want = top && f.test(px, pz) ? f.minOp : 1;
       if (f.op !== want) {
         f.op += Math.sign(want - f.op) * Math.min(Math.abs(want - f.op), dt * 3);
         for (let j = 0; j < f.mats.length; j++) f.mats[j].opacity = f.op;
       }
     }
-    CUT.pos.value.set(px, 1.0, pz);
-    CUT.r.value = b ? 0.3 : 0.27;
+    // 透かし: 見下ろし = 主人公のまわりを丸く / 肩越し = 小さく(カメラと主人公の間だけ)/ 一人称 = なし
+    const vm = Engine.viewMode;
+    if (vm === 'fps') { CUT.pos.value.set(px, -9999, pz); CUT.nearF.value = 0.6; }
+    else if (vm === 'tps') { CUT.pos.value.set(px, 1.2, pz); CUT.r.value = 0.13; CUT.rf.value = 0.16; CUT.nearF.value = 1.6; }
+    else { CUT.pos.value.set(px, 1.0, pz); CUT.r.value = b ? 0.3 : 0.27; CUT.rf.value = 0.32; CUT.nearF.value = 9.5; }
     const M = this.M;
     if (M) {
       M.water.map.offset.x = (this._time * 0.012) % 1; M.water.map.offset.y = (this._time * 0.007) % 1;
@@ -433,7 +448,84 @@ export const World = {
       this._emberU.uCenter.value.set(px, 0, pz);
       this._emberU.uScale.value = (Engine.renderer ? Engine.renderer.domElement.height : 400) * 0.12;
     }
+    Sky.update(dt, px, pz);
+    Brk.update(dt, px, pz);
+    Life.update(dt, px, pz);
+    if ((this._cullT -= dt) <= 0) { this._cullT = 0.15; this._cull(); }
   },
+
+  // 霧の向こう(見えない所)の区画は描かない(描く回数を へらす)
+  _cullT: 0,
+  _cull() {
+    const cam = Engine.camera.position, far = (Engine.scene.fog ? Engine.scene.fog.far : 300) + 6;
+    const ch = this.group.children;
+    if (!this._cullList) {
+      this._cullList = [];
+      for (const m of ch) {
+        if (!m.isMesh || m.frustumCulled === false || !m.geometry || m.matrixAutoUpdate !== false) continue;   // 動く物は のぞく
+        if (!m.geometry.boundingSphere) m.geometry.computeBoundingSphere();
+        const bs = m.isInstancedMesh ? (m.boundingSphere || (m.computeBoundingSphere(), m.boundingSphere)) : m.geometry.boundingSphere;
+        if (!bs || bs.radius > 900) continue;
+        this._cullList.push({ m, x: bs.center.x, z: bs.center.z, y: bs.center.y, r: bs.radius, hide: false, vis: (m.material && m.material.userData && m.material.userData.vis) || 1e9 });
+      }
+    }
+    const L = this._cullList;
+    for (let i = 0; i < L.length; i++) {
+      const o = L[i], dx = o.x - cam.x, dz = o.z - cam.z, dy = o.y - cam.y;
+      const d = Math.sqrt(dx * dx + dz * dz + dy * dy) - o.r;
+      const hide = d > (o.vis < far ? o.vis : far);
+      if (hide !== o.hide) { o.hide = hide; o.m.userData.culled = hide; o.m.visible = !hide && !o.m.userData.off; }
+    }
+  },
+
+  // ---------- こわせる物(武器係が 弾・爆発のたびに呼ぶ) ----------
+  // 円(x,z,半径 r)にふれた 車・ドラム缶・ガラス・柵 … に amount のダメージ。opts.cause: 'explosion' などは よく効く。こわれた数を返す
+  damage(x, z, r, amount, opts = {}) { return Brk.damage(x, z, r, amount, opts); },
+  // 弾の通り道(線)で いちばん手前の こわせる物に当てる。当たった所の割合 0..1(なければ 1)。車など低い物にも当たる
+  hitLine(x0, z0, x1, z1, amount, opts = {}) { return Brk.hitLine(x0, z0, x1, z1, amount, opts); },
+  // その場所で爆発を起こす(ゾンビ・物にダメージ。イベント propExplode)
+  explode(x, z, radius = 6, amount = 400, kind = 'world') { Brk.explode(x, z, radius, amount, kind); },
+  get props() { return Brk.list; },
+  get life() { return Life; },
+  lightningTarget(px, pz) { return Brk.lightningTarget(px, pz); },
+  lightningHit(x, z) { Brk.lightningHit(x, z); },
+
+  // 壁(箱)を消す(こわれた物)。道さがし地図も その場所だけ直す
+  _removeBox(box) {
+    if (!box || box.dead) return;
+    const { minX, minZ, maxX, maxZ } = box;
+    box.dead = true; box.minX = box.maxX = box.minZ = box.maxZ = 1e7;
+    const nv = this.nav; if (!nv) return;
+    const w = nv.w, hf = this.half;
+    const x0 = Math.max(0, Math.floor((minX - 0.35 + hf) / NAV)), x1 = Math.min(w - 1, Math.floor((maxX + 0.35 + hf) / NAV));
+    const z0 = Math.max(0, Math.floor((minZ - 0.35 + hf) / NAV)), z1 = Math.min(w - 1, Math.floor((maxZ + 0.35 + hf) / NAV));
+    for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) nv.blocked[z * w + x] = 0;
+    // まだ残っている壁を もう一度 書く
+    const c0 = this._cell(minX - 1, minZ - 1), c1 = this._cell(maxX + 1, maxZ + 1);
+    for (let gz = c0.z; gz <= c1.z; gz++) for (let gx = c0.x; gx <= c1.x; gx++) {
+      const cell = this.grid[gz * this.gw + gx];
+      for (let k = 0; k < cell.length; k++) {
+        const b = this.boxes[cell[k]];
+        if (b.dead) continue;
+        const a0 = Math.max(x0, Math.floor((b.minX - 0.35 + hf) / NAV)), a1 = Math.min(x1, Math.floor((b.maxX + 0.35 + hf) / NAV));
+        const b0 = Math.max(z0, Math.floor((b.minZ - 0.35 + hf) / NAV)), b1 = Math.min(z1, Math.floor((b.maxZ + 0.35 + hf) / NAV));
+        for (let z = b0; z <= b1; z++) for (let x = a0; x <= a1; x++) nv.blocked[z * w + x] = 1;
+      }
+    }
+    if (this.comp) { const id = this._compAt((minX + maxX) / 2 + 1.5, (minZ + maxZ) / 2) || this._mainComp; for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) if (!nv.blocked[z * w + x] && !this.comp[z * w + x]) this.comp[z * w + x] = id; }
+  },
+
+  // ---------- 時間と天気(ほかの係も読める) ----------
+  // timeOfDay: 0..1(0 = 昼 / 0.25 = 夕方 / 0.5 = 真夜中 / 0.75 = 夜明け)。weather: 'clear'|'rain'|'storm'|'fog'|'snow'|'ash'
+  get timeOfDay() { return Sky.t; },
+  get weather() { return Sky.weather; },
+  get night() { return Sky.night; },          // 0 = 昼 … 1 = 夜
+  get wet() { return Sky.wet; },
+  setTime(t) { Sky.setTime(t); Sky.apply(0); },
+  setWeather(w, instant = false) { Sky.setWeather(w, instant); },
+  set timeSpeed(v) { Sky.speed = v; },
+  get timeSpeed() { return Sky.speed; },
+  strikeLightning(near = true) { const p = window.__game && window.__game.Player; Sky.strike(p ? p.pos.x : 0, p ? p.pos.z : 0, near); },
 
   get inside() { return this._cur; },
 };
