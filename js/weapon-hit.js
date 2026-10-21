@@ -12,6 +12,9 @@ export const LOW = 1.7;
 
 const OPT = { dirX: 0, dirZ: 0, force: 0, cause: '', crit: false };
 
+// 当たった記録(照準の「当たった印」用。weapons.js が まとめて hitMarker イベントにする)
+export const HIT = { n: 0, crit: false, kill: 0, boss: false, step: 0 };
+
 export function hurt(e, dmg, dirX, dirZ, force, cause, crit = false) {
   if (!e.alive) return false;
   const frozen = e.frozen > 0;
@@ -19,6 +22,10 @@ export function hurt(e, dmg, dirX, dirZ, force, cause, crit = false) {
   OPT.dirX = dirX; OPT.dirZ = dirZ; OPT.force = force; OPT.cause = cause; OPT.crit = crit;
   const killed = Zombies.damage(e, dmg, OPT);
   if (killed && frozen) FX.shatter(e.x, 0.6, e.z, (e.def && e.def.scale) || 1);
+  HIT.n++;
+  if (crit) HIT.crit = true;
+  if (e.boss) HIT.boss = true;
+  if (killed) { HIT.kill++; HIT.step++; }
   return killed;
 }
 
@@ -56,6 +63,8 @@ export function cone(x, z, dirX, dirZ, range, cosMin, out) {
 export function explode(x, z, radius, dmg, force, kind = 'fire', weapon = '') {
   FX.explosion(x, z, radius, kind);
   const k = area(x, z, radius, dmg, force, 'explosion', true, true);
+  // こわせる物(車・ドラム缶・ガラス …)。マップ係が作る
+  if (World.damage) World.damage(x, z, radius, dmg, { cause: 'explosion' });
   if (radius >= 7 || k >= 6) Engine.hitStop(0.035);
   Events.emit('explosion', { x, z, radius, weapon, kills: k });
   return k;

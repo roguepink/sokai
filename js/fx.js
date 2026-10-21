@@ -360,6 +360,7 @@ class ChunkPool {
 // ================= 公開する道具 =================
 export const FX = {
   quality: 1,               // 粒の多さ(low 0.4 / mid 0.7 / high 1)
+  muzzleScale: 1,           // 銃口の火の大きさ(一人称では 目の前なので 小さく。武器係が入れる)
   killFx: false,            // 倒したときの血は zombie-gore.js が倒れ方ごとに出す(二重にならないよう、ここは出さない)
   glowPool: null, solidPool: null, beams: null, rings: null, decals: null, slashes: null, chunks: null,
   lights: [], _lt: [], _boom: 0, _bloodBudget: 80,
@@ -371,7 +372,7 @@ export const FX = {
     this.solidPool = new ParticlePool(big ? 2600 : q === 'mid' ? 1800 : 900, SH.SOLID_FS, THREE.NormalBlending, 2, false);
     this.glowPool = new ParticlePool(big ? 5000 : q === 'mid' ? 3500 : 1800, SH.GLOW_FS, THREE.AdditiveBlending, 4, true);
     this.beams = new BeamPool(700);
-    this.rings = new RingPool(80);
+    this.rings = new RingPool(170);
     this.decals = new DecalPool(big ? 140 : q === 'mid' ? 100 : 50);
     this.slashes = new SlashPool(24);
     this.chunks = new ChunkPool(big ? 420 : 200);
@@ -549,6 +550,7 @@ export const FX = {
   // 銃口の火(dir は撃つ向き)。size 1 = ふつう
   muzzle(x, y, z, dirX, dirZ, color = 0xffc060, size = 1, light = true) {
     const g = this.glowPool;
+    size *= this.muzzleScale;
     g.emit(x, y, z, 0, 0, 0, 0.05, 0.2 * size, 0.3 * size, 0xffffff, 2.2, color, 1.6, 1, 0, 0, 0, 0, 0);
     g.emit(x + dirX * 0.25 * size, y, z + dirZ * 0.25 * size, dirX * 14 * size, 0, dirZ * 14 * size, 0.05, 0.12 * size, 0.18 * size, color, 3.5, color, 1.5, 1, 0, 6, 0.03, 0, 0);
     g.emit(x, y, z, 0, 0, 0, 0.04, 0.34 * size, 0.2 * size, color, 2.2, color, 1, 1, 0, 0, 0, 2, 0);
@@ -601,6 +603,17 @@ export const FX = {
     }
     this.solidPool.emit(x, y, z, 0, 0.8, 0, 0.6, 0.4, 1.3, 0xe0f4ff, 1, 0xa0c8e0, 1, 0.45, 0, 2, 0, 0, 0);
     if (rnd() < 0.3) this.decals.add(x, z, 0.6 * amount, 2, 0x8ab8d8, 0.4, 8);
+  },
+  // 空から地面へ落ちる光(衛星レーザー・雷)の 上の端の高さ。カメラの後ろに回らない高さを選ぶ(線が こわれないように)
+  skyTop(x, z, maxY = 60) {
+    const cam = Engine.camera;
+    if (!cam) return maxY;
+    for (let i = 0; i < SKY_H.length; i++) {
+      const y = Math.min(maxY, SKY_H[i]);
+      _v1.set(x, y, z).applyMatrix4(cam.matrixWorldInverse);
+      if (_v1.z < -1.5) return y;
+    }
+    return 4;
   },
   // 地面の光る輪(衝撃波)。life < 0 なら このフレームだけ
   ring(x, z, r0, r1, life = 0.4, color = 0xffffff, thick = 0.4, k = 3, alpha = 1, fill = 0, y = 0.12) {
@@ -674,8 +687,13 @@ export const FX = {
   },
 };
 
+const SKY_H = [60, 40, 28, 20, 14, 9, 6];
 // 爆発の色の組み合わせ
 const KIND = {
+  meteor: { fire: 0xff7a25, c0: 0xffb050, c1: 0xff3008, c2: 0x3a1004, spark: 0xffb050, ring: 0xffa040, smoke: 0x2e2a28, debris: 0x3a2a22, decal: 0x120e0c, decalKind: 0, light: 0xff7a30 },
+  elec:   { fire: 0x8ac8ff, c0: 0xe0f4ff, c1: 0x3a80ff, c2: 0x101a3a, spark: 0xd8f0ff, ring: 0x9ad0ff, smoke: 0x3a4048, debris: 0x4a4440, decal: 0x101418, decalKind: 0, light: 0x80c0ff },
+  acid:   { fire: 0x8aff3a, c0: 0xd0ff90, c1: 0x30a010, c2: 0x183a08, spark: 0xc0ff70, ring: 0x8aff3a, smoke: 0x4a6a2a, debris: 0, decal: 0x2a4a0a, decalKind: 1, light: 0x70ff40 },
+  gold:   { fire: 0xffc040, c0: 0xfff0a0, c1: 0xff8a10, c2: 0x4a2a06, spark: 0xfff0a0, ring: 0xffd860, smoke: 0x3a3632, debris: 0x4a4038, decal: 0x1a1512, decalKind: 0, light: 0xffc040 },
   fire:   { fire: 0xff9a35, c0: 0xffc060, c1: 0xff3c0a, c2: 0x4a1606, spark: 0xffc060, ring: 0xffb060, smoke: 0x3a3632, debris: 0x4a4038, decal: 0x1a1512, decalKind: 0, light: 0xff9a40 },
   small:  { fire: 0xff9a35, c0: 0xffc060, c1: 0xff4a10, c2: 0x4a1606, spark: 0xffc060, ring: 0xffb060, smoke: 0x4a4642, debris: 0, decal: 0x1a1512, decalKind: 0, light: 0xff9a40 },
   plasma: { fire: 0x9a70ff, c0: 0xc8b0ff, c1: 0x5a20ff, c2: 0x22104a, spark: 0xb0d0ff, ring: 0x9a7aff, smoke: 0, debris: 0, decal: 0x14101e, decalKind: 0, light: 0x8a60ff },

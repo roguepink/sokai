@@ -7,6 +7,7 @@ import { World } from './world.js';
 import { FX } from './fx.js';
 import { Engine } from './engine.js';
 import { hurt, explode, LOW } from './weapon-hit.js';
+import { P2 } from './weapon-proj2.js';
 
 const MAXP = 420;
 export const GRAV = 24;
@@ -41,12 +42,14 @@ export const Proj = {
     // ブラックホールの黒い玉
     const hg = new THREE.SphereGeometry(1, 20, 14), hm = new THREE.MeshBasicMaterial({ color: 0x000000 });
     for (let i = 0; i < 5; i++) { const h = new THREE.Mesh(hg, hm); h.userData.on = false; h.position.y = -60; scene.add(h); this.holes.push(h); }
+    P2.init(scene);
   },
 
   reset() {
     while (this.live.length) this._free.push(this.live.pop());
     this.gMesh.count = 0; this.rMesh.count = 0;
     for (const h of this.holes) { h.userData.on = false; h.position.y = -60; }
+    P2.reset();
   },
 
   count(kind) { let n = 0; for (const p of this.live) if (p.kind === kind) n++; return n; },
@@ -58,7 +61,7 @@ export const Proj = {
     if (World.segmentHit(px, pz, x, z) < 1) { x = px; z = pz; }
     p.kind = kind; p.w = w; p.x = x; p.y = y; p.z = z; p.vx = vx; p.vy = vy; p.vz = vz;
     p.age = 0; p.fuse = 9; p.dist = 0; p.state = 0; p.target = null; p.tx = 0; p.tz = 0; p.ty = 1;
-    p.stamp = _stamp++; p.seed = rnd() * 100; p.spd = Math.hypot(vx, vz); p.tick = 0; p.hole = null;
+    p.stamp = _stamp++; p.seed = rnd() * 100; p.spd = Math.hypot(vx, vz); p.tick = 0; p.hole = null; p.n = 0; p.oy = 0; p.slope = 0;
     this.live.push(p);
     return p;
   },
@@ -85,9 +88,11 @@ export const Proj = {
         case 'missile': dead = this._missile(p, dt); break;
         case 'plasma': dead = this._plasma(p, dt); break;
         case 'blackhole': dead = this._hole(p, dt); break;
+        default: dead = P2.step(p, dt);
       }
       if (dead) this._kill(i);
     }
+    P2.post(dt);
     this._draw();
   },
 
@@ -145,15 +150,15 @@ export const Proj = {
     p.spd = Math.min(78, p.spd + 120 * dt);
     const wob = Math.sin(p.age * 30 + p.seed) * 0.6;
     const dx = p.tx, dz = p.tz;    // 向き
-    p.vx = dx * p.spd - dz * wob; p.vz = dz * p.spd + dx * wob; p.vy = 0;
+    p.vx = dx * p.spd - dz * wob; p.vz = dz * p.spd + dx * wob; p.vy = p.slope * p.spd;
     const hitWall = this._move(p, dt);
-    if (hitWall || this._touch(p, 0.75) || p.dist > w.range) { explode(p.x, p.z, w.radius, w.dmg, w.force, 'fire', w.id); return true; }
+    if (hitWall || this._touch(p, 0.75) || p.dist > w.range || p.y < 0.12) { explode(p.x, p.z, w.radius, w.dmg, w.force, 'fire', w.id); return true; }
     const bx = p.x - dx * 0.4, bz = p.z - dz * 0.4;
     FX.glow(bx, p.y, bz, 0.55, 0xffa040, 5);
     FX.glow(bx, p.y, bz, 0.22, 0xffffff, 4);
     FX.flame(bx, p.y, bz, -dx * 8 + (rnd() - 0.5) * 2, (rnd() - 0.5) * 2, -dz * 8 + (rnd() - 0.5) * 2, 0.16, 0.18);
     FX.smoke(bx, p.y, bz, 0.22, 1.3 + rnd() * 0.6, 0x8a8580, (rnd() - 0.5) * 0.8, 0.4, (rnd() - 0.5) * 0.8, 0.55);
-    if (rnd() < 0.5) FX.smoke(bx - dx * 0.3 * p.spd * dt, p.y, bz - dz * 0.3 * p.spd * dt, 0.2, 1.1, 0x9a9590, 0, 0.3, 0, 0.45);
+    if (!w.small && rnd() < 0.5) FX.smoke(bx - dx * 0.3 * p.spd * dt, p.y, bz - dz * 0.3 * p.spd * dt, 0.2, 1.1, 0x9a9590, 0, 0.3, 0, 0.45);
     return false;
   },
 
@@ -278,13 +283,14 @@ export const Proj = {
         const l = Math.hypot(p.vx, p.vy, p.vz) || 1;
         _d.set(p.vx / l, p.vy / l, p.vz / l);
         _q.setFromUnitVectors(_fwd, _d);
-        const s = p.kind === 'missile' ? 0.55 : 1.15;
+        const s = p.kind === 'missile' ? 0.55 : p.w.small ? 0.75 : 1.15;
         _m.compose(_p.set(p.x, p.y, p.z), _q, _s.set(s, s, s));
         R.setMatrixAt(nr, _m);
         R.setColorAt(nr, p.kind === 'missile' ? _white : _olive);
         nr++;
       }
     }
+    P2.draw(this.live);
     G.count = ng; R.count = nr;
     if (ng) G.instanceMatrix.needsUpdate = true;
     if (nr) { R.instanceMatrix.needsUpdate = true; R.instanceColor.needsUpdate = true; }

@@ -2,6 +2,8 @@
 // rate = 1 秒に撃つ数 / dmg = 1 発の威力(ふつうのゾンビの体力は 20〜160)/ range = とどく距離(m)
 // force = ふっとばす強さ / radius = 爆発の大きさ(m)/ sound = 音係と共通の音の名前
 // kind = 撃ち方: bullet(弾)| rail | grenade | launcher | rocket | missile | flame | laser | lightning | plasma | freeze | blackhole
+//   第2弾: chainsaw | hammer | disc | crossbow | airstrike | orbital | cannon | tornado | meteor | acid | shuriken | drone | emp
+//   (新しい武器の撃ち方は weapon-extra.js、飛ぶ物は weapon-proj2.js、ドローン・戦闘機・酸の水たまりは weapon-summon.js)
 export const WEAPONS = [
   { id: 'ar', name: 'アサルトライフル', icon: '🔫', sound: 'mg', kind: 'bullet',
     rate: 15, dmg: 36, range: 55, spread: 0.03, pellets: 1, pierce: 3, force: 8, color: 0xffd070, recoil: 0.25, shake: 0.1, casing: 'brass', muz: 0.45, flash: 1 },
@@ -37,4 +39,33 @@ export const WEAPONS = [
     rate: 10, dmg: 30, range: 14, cone: 0.9, freeze: 3, force: 2, color: 0x80d8ff, recoil: 0.05, shake: 0.04, muz: 0.6 },
   { id: 'blackhole', name: 'ブラックホール', icon: '🌑', sound: 'blackhole', kind: 'blackhole', cluster: true,
     rate: 1.4, dmg: 800, radius: 11, range: 22, force: 42, color: 0xb060ff, recoil: 0.8, shake: 0.3, muz: 0.5 },
+  // ---------------- 第2弾(2026-10-22) ----------------
+  { id: 'chainsaw', name: 'チェーンソー', icon: '🪚', sound: 'chainsaw', kind: 'chainsaw', continuous: true, near: true,
+    rate: 15, dmg: 75, range: 6.5, width: 1.25, force: 14, color: 0xff6a20, recoil: 0.07, shake: 0.13, muz: 0.95 },
+  { id: 'thor', name: '雷神ハンマー', icon: '🔨', sound: 'hammer', kind: 'hammer',
+    rate: 1.7, dmg: 600, radius: 8.5, range: 5.5, bolts: 8, boltRange: 18, boltDmg: 320, force: 46, color: 0x8ad0ff, recoil: 1, shake: 1.1, muz: 0.7 },
+  { id: 'disc', name: '丸ノコ', icon: '💿', sound: 'disc', kind: 'disc',
+    rate: 4.5, dmg: 160, range: 60, bounces: 5, force: 13, color: 0xdce8f4, recoil: 0.35, shake: 0.12, muz: 0.6 },
+  { id: 'crossbow', name: '爆発ボウガン', icon: '🏹', sound: 'crossbow', kind: 'crossbow',
+    rate: 4, dmg: 200, radius: 5, blast: 340, fuse: 0.55, range: 70, force: 32, color: 0xff4a3a, recoil: 0.5, shake: 0.1, muz: 0.75 },
+  { id: 'airstrike', name: '空爆要請', icon: '✈️', sound: 'airstrike', kind: 'airstrike', designator: true,
+    rate: 0.85, dmg: 460, radius: 6.5, range: 46, bombs: 9, force: 40, color: 0xff2a2a, recoil: 0.15, shake: 0, muz: 0.35 },
+  { id: 'orbital', name: '衛星レーザー', icon: '🛰️', sound: 'beam', kind: 'orbital', continuous: true, cluster: true,
+    rate: 12, dmg: 95, radius: 3.8, range: 45, force: 10, color: 0x5ae0ff, recoil: 0.02, shake: 0.16, muz: 0.4 },
+  { id: 'cannon', name: '戦車砲', icon: '🏴‍☠️', sound: 'cannon', kind: 'cannon', cluster: true,
+    rate: 1.15, dmg: 1300, hitDmg: 450, pierce: 7, radius: 9.5, range: 90, force: 58, color: 0xffa040, recoil: 1, shake: 0.95, muz: 1.05 },
+  { id: 'tornado', name: '竜巻発生器', icon: '🌪️', sound: 'tornado', kind: 'tornado', cluster: true,
+    rate: 1.1, dmg: 70, radius: 7.5, range: 30, life: 5, max: 3, force: 34, color: 0xd0dae4, recoil: 0.4, shake: 0.2, muz: 0.6 },
+  { id: 'meteor', name: '隕石召喚', icon: '☄️', sound: 'meteor', kind: 'meteor', cluster: true,
+    rate: 2.2, dmg: 520, radius: 6.5, range: 40, count: 3, force: 42, color: 0xff7020, recoil: 0.3, shake: 0.1, muz: 0.5 },
+  { id: 'acid', name: '酸の銃', icon: '🧪', sound: 'acid', kind: 'acid', cluster: true,
+    rate: 6, dmg: 60, radius: 2.9, range: 26, dps: 150, life: 5, force: 6, color: 0x8aff3a, recoil: 0.25, shake: 0.05, muz: 0.6 },
+  { id: 'shuriken', name: '手裏剣', icon: '✴️', sound: 'shuriken', kind: 'shuriken',
+    rate: 8, dmg: 120, range: 36, count: 3, hops: 3, force: 11, color: 0xbfe6ff, recoil: 0.15, shake: 0.03, muz: 0.3 },
+  { id: 'drone', name: '攻撃ドローン', icon: '🛸', sound: 'drone', kind: 'drone',
+    rate: 2.5, dmg: 48, range: 32, max: 5, life: 16, droneRate: 8, force: 8, color: 0x5affd0, recoil: 0.1, shake: 0, muz: 0.45 },
+  { id: 'rocketgat', name: 'ガトリングロケット', icon: '🎇', sound: 'gatling', kind: 'rocket', spinUp: 0.55, rateMin: 3, small: true,
+    rate: 13, dmg: 210, radius: 4.6, range: 60, spread: 0.07, force: 28, color: 0xff9040, recoil: 0.35, shake: 0.14, muz: 0.95 },
+  { id: 'emp', name: 'EMP衝撃波', icon: '🌀', sound: 'emp', kind: 'emp',
+    rate: 1.4, dmg: 170, radius: 15, range: 15, force: 34, color: 0x7ab8ff, recoil: 0.8, shake: 0.7, muz: 0.5 },
 ];
