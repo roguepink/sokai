@@ -8,8 +8,9 @@ import { CONFIG } from './config.js';
 import { World } from './world.js';
 import { Events } from './events.js';
 import { damp, hashValue } from './util.js';
+import { ViewCam } from './view-camera.js';
 
-const C = CONFIG.CAMERA;
+const C = CONFIG.CAMERA, V = CONFIG.VIEW;
 
 export const Engine = {
   renderer: null, scene: null, camera: null, composer: null, bloom: null,
@@ -29,6 +30,10 @@ export const Engine = {
   lookPitch: 0,             // tps/fps の上下(+ = 上を見る)
   viewDir: new THREE.Vector3(0, 0, -1),   // 見ている向き(XZ、長さ1)。top のときは北
   camYaw: 0,                // 0 = 北(-z)を上に見る。固定(スティックの向きと画面の向きをそろえるため)
+  ctx: null,                // main が入れる { Player, Zombies, Weapons, Input, World }(視点係が読むだけ)
+  get hideHero() { return ViewCam.hideHero && this.viewMode !== 'top'; },   // 主人公を見せない(一人称・壁ぎわ)
+  get cross() { return ViewCam.cross; },
+  get heroFade() { return this.viewMode === 'tps' ? ViewCam.heroFade : 1; },   // 主人公の こさ(肩越しで壁ぎわ = うすく)   // 照準の画面の位置 {x, y}(px)
   _shake: 0, _hitStop: 0, _slow: 0, _slowScale: 1,
   _fpsAcc: 0, _fpsN: 0, _lowFpsTime: 0,
 
@@ -90,10 +95,7 @@ export const Engine = {
     this.renderer.domElement.style.width = w + 'px';
     this.renderer.domElement.style.height = h + 'px';
     this.camera.aspect = w / h;
-    // 縦長の画面では広めに見せる
-    const baseFov = this.viewMode === 'top' ? C.FOV : 70;
-    this.camera.fov = w < h ? baseFov * 1.35 : baseFov;
-    this.camera.updateProjectionMatrix();
+    this.camera.updateProjectionMatrix();   // 画角(fov)は カメラを動かすたびに決める(post)
     if (this.composer) {
       this.composer.setPixelRatio(dpr);
       this.composer.setSize(w, h);
@@ -109,6 +111,12 @@ export const Engine = {
   slowMo(sec, scale = 0.35) { this._slow = Math.max(this._slow, sec); this._slowScale = scale; },
   // カメラの引き具合(1 = いつも, 1.5 = 引く)
   setZoom(mult) { this._zoomMult = mult; },
+  // 画角のパンチ(度。爆発・叩きつけなどで 一瞬 広がる。肩越し・一人称のとき)
+  fovKick(deg) { ViewCam.punch(deg); },
+  // カメラのかたむき(ラジアン。ダッシュで横へ)。0 でもどる
+  setRoll(rad) { ViewCam.rollWant = rad; },
+  // 着地でカメラが沈む(0.1〜0.5)
+  landDip(amount) { ViewCam.land(amount); },
 
   // ゲーム計算の速さ(フレームごとに main が呼ぶ。実時間 realDt を渡す)
   stepTime(realDt) {
@@ -117,25 +125,57 @@ export const Engine = {
     this.timeScale = 1;
   },
 
-  // 視点を切りかえる(イベント viewChange {mode} を出す)。保存もする
+  // 視点を切りかえる(イベント viewChange {mode} を出す)。保存もする。カメラは なめらかに移る
   setViewMode(mode, yaw, save = true) {
     if (!['top', 'tps', 'fps'].includes(mode) || mode === this.viewMode) return;
+    ViewCam.startBlend(this.camera, this.viewMode === 'top' || mode === 'top' ? V.BLEND : V.BLEND * 0.7);
+    const prev = this.viewMode;
     this.viewMode = mode;
     if (yaw !== undefined) this.lookYaw = yaw;
-    this.lookPitch = mode === 'fps' ? -0.05 : -0.12;
+    if (prev === 'top' || yaw !== undefined) this.lookPitch = mode === 'fps' ? V.FPS.PITCH0 : V.TPS.PITCH0;
+    this.look(0, 0);
     if (save) { const s = loadSettings(); s.view = mode; saveSettings(s); }
     this.resize();
-    Events.emit('viewChange', { mode });
+    Events.emit('viewChange', { mode, prev });
   },
-  // tps/fps: 指やマウスで向きを変える(ラジアン)
+  // tps/fps: 指やマウスで向きを変える(ラジアン)。上下は 見すぎないように かぎる
   look(dYaw, dPitch) {
+    const L = this.viewMode === 'fps' ? V.FPS : V.TPS;
     this.lookYaw += dYaw;
-    this.lookPitch = Math.max(-1.1, Math.min(0.9, this.lookPitch + dPitch));
+    this.lookPitch = Math.max(L.PITCH_MIN, Math.min(L.PITCH_MAX, this.lookPitch + dPitch));
+  },
+
+  // 操作の設定(保存される): sens = 向きを変える速さ(0.5〜2)/ autoTurn = 自動で向きを合わせる / invertY = 上下を反対に
+  settings: {
+    _c: null,
+    _get() { return this._c || (this._c = loadSettings()); },
+    _set(k, v) { const s = loadSettings(); s[k] = v; saveSettings(s); this._c = s; },
+    get sens() { const v = +this._get().lookSens; return v > 0 ? v : 1; },
+    set sens(v) { this._set('lookSens', Math.max(0.3, Math.min(3, +v || 1))); },
+    get autoTurn() { return this._get().autoTurn !== false; },
+    set autoTurn(v) { this._set('autoTurn', !!v); },
+    get invertY() { return this._get().invertY === true; },
+    set invertY(v) { this._set('invertY', !!v); },
   },
 
   // カメラをプレイヤーに追従させる
   updateCamera(realDt, target, inside, demo) {
-    if (!demo && this.viewMode !== 'top') return this._updateCloseCamera(realDt, target);
+    if (!this._vcInit) { this._vcInit = true; ViewCam.init(); }
+    const close = !demo && this.viewMode !== 'top';
+    if (!demo && ViewCam.shot) ViewCam.endShot(this.camera);
+    let mode = 'top';
+    if (close || ViewCam.shot) this.camTarget.set(target.x, target.y + 1, target.z);   // 見下ろしにもどったとき とばないように
+    if (close) {
+      ViewCam.close(this, realDt, target);
+      this.viewDir.set(Math.sin(this.lookYaw), 0, -Math.cos(this.lookYaw));
+      mode = 'close';
+    } else if (demo && ViewCam.cine(this, realDt, target)) mode = 'close';
+    else this._topCamera(realDt, target, inside, demo);
+    ViewCam.post(this, realDt, mode, innerWidth < innerHeight ? C.FOV * 1.35 : C.FOV);
+  },
+
+  // 見下ろしのカメラ(いつもの)
+  _topCamera(realDt, target, inside, demo) {
     this.viewDir.set(0, 0, -1);
     // タイトルの見本プレイ: ゆっくり回りこみ、少し低い角度で 迫力を出す。プレイが始まったら北が上にもどす
     if (demo) {
@@ -172,37 +212,6 @@ export const Engine = {
     this.sun.target.position.set(target.x, 0, target.z);
   },
 
-  // 肩越し・一人称のカメラ
-  _updateCloseCamera(realDt, target) {
-    const cam = this.camera, y = this.lookYaw, p = this.lookPitch;
-    const fx = Math.sin(y), fz = -Math.cos(y);           // 前
-    const rx = Math.cos(y), rz = Math.sin(y);            // 右
-    this.viewDir.set(fx, 0, fz);
-    const cp = Math.cos(p), sp = Math.sin(p);
-    if (this.viewMode === 'fps') {
-      cam.position.set(target.x + fx * 0.15, target.y + 1.68, target.z + fz * 0.15);
-    } else {
-      // 右肩の後ろ。壁があれば 近づく
-      const back = 4.2, side = 0.75, up = 2.0;
-      const hx = target.x + rx * side, hz = target.z + rz * side;
-      let bx = -fx * back * cp, bz = -fz * back * cp;
-      const t = World.segmentHit(target.x, target.z, hx + bx, hz + bz, 2.2);
-      const k = Math.max(0.25, t * 0.92);
-      this._tpsK = damp(this._tpsK || 1, k, t < 1 ? 30 : 6, realDt);
-      cam.position.set(hx + bx * this._tpsK, target.y + up - sp * back * 0.6 * this._tpsK, hz + bz * this._tpsK);
-      this.camTarget.copy(target);   // 見下ろしにもどったとき とばないように
-    }
-    if (this._shake > 0) {
-      const s = this._shake * this._shake * 0.25;
-      cam.position.x += (Math.random() - 0.5) * s; cam.position.y += (Math.random() - 0.5) * s; cam.position.z += (Math.random() - 0.5) * s;
-      this._shake = Math.max(0, this._shake - realDt * 2.2);
-    }
-    _v.set(cam.position.x + fx * cp * 10, cam.position.y + sp * 10, cam.position.z + fz * cp * 10);
-    cam.lookAt(_v);
-    this.sun.position.set(target.x + 30, 60, target.z + 20);
-    this.sun.target.position.set(target.x, 0, target.z);
-  },
-
   render(realDt) {
     this._measureFps(realDt);
     if (this.composer && !this._noBloom) this.composer.render(realDt);
@@ -211,7 +220,10 @@ export const Engine = {
 
   // 3D の位置 → 画面の位置(px)。画面の外・後ろなら null
   project(x, y, z, out = {}) {
-    _v.set(x, y, z).project(this.camera);
+    const cam = this.camera;
+    _v.set(x, y, z).applyMatrix4(cam.matrixWorldInverse);
+    if (_v.z > -cam.near) return null;          // カメラの後ろ(肩越し・一人称で よくある)
+    _v.applyMatrix4(cam.projectionMatrix);
     if (_v.z > 1) return null;
     out.x = (_v.x * 0.5 + 0.5) * innerWidth;
     out.y = (-_v.y * 0.5 + 0.5) * innerHeight;

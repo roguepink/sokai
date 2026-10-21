@@ -2,6 +2,7 @@
 // スマホ(タッチ)と PC(キーボード WASD/矢印 + マウス/スペース)の両方。
 // アドレスに #auto をつけると、自動で動いて撃つ(確認用・タイトル画面の見本)。
 import { HASH } from './util.js';
+import { CONFIG } from './config.js';
 
 export const Input = {
   move: { x: 0, z: 0 },     // 移動の向き(-1..1)。x = 右, z = 下(画面の手前)
@@ -11,8 +12,14 @@ export const Input = {
   weaponSelect: -1,         // 番号で直接えらぶ(使ったら -1 に)
   aim: null,                // PC のマウスで狙う場所 {x, z}(画面→地面に直すのは main)。なければ自動で狙う
   mouse: null,              // 画面上のマウス位置 {x, y}
-  look: { x: 0, y: 0 },     // 向きを変える量(px。肩越し・一人称で使う)。使ったら consumeLook
+  look: { x: 0, y: 0 },     // 指で向きを変える量(px。速くなぞると 加速ずみ)。使ったら consumeLook
+  lookMouse: { x: 0, y: 0 },// マウス(ロック中)で向きを変える量(px)
+  lookT: 0,                 // 最後に 向きを変えた時刻(performance.now)。自動で向きを合わせるのは しばらく さわっていないとき
+  lookHeld: false,          // 右側を なぞっている最中
   view: false,              // 視点の切りかえボタン(押した瞬間だけ)
+  viewHold: false,          // 視点ボタンの長押し(視点の設定を開く)
+  dash: false,              // ダッシュ(押した瞬間だけ)。すばやく 2 回 = ジャンプ叩きつけ
+  slam: false,              // ジャンプ叩きつけ(PC の G キー)
   auto: HASH.has('auto'),   // 自動操作
   enabled: false,           // プレイ中だけ true
   touchUsed: false,
@@ -74,34 +81,55 @@ export const Input = {
     fireBtn.addEventListener('pointercancel', endFire);
 
     tapButton(this.el.querySelector('.btn-spin'), () => { this.spin = true; });
-    tapButton(this.el.querySelector('.btn-view'), () => { this.view = true; });
+    // 視点ボタン: 短く押す = 切りかえ / 長押し = 視点の設定
+    const vb = this.el.querySelector('.btn-view');
+    let vt = 0, vtimer = 0;
+    vb.addEventListener('pointerdown', (e) => {
+      e.preventDefault(); e.stopPropagation(); vb.classList.add('down');
+      vt = performance.now(); clearTimeout(vtimer);
+      vtimer = setTimeout(() => { vt = 0; vb.classList.remove('down'); this.viewHold = true; }, 480);
+    });
+    const vEnd = () => { clearTimeout(vtimer); vb.classList.remove('down'); if (vt) { vt = 0; this.view = true; } };
+    vb.addEventListener('pointerup', vEnd);
+    vb.addEventListener('pointercancel', () => { clearTimeout(vtimer); vt = 0; vb.classList.remove('down'); });
+    tapButton(this.el.querySelector('.btn-dash'), () => { this.dash = true; });
 
+    // 指でなぞった量 → 速くなぞるほど 大きく回る(加速)。ゆっくりなら 細かく狙える
+    const addLook = (dx, dy, dtMs) => {
+      const v = Math.hypot(dx, dy) / Math.max(4, dtMs);          // px/ms
+      const g = 0.8 + CONFIG.VIEW.ACCEL * Math.min(1, Math.max(0, (v - 0.25) / 1.6));
+      this.look.x += dx * g; this.look.y += dy * g;
+      this.lookT = performance.now();
+    };
     // --- 右半分: なぞると向きを変える(肩越し・一人称のとき) ---
     const lookZone = this.el.querySelector('.look-zone');
-    let lookId = null, lx = 0, ly = 0;
+    let lookId = null, lx = 0, ly = 0, lt = 0;
     lookZone.addEventListener('pointerdown', (e) => {
       if (e.pointerType === 'mouse') { if (e.button === 0) this._mouseDown = true; return; }
       if (lookId !== null) return;
       e.preventDefault(); lookZone.setPointerCapture(e.pointerId);
-      lookId = e.pointerId; lx = e.clientX; ly = e.clientY;
+      this.touchUsed = true;
+      lookId = e.pointerId; lx = e.clientX; ly = e.clientY; lt = e.timeStamp; this.lookHeld = true; this.lookT = performance.now();
     });
     lookZone.addEventListener('pointermove', (e) => {
       if (e.pointerId !== lookId) return;
-      this.look.x += e.clientX - lx; this.look.y += e.clientY - ly; lx = e.clientX; ly = e.clientY;
+      addLook(e.clientX - lx, e.clientY - ly, e.timeStamp - lt); lx = e.clientX; ly = e.clientY; lt = e.timeStamp;
     });
-    const endLook = (e) => { if (e.pointerId === lookId) lookId = null; };
+    const endLook = (e) => { if (e.pointerId === lookId) { lookId = null; this.lookHeld = false; } };
     lookZone.addEventListener('pointerup', endLook); lookZone.addEventListener('pointercancel', endLook);
-    // 撃つボタンを押したまま 指をすべらせても 向きを変えられる
+    // 撃つボタンを押したまま 指をすべらせても 向きを変えられる(少し動かしてから。ふるえで向きが変わらないように)
     const fb = this.el.querySelector('.btn-fire');
-    let fx = 0, fy = 0;
-    fb.addEventListener('pointerdown', (e) => { fx = e.clientX; fy = e.clientY; });
+    let fx = 0, fy = 0, ft = 0, fdrag = false;
+    fb.addEventListener('pointerdown', (e) => { fx = e.clientX; fy = e.clientY; ft = e.timeStamp; fdrag = false; });
     fb.addEventListener('pointermove', (e) => {
       if (e.pointerId !== this._firePointer) return;
-      this.look.x += e.clientX - fx; this.look.y += e.clientY - fy; fx = e.clientX; fy = e.clientY;
+      const dx = e.clientX - fx, dy = e.clientY - fy;
+      if (!fdrag) { if (Math.hypot(dx, dy) < 9) return; fdrag = true; fx = e.clientX; fy = e.clientY; ft = e.timeStamp; return; }
+      addLook(dx, dy, e.timeStamp - ft); fx = e.clientX; fy = e.clientY; ft = e.timeStamp;
     });
     // PC: マウスを動かすと向きを変える(画面をクリックするとマウスが消える。Esc でもどる)
     addEventListener('mousemove', (e) => {
-      if (document.pointerLockElement) { this.look.x += e.movementX; this.look.y += e.movementY; }
+      if (document.pointerLockElement) { this.lookMouse.x += e.movementX; this.lookMouse.y += e.movementY; this.lookT = performance.now(); }
     });
     tapButton(this.el.querySelector('.btn-next'), () => { this.weaponDelta = 1; });
     tapButton(this.el.querySelector('.btn-prev'), () => { this.weaponDelta = -1; });
@@ -128,13 +156,16 @@ export const Input = {
       this._keys.add(k);
       if (k === 'shift' || k === 'e') this.spin = true;
       if (k === 'v') this.view = true;
+      if (k === 'b') this.viewHold = true;
+      if (k === 'f' || k === 'c') this.dash = true;
+      if (k === 'g') this.slam = true;
       if (k === 'q') this.weaponDelta = -1;
       if (k === 'r' || k === 'tab') { this.weaponDelta = 1; e.preventDefault(); }
       if (/^[0-9]$/.test(k)) this.weaponSelect = k === '0' ? 9 : +k - 1;
       if (k === ' ') e.preventDefault();
     });
     addEventListener('keyup', (e) => this._keys.delete(e.key.toLowerCase()));
-    addEventListener('blur', () => { this._keys.clear(); this._firePointer = null; this._mouseDown = false; });
+    addEventListener('blur', () => { this._keys.clear(); this._firePointer = null; this._mouseDown = false; this.lookHeld = false; });
     const canvasArea = root;
     canvasArea.addEventListener('mousemove', (e) => { this.mouse = { x: e.clientX, y: e.clientY }; });
     addEventListener('mouseup', () => { this._mouseDown = false; });
@@ -158,7 +189,11 @@ export const Input = {
   },
 
   consumeLook(out) { out.x = this.look.x; out.y = this.look.y; this.look.x = 0; this.look.y = 0; return out; },
+  consumeLookMouse(out) { out.x = this.lookMouse.x; out.y = this.lookMouse.y; this.lookMouse.x = 0; this.lookMouse.y = 0; return out; },
   consumeView() { const v = this.view; this.view = false; return v; },
+  consumeViewHold() { const v = this.viewHold; this.viewHold = false; return v; },
+  consumeDash() { const v = this.dash; this.dash = false; return v; },
+  consumeSlam() { const v = this.slam; this.slam = false; return v; },
   consumeSpin() { const s = this.spin; this.spin = false; return s; },
   consumeWeaponDelta() { const d = this.weaponDelta; this.weaponDelta = 0; return d; },
   consumeWeaponSelect() { const s = this.weaponSelect; this.weaponSelect = -1; return s; },
@@ -173,6 +208,10 @@ export const Input = {
     this.fire = true;
     if (Math.floor(this._botT / 5) !== Math.floor((this._botT - dt) / 5)) this.spin = true;
     if (Math.floor(this._botT / 7) !== Math.floor((this._botT - dt) / 7)) this.weaponDelta = 1;
+    // ダッシュ(3 秒ごと)と ジャンプ叩きつけ(ときどき 2 回押し)を見せる
+    const d0 = Math.floor((this._botT - dt) / 3.1), d1 = Math.floor(this._botT / 3.1);
+    if (d1 !== d0) { this.dash = true; this._botSlam = d1 % 3 === 2 ? 0.12 : 0; }
+    if (this._botSlam > 0 && (this._botSlam -= dt) <= 0) this.dash = true;
   },
 };
 
@@ -196,6 +235,7 @@ function buildControls(root) {
     <button class="btn btn-prev" type="button" aria-label="前の武器">◀</button>
     <button class="btn btn-next" type="button" aria-label="次の武器">▶</button>
     <button class="btn btn-view" type="button" aria-label="視点の切りかえ">👁<small>視点</small></button>
+    <button class="btn btn-dash" type="button" aria-label="ダッシュ(2回で叩きつけ)"><span>ダッシュ</span><small>2回で叩きつけ</small></button>
     <button class="btn btn-spin" type="button" aria-label="回転斬り"><span>回転<br>斬り</span></button>
     <button class="btn btn-fire" type="button" aria-label="撃つ"><span>撃つ</span></button>`;
   root.appendChild(el);

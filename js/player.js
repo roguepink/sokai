@@ -7,6 +7,7 @@ import { Engine } from './engine.js';
 import { damp, dampAngle } from './util.js';
 import { lathe, sstep } from './zombie-models.js';
 import { mergeByMaterial } from './weapon-models.js';
+import { Moves } from './hero-moves.js';
 
 const P = CONFIG.PLAYER;
 
@@ -18,6 +19,7 @@ export const Player = {
   aiming: false,            // 撃っている間 true(移動の向きではなく狙いの向きを向く)
   radius: P.RADIUS,
   mesh: null,
+  moves: Moves,             // 大技(ダッシュ・ジャンプ叩きつけ)。dashing / airborne / busy
   parts: {},                // 体の部品(動かすため)。gunMount = 右手の銃をつける所(-z が前、+y が上)
   _swing: 0, _swingSide: 1, _spin: 0, _recoil: 0, _walk: 0, _t: 0, _lean: 0, _speed: 0,
 
@@ -25,9 +27,10 @@ export const Player = {
     this.mesh = buildHero();
     this.parts = this.mesh.userData.parts;
     scene.add(this.mesh);
+    Moves.init(scene);
   },
 
-  reset() { this.pos.set(0, 0, 0); this.vel.set(0, 0, 0); this.facing = 0; this._swing = this._spin = this._recoil = 0; },
+  reset() { this.pos.set(0, 0, 0); this.vel.set(0, 0, 0); this.facing = 0; this._swing = this._spin = this._recoil = 0; Moves.reset(); },
 
   update(dt, input) {
     // 移動(壁で止まる・すべる)
@@ -40,19 +43,27 @@ export const Player = {
       const a = mx, b = -mz;
       mx = rx * a + fx * b; mz = rz * a + fz * b;
     }
-    this.vel.x = damp(this.vel.x, mx * sp, 14, dt);
-    this.vel.z = damp(this.vel.z, mz * sp, 14, dt);
+    // 大技(ダッシュ・叩きつけ)の間は 大技が速さを決める
+    Moves.update(dt, input, this, mx, mz);
+    if (Moves.busy) { this.vel.x = Moves.vx; this.vel.z = Moves.vz; }
+    else {
+      this.vel.x = damp(this.vel.x, mx * sp, 14, dt);
+      this.vel.z = damp(this.vel.z, mz * sp, 14, dt);
+    }
     this.pos.x += this.vel.x * dt; this.pos.z += this.vel.z * dt;
+    this.pos.y = Moves.y;
     World.collideCircle(this.pos, this.radius);
 
     // 向き: 撃っている間は狙いの方、それ以外は進む方
     const moving = Math.hypot(this.vel.x, this.vel.z) > 0.5;
     let want = this.facing;
     if (close) want = Engine.lookYaw;            // 肩越し・一人称: いつも見ている向き
+    else if (Moves.busy) want = Math.atan2(Moves.dirX, -Moves.dirZ);   // 突進・ジャンプの向き
     else if (this.aiming) want = Math.atan2(this.aimDir.x, -this.aimDir.z);
     else if (moving) want = Math.atan2(this.vel.x, -this.vel.z);
-    this.facing = close ? want : dampAngle(this.facing, want, 18, dt);
-    this.mesh.visible = Engine.viewMode !== 'fps';   // 一人称では自分の体は見せない(武器係が手元の武器を出す)
+    this.facing = close ? want : dampAngle(this.facing, want, Moves.busy ? 30 : 18, dt);
+    this.mesh.visible = !Engine.hideHero;   // 一人称(と 壁ぎわで カメラが近すぎるとき)は 自分の体を見せない(武器係が手元の武器を出す)
+    this._setFade(Engine.heroFade);
 
     this._animate(dt, moving);
   },
@@ -78,6 +89,15 @@ export const Player = {
       if (Math.hypot(out.x - this.pos.x, out.z - this.pos.z) < 2 && out.y > 0.9 && out.y < 2) return out;
     }
     return out.set(this.pos.x + Math.sin(f) * 0.95 + Math.cos(f) * 0.24, 1.4, this.pos.z - Math.cos(f) * 0.95 + Math.sin(f) * 0.24);
+  },
+
+  // 肩越しで カメラが近いときは 体を うすくする(画面が ふさがらないように)
+  _setFade(f) {
+    f = Math.round(f * 20) / 20;
+    if (f === this._fade) return;
+    this._fade = f;
+    const mats = this.mesh.userData.mats || [];
+    for (const m of mats) m.opacity = f;     // alphaHash(ざらざらに 消える)なので 材質の作り直しは いらない
   },
 
   _animate(dt, moving) {
@@ -140,11 +160,42 @@ export const Player = {
       pr.legL.rotation.set(0.5, 0, -0.35); pr.legR.rotation.set(-0.2, 0, 0.35);
       pr.torso.rotation.set(-0.3, 0, 0);
     }
+    // 大技のポーズ: ダッシュ = 深い前のめり・剣を後ろへ / 空中 = ひざを抱えて 剣をふりかぶる / 着地 = しゃがんで 剣を地面へ
+    const mv = Moves;
+    let pose = 0;
+    if (mv.dashT > 0) {
+      pose = 1;
+      const d = Math.min(1, (CONFIG.MOVES.DASH_TIME - mv.dashT) / 0.06);
+      pr.torso.rotation.x = -0.8 * d; pr.torso.rotation.y = 0; pr.torso.rotation.z = 0;
+      pr.hips.position.y = 0.9; pr.hips.rotation.set(-0.1, 0, 0);
+      pr.legL.rotation.set(1.1 * d, 0, -0.06); pr.legR.rotation.set(-0.9 * d, 0, 0.06);
+      pr.kneeL.rotation.x = -0.5; pr.kneeR.rotation.x = -1.2 * d;
+      lx = -0.6; ly = 0.3; lz = -0.35; le = 0.3; swordTwist = -0.2;
+      pr.head.rotation.set(0.55 * d, 0, 0);
+    } else if (mv.airT > 0) {
+      pose = 2;
+      const u = 1 - mv.airT / CONFIG.MOVES.SLAM_AIR, up = u < 0.62, f = up ? 1 : (u - 0.62) / 0.38;
+      pr.hips.position.y = 0.98 - 0.12 * (up ? 1 : 1 - f);
+      pr.legL.rotation.set(up ? 1.3 : 1.3 - 1.0 * f, 0, -0.15); pr.legR.rotation.set(up ? 0.6 : 0.6 - 0.5 * f, 0, 0.15);
+      pr.kneeL.rotation.x = up ? -1.9 : -1.9 + 1.4 * f; pr.kneeR.rotation.x = up ? -1.5 : -1.5 + 1.1 * f;
+      pr.torso.rotation.set(up ? 0.25 : 0.25 - 0.9 * f, 0, 0);
+      lx = up ? 3.0 : 3.0 - 2.4 * f; ly = 0.1; lz = -0.15; le = 0.2; swordTwist = 0;
+      pr.head.rotation.set(up ? -0.2 : 0.3 * f, 0, 0);
+    } else if (mv.landT > 0) {
+      pose = 3;
+      const l = mv.landT / 0.42, c2 = Math.min(1, l * 1.6);
+      pr.hips.position.y = 0.98 - 0.42 * c2;
+      pr.legL.rotation.set(1.05 * c2, 0, -0.2 * c2); pr.legR.rotation.set(-0.35 * c2, 0, 0.25 * c2);
+      pr.kneeL.rotation.x = -1.35 * c2; pr.kneeR.rotation.x = -1.5 * c2;
+      pr.torso.rotation.set(-0.55 * c2, 0, 0);
+      lx = 0.6 + 0.2 * (1 - c2); ly = 0; lz = -0.1; le = 0.1; swordTwist = 0;
+    }
     pr.armL.rotation.set(lx, ly, lz, 'XYZ');
     pr.foreL.rotation.x = le;
     pr.sword.rotation.set(0, swordTwist, 0);
-    pr.blade.material.emissiveIntensity = 2.2 + (sw > 0 || sp > 0 ? 2.5 : 0) + 0.3 * Math.sin(t * 11);
-    pr.glow.scale.set(1, 1, 1).multiplyScalar(1 + (sw > 0 || sp > 0 ? 0.6 : 0));
+    const big = sw > 0 || sp > 0 || pose === 2 || pose === 1;
+    pr.blade.material.emissiveIntensity = 2.2 + (big ? 2.5 : 0) + 0.3 * Math.sin(t * 11);
+    pr.glow.scale.set(1, 1, 1).multiplyScalar(1 + (big ? 0.6 : 0));
     // 右腕(銃): 撃っている間は前へ、それ以外は 走りにあわせてふる
     this._recoil = Math.max(0, this._recoil - dt * 6);
     const rc = this._recoil;
@@ -157,11 +208,15 @@ export const Player = {
       pr.foreR.rotation.x = 0.6 + 0.6 * k;
     }
     if (sp > 0) { pr.armR.rotation.set(1.4, 0, 1.3); pr.foreR.rotation.x = 0.1; }
+    if (pose === 1 && !this.aiming) { pr.armR.rotation.set(-0.9, 0, 0.25, 'XYZ'); pr.foreR.rotation.x = 0.5; }
+    else if (pose === 2) { pr.armR.rotation.set(lx * 0.9, -0.2, 0.1, 'XYZ'); pr.foreR.rotation.x = 0.3; }
+    else if (pose === 3 && !this.aiming) { pr.armR.rotation.set(0.5, 0, 0.5, 'XYZ'); pr.foreR.rotation.x = 0.4; }
     // マフラー: 走るとなびく
     for (let i = 0; i < pr.scarf.length; i++) {
       const seg = pr.scarf[i];
       const ph = t * 9 + i * 0.9 + seg.userData.off;
-      seg.rotation.x = (i === 0 ? 0.55 - 0.5 * k : 0.22 - 0.14 * k) + Math.sin(ph) * (0.06 + 0.16 * k);
+      const kk = pose === 1 ? 1.4 : pose === 2 ? 1.1 : k;
+      seg.rotation.x = (i === 0 ? 0.55 - 0.5 * kk : 0.22 - 0.14 * kk) + Math.sin(ph * (pose === 1 ? 1.8 : 1)) * (0.06 + 0.16 * kk);
       seg.rotation.z = Math.sin(ph * 0.7) * 0.2 * (0.5 + k);
       seg.rotation.y = Math.sin(ph * 0.5 + 1) * 0.15;
     }
@@ -295,6 +350,8 @@ function buildHero() {
     o.geometry.computeBoundingSphere();
     if (o.material === scarfM || o.geometry.boundingSphere.radius < 0.075) o.castShadow = false;
   });
+  g.userData.mats = [suit, armor, plate, glowM, visor, scarfM, blade];
+  for (const m of g.userData.mats) m.alphaHash = true;
   g.userData.parts = { hips, torso, chest, head, legL, legR, kneeL: knees[0], kneeR: knees[1], armL, armR, foreL, foreR, sword, blade: bladeMesh, glow, gunMount, scarf };
   return g;
 }

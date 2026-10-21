@@ -15,6 +15,8 @@ import { Score } from './score.js';
 import { UI } from './ui.js';
 import { Audio } from './audio.js';
 import { Flow } from './zombie-flow.js';
+import { Look } from './view-look.js';
+import { ViewHud } from './view-hud.js';
 
 export const Game = {
   state: 'title',           // 'title'(見本プレイ) | 'play' | 'paused' | 'result'
@@ -46,7 +48,11 @@ async function boot() {
   await step_('world', 0.12, '町をつくっています…', () => World.init(Engine.scene));
   await step_('chars', 0.55, 'ゾンビを集めています…', () => { Player.init(Engine.scene); Zombies.init(Engine.scene); });
   await step_('weapons', 0.72, '武器をそろえています…', () => { FX.init(Engine.scene); Weapons.init(Engine.scene); });
-  await step_('ui', 0.8, 'もうすぐ…', () => { Score.init(); Input.init(root); UI.init(root); Audio.init(); });
+  await step_('ui', 0.8, 'もうすぐ…', () => {
+    Score.init(); Input.init(root); UI.init(root); Audio.init();
+    Engine.ctx = { Player, Zombies, Weapons, Input, World };
+    ViewHud.init(root, Engine.ctx);
+  });
 
   $('btnPlay').addEventListener('click', (e) => { e.currentTarget.blur(); start(e); });
   $('btnResume').addEventListener('click', (e) => { e.currentTarget.blur(); resume(); });
@@ -54,7 +60,12 @@ async function boot() {
   $('btnAgain').addEventListener('click', (e) => { e.currentTarget.blur(); start(e); });
   $('btnTitle').addEventListener('click', (e) => { e.currentTarget.blur(); toTitle(); });
   UI.el.pause.addEventListener('click', (e) => { e.currentTarget.blur(); pause(); });
-  addEventListener('keydown', (e) => { if (e.key === 'Escape' || e.key === 'p') { Game.state === 'play' ? pause() : Game.state === 'paused' && resume(); } });
+  addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' || e.key === 'p') {
+      if (ViewHud.open) { ViewHud.closePanel(); return; }
+      Game.state === 'play' ? pause() : Game.state === 'paused' && resume();
+    }
+  });
   document.addEventListener('visibilitychange', () => { if (document.hidden && Game.state === 'play') pause(); });
   // 音: 最初にさわるまでは鳴らさない。さわったら(タブから戻ったあとも)目を覚ます
   const wake = () => { if (Audio.ctx) Audio.unlock(); else if (Game.state === 'play') Audio.unlock(); };
@@ -98,6 +109,8 @@ function start(ev) {
   ['title', 'pauseMenu', 'result'].forEach((id) => $(id).classList.add('hidden'));
   Input.setVisible(true); UI.show(true);
   Engine.setViewMode(loadSettings().view || 'top', Player.facing, false);
+  Look.reset();
+  ViewHud.onStart();
   Events.emit('start', {});
   // 最初のタップのあとに全画面(Android の Chrome。だめでもそのまま遊べる)
   if (ev && ev.isTrusted) try {
@@ -110,6 +123,7 @@ function start(ev) {
 
 function pause() {
   if (Game.state !== 'play') return;
+  ViewHud.closePanel();
   Game.state = 'paused';
   Score.save();
   $('pauseMenu').classList.remove('hidden');
@@ -137,13 +151,14 @@ function finish() {
 }
 // PC: 肩越し・一人称のときに画面をクリックすると、マウスで向きを変えられる(Esc でもどる)
 addEventListener('mousedown', (e) => {
-  if (Game.state === 'play' && Engine.viewMode !== 'top' && !Input.touchUsed && !e.target.closest('button') && !document.pointerLockElement) {
+  if (Game.state === 'play' && Engine.viewMode !== 'top' && !Input.touchUsed && !ViewHud.open && !e.target.closest('button, .overlay') && !document.pointerLockElement) {
     try { const p = Engine.renderer.domElement.requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch (err) {}
   }
 });
 
 function toTitle() {
   $('result').classList.add('hidden');
+  ViewHud.closePanel();
   resetRun();
   Engine.setViewMode('top', 0, false);
   Game.state = 'title'; Game.demo = true; Input.auto = true; Score.active = false; Game.titleT = 0;
@@ -156,9 +171,9 @@ function loop(now) {
   requestAnimationFrame(loop);
   try {
     const real = Math.min((now - last) / 1000, CONFIG.MAX_FRAME); last = now;
-    const running = Game.state === 'play' || Game.state === 'title';
+    const running = (Game.state === 'play' && !ViewHud.open) || Game.state === 'title';
     Input.update(real);
-    if (Game.state === 'play') handleView();
+    if (Game.state === 'play' && !ViewHud.open) handleView(real);
     if (running) {
       Engine.stepTime(real);
       acc += real * Engine.timeScale;
@@ -169,6 +184,7 @@ function loop(now) {
     if ((streetT -= real) <= 0) { streetT = 0.3; Engine.street = streetCheck(Player.pos.x, Player.pos.z); }
     Engine.updateCamera(real, Player.pos, !!World.inside, Game.state === 'title');
     if (Game.state !== 'title') UI.update(real);
+    ViewHud.update(real, Game.state === 'play');
     Engine.render(real);
     if (Game.state === 'play' && (saveT += real) > 5) { saveT = 0; Score.save(); }
     // 1 フレームの計算にかかった時間(ミリ秒。確認用。16 をこえるとカクつく)
@@ -192,22 +208,18 @@ function streetCheck(px, pz) {
   return hit;
 }
 
-// 視点の切りかえ(見下ろし → 肩越し → 一人称 → 見下ろし)と、指・マウスで向きを変える
+// 視点の切りかえ(見下ろし → 肩越し → 一人称 → 見下ろし)と、指・マウスで向きを変える(view-look.js)
 const VIEWS = ['top', 'tps', 'fps'];
 const _look = { x: 0, y: 0 };
-function handleView() {
-  const ch = $('crosshair');
-  if (ch) ch.classList.toggle('hidden', Engine.viewMode === 'top' || Game.state !== 'play');
+function handleView(real) {
+  if (Input.consumeViewHold()) { ViewHud.openPanel(); return; }
   if (Input.consumeView()) {
     const next = VIEWS[(VIEWS.indexOf(Engine.viewMode) + 1) % VIEWS.length];
-    Engine.setViewMode(next, Player.facing);
+    Engine.setViewMode(next, Engine.viewMode === 'top' ? Player.facing : undefined);
     if (next === 'top' && document.pointerLockElement) document.exitPointerLock();
   }
-  Input.consumeLook(_look);
-  if (Engine.viewMode !== 'top') {
-    const sens = document.pointerLockElement ? 0.0026 : 0.0062;
-    Engine.look(_look.x * sens, -_look.y * sens * 0.8);
-  }
+  if (Engine.viewMode !== 'top') Look.update(real, Engine, Input, Engine.ctx);
+  else { Input.consumeLook(_look); Input.consumeLookMouse(_look); }
 }
 
 function step(dt) {
@@ -223,7 +235,7 @@ function step(dt) {
 
 // 確認用に外から見られる数字
 const stats = window.__stats = { ms: 0, fps: 0, zombies: 0, kills: 0, score: 0, state: '' };
-window.__game = { Game, Engine, Flow, Audio, UI, Player, Zombies, Weapons, World, Score, Director, FX, Input, start, pause, resume, finish };
+window.__game = { Game, Engine, Look, ViewHud, Flow, Audio, UI, Player, Zombies, Weapons, World, Score, Director, FX, Input, start, pause, resume, finish };
 
 boot().catch((e) => {
   console.error(e);
