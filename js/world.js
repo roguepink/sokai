@@ -150,8 +150,8 @@ export const World = {
           vec4 mv = modelViewMatrix * vec4(p, 1.0);
           gl_Position = projectionMatrix * mv;
           vK = aSeed;
-          gl_PointSize = (aSeed > 0.62 ? 2.6 : 3.4) * uScale / max(1.0, -mv.z);
-          vA = smoothstep(0.0, 2.0, p.y) * (1.0 - smoothstep(14.0, 22.0, p.y)) * (0.6 + 0.4 * sin(uTime * 6.0 + aSeed * 90.0));
+          gl_PointSize = min((aSeed > 0.62 ? 2.6 : 3.4) * uScale / max(1.0, -mv.z), uScale * 0.1);
+          vA = smoothstep(0.0, 2.0, p.y) * (1.0 - smoothstep(14.0, 22.0, p.y)) * (0.6 + 0.4 * sin(uTime * 6.0 + aSeed * 90.0)) * smoothstep(5.0, 10.0, -mv.z);
         }`,
       fragmentShader: `varying float vA; varying float vK;
         void main() {
