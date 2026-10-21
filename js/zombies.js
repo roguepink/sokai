@@ -143,11 +143,11 @@ export const Zombies = {
     const B = e._B;
     let glow = 0;
     if (e.frozen > 0) e.frozen -= dt;
-    if (e.shock > 0) { e.shock -= dt; glow = -(0.25 + Math.random() * 0.6); }
+    if (e.shock > 0) { e.shock -= dt; glow = Math.random() < 0.5 ? -(0.15 + Math.random() * 0.5) : 0; }
     if (e.burn > 0) {
       e.burn -= dt;
       e._burnAcc += dt;
-      glow = 0.25 + 0.2 * Math.sin(e.t * 25);
+      glow = 0.3 + 0.25 * Math.sin(e.t * 25);
       if (Math.random() < dt * (e.boss ? 20 : 8)) {
         const s = e.def.scale;
         FX.burst({ x: e.x + (Math.random() - 0.5) * 0.5 * s, y: (0.6 + Math.random() * 0.9) * s, z: e.z + (Math.random() - 0.5) * 0.5 * s,
@@ -161,7 +161,7 @@ export const Zombies = {
     if (B) {
       B.fx[0] = e.flash;
       B.fx[1] = e.frozen > 0 ? Math.min(1, B.fx[1] + dt * 8) : Math.max(0, B.fx[1] - dt * 2);
-      B.fx[2] = e.burn > 0 ? Math.min(0.55, B.fx[2] + dt * 0.25) : B.fx[2];
+      B.fx[2] = e.burn > 0 ? Math.min(0.6, B.fx[2] + dt * 0.3) : B.fx[2];
       B.fx[3] = glow;
     }
   },

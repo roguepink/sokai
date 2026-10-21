@@ -143,7 +143,7 @@ export const Player = {
     for (let i = 0; i < pr.scarf.length; i++) {
       const seg = pr.scarf[i];
       const ph = t * 9 + i * 0.9 + seg.userData.off;
-      seg.rotation.x = (i === 0 ? 1.1 - 0.95 * k : 0.16 - 0.08 * k) + Math.sin(ph) * (0.06 + 0.16 * k);
+      seg.rotation.x = (i === 0 ? 0.55 - 0.5 * k : 0.22 - 0.14 * k) + Math.sin(ph) * (0.06 + 0.16 * k);
       seg.rotation.z = Math.sin(ph * 0.7) * 0.12 * (0.4 + k);
     }
     // 銃の台座は いつも まっすぐ前・水平に(腕の角度に関係なく)

@@ -436,7 +436,7 @@ export const Gore = {
       if (B.burnT > 0) {
         B.burnT -= dt;
         B.fx[2] = Math.min(0.92, B.fx[2] + dt * 0.4);
-        B.fx[3] = 0.25 + 0.25 * Math.sin(B.age * 23) * Math.sin(B.age * 7);
+        B.fx[3] = 0.35 + 0.3 * Math.sin(B.age * 23) * Math.sin(B.age * 7);
         if (rnd() < dt * 9) FX.burst({ x: B.ra.x + R(-0.4, 0.4), y: B.ra.y + 0.2, z: B.ra.z + R(-0.4, 0.4), count: 2, color: rnd() < 0.5 ? 0xff6a10 : 0xffb030, speed: 0.8, up: 2.5, life: 0.5, size: 0.22, grav: -3, drag: 2 });
         if (B.burnT <= 0) B.fx[3] = 0;
       }

@@ -514,11 +514,17 @@ vec3 tint = mix( vSkin, vec3(1.0), smoothstep(0.2, 0.42, texelColor.a) );
 tint = mix( tint, vCloth, smoothstep(0.58, 0.8, texelColor.a) );
 diffuseColor.rgb *= texelColor.rgb * tint;
 diffuseColor.rgb = mix( diffuseColor.rgb, diffuseColor.rgb * vec3(0.09, 0.07, 0.06), vFx.z );
-diffuseColor.rgb = mix( diffuseColor.rgb, vec3(0.62, 0.82, 1.0), vFx.y * 0.8 );`)
+diffuseColor.rgb = mix( diffuseColor.rgb, vec3(0.45, 0.7, 0.95), vFx.y * 0.75 );`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
 totalEmissiveRadiance += vec3(1.0, 0.93, 0.85) * vFx.x * 0.9;
-totalEmissiveRadiance += vec3(0.25, 0.5, 0.75) * vFx.y * 0.35;
-totalEmissiveRadiance += vFx.w > 0.0 ? vec3(1.0, 0.35, 0.05) * vFx.w : vec3(0.35, 0.6, 1.0) * (-vFx.w);`);
+totalEmissiveRadiance += vec3(0.12, 0.3, 0.55) * vFx.y * 0.18;
+{ // 燃える: 暗いところ(焦げ・傷)が おき火のように光る / しびれ: 青白く光る
+  float lum = dot(texelColor.rgb, vec3(0.3, 0.59, 0.11));
+  vec2 cell = floor(vMapUv * 420.0);
+  float nz = fract(sin(dot(cell, vec2(12.9898, 78.233))) * 43758.5453);
+  float ember = smoothstep(0.4, 0.08, lum) * 0.8 + step(0.86, nz) * 0.7;
+  totalEmissiveRadiance += vFx.w > 0.0 ? vec3(1.0, 0.3, 0.03) * vFx.w * (0.15 + ember * 1.6) : vec3(0.35, 0.6, 1.0) * (-vFx.w);
+}`);
   };
   mat.customProgramCacheKey = () => 'zombie-v1';
   return mat;
