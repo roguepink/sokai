@@ -76,7 +76,7 @@ export function genTown(ctx) {
       continue;
     }
     const mat = p.kind === 'plaza' ? M.pave : p.kind === 'parking' ? M.asphalt : p.kind === 'park' ? M.ground : M.sidewalk;
-    const col = p.kind === 'park' ? [0.42, 0.55, 0.28] : p.kind === 'plaza' ? [1, 0.97, 0.92] : null;
+    const col = p.kind === 'park' ? [0.42, 0.55, 0.28] : p.kind === 'plaza' ? [0.86, 0.88, 0.92] : null;
     padBox(ctx, x0, z0, x1, z1, mat, col);
     ctx.mapRect(x0, z0, x1, z1, p.kind === 'park' ? '#3f5a2c' : p.kind === 'plaza' ? '#8a8070' : '#77736c');
     ctx.occupy(x0, z0, x1, z1);
@@ -286,7 +286,12 @@ function plaza(ctx, x0, z0, x1, z1) {
   ctx.prop('truck', cx - 27, cz + 6, Math.PI / 2, { y: Y, col: [0.32, 0.36, 0.24] });
   ctx.prop('van', cx + 27, cz - 8, Math.PI / 2 + 0.2, { y: Y, col: [0.32, 0.36, 0.24] });
   ctx.prop('police', cx + 8, cz + 27, 0.3, { y: Y });
-  // 中央の記念碑(低い台。主人公の出発点からは少し離す)
+  // 床の模様(白い輪と十字。主人公の出発点は広く あけたまま)
+  const pc = [0.78, 0.76, 0.72];
+  for (const R of [9, 16]) for (let a = 0; a < 48; a++) { const t = a / 48 * Math.PI * 2; ctx.B.flat(ctx.M.paint, cx + Math.cos(t) * R, Y + 0.012, cz + Math.sin(t) * R, R * 0.07, 0.35, { rot: t + Math.PI / 2, col: pc }); }
+  for (const [dx, dz] of [[1, 0], [0, 1]]) for (let s = -1; s <= 1; s += 2) ctx.B.flat(ctx.M.paint, cx + dx * s * 12.5, Y + 0.012, cz + dz * s * 12.5, dx ? 7 : 0.35, dz ? 7 : 0.35, { col: pc });
+  // 角の植えこみ
+  for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { ctx.prop('planter', cx + sx * 31, cz + sz * 21, 0, { y: Y }); placeTree(ctx, 'broad', cx + sx * 31, cz + sz * 21, 0.7, sx + sz); ctx.prop('planter', cx + sx * 21, cz + sz * 31, 0, { y: Y }); placeTree(ctx, 'birch', cx + sx * 21, cz + sz * 31, 0.75, sx - sz); }
   // 地面に 血・焦げ・紙くず
   for (let k = 0; k < 18; k++) decal(ctx, [1, 2, 3, 7, 6, 9][k % 6], cx + (rnd() - 0.5) * 60, cz + (rnd() - 0.5) * 60, 2 + rnd() * 3, rnd() * 6, Y + 0.01);
   for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) lamp(ctx, cx + sx * 12, cz + sz * 12, Math.atan2(-sz, sx) + Math.PI, Y);

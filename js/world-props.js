@@ -313,7 +313,7 @@ export function defineProps(ctx) {
   }), fol, { cast: false, decor: true });
   const rockGeo = new THREE.DodecahedronGeometry(1, 0);
   { const p = rockGeo.attributes.position, rr = seeded(5); for (let i = 0; i < p.count; i++) p.setXYZ(i, p.getX(i) * (0.8 + rr() * 0.4), p.getY(i) * (0.6 + rr() * 0.3), p.getZ(i) * (0.8 + rr() * 0.4)); rockGeo.computeVertexNormals(); }
-  I.define('rock', makeGeo((b) => { _m.makeTranslation(0, 0.3, 0); b.geom(null, rockGeo, _m, { col: [0.5, 0.49, 0.46] }); }), M.rock);
+  I.define('rock', makeGeo((b) => { _m.makeTranslation(0, 0.3, 0); b.geom(null, rockGeo, _m, { col: [0.36, 0.35, 0.33] }); }), M.rock);
   I.define('log', makeGeo((b) => { cyl(b, 0, 0.35, 0, 0.35, 5, [0.36, 0.26, 0.17], 8, 0, Math.PI / 2); cyl(b, 2.51, 0.35, 0, 0.3, 0.02, [0.6, 0.48, 0.32], 8, 0, Math.PI / 2); cyl(b, -2.51, 0.35, 0, 0.3, 0.02, [0.6, 0.48, 0.32], 8, 0, Math.PI / 2); }), M.rock);
   I.define('grass', makeGeo((b) => {
     for (const a of [0, 1.05, 2.1]) { const g = new THREE.PlaneGeometry(1.4, 0.7); _m.makeRotationY(a); _m.setPosition(0, 0.35, 0); b.geom(null, g, _m, { col: [0.35, 0.5, 0.22] }); }

@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { seeded } from './util.js';
 
 // 透かしの中心(主人公の位置)と 半径(画面上の大きさ。tan 単位)。World.update が毎フレーム入れる
-export const CUT = { pos: { value: new THREE.Vector3(0, -999, 0) }, r: { value: 0.2 }, rf: { value: 0.32 } };
+export const CUT = { pos: { value: new THREE.Vector3(0, -999, 0) }, r: { value: 0.2 }, rf: { value: 0.32 }, near0: { value: 0 }, nearF: { value: 9.5 } };
 
 const R = seeded(9001);
 const rr = (a, b) => a + R() * (b - a);
@@ -253,7 +253,7 @@ function tileTex() {       // 床タイル(4m に 8×8)
   for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) { const v = ri(205, 230); x.fillStyle = rgb(v, v, v - 4); x.fillRect(i * q, j * q, q, q); }
   x.strokeStyle = 'rgba(110,108,100,0.9)'; x.lineWidth = 2;
   for (let i = 0; i <= n; i++) { x.beginPath(); x.moveTo(i * q, 0); x.lineTo(i * q, S); x.stroke(); x.beginPath(); x.moveTo(0, i * q); x.lineTo(S, i * q); x.stroke(); }
-  blots(x, S, S, 14, 10, 50, ['rgba(100,90,70,0.2)']);
+  blots(x, S, S, 6, 30, 80, ['rgba(100,90,70,0.08)']);
   grain(x, S, S, 10);
   return tex(c);
 }
@@ -262,7 +262,7 @@ function linoTex() {
   x.fillStyle = rgb(200, 205, 198); x.fillRect(0, 0, S, S);
   for (let i = 0; i < 1500; i++) { x.fillStyle = R() < 0.5 ? 'rgba(140,150,140,0.5)' : 'rgba(240,240,235,0.6)'; x.fillRect(R() * S, R() * S, 2, 2); }
   x.fillStyle = 'rgba(120,125,118,0.8)'; x.fillRect(0, 0, S, 2); x.fillRect(0, 0, 2, S);
-  blots(x, S, S, 10, 10, 40, ['rgba(110,100,80,0.2)']);
+  blots(x, S, S, 5, 30, 80, ['rgba(110,100,80,0.08)']);
   grain(x, S, S, 10);
   return tex(c);
 }
@@ -285,7 +285,7 @@ function woodTex() {       // 板の床(4m)
 function concreteTex() {   // 工場・倉庫の床、打ちっぱなし(8m)
   const S = 256, [c, x] = cnv(S);
   x.fillStyle = rgb(160, 160, 158); x.fillRect(0, 0, S, S);
-  blots(x, S, S, 30, 15, 70, ['rgba(100,100,98,0.3)', 'rgba(200,200,195,0.25)', 'rgba(70,60,50,0.25)']);
+  blots(x, S, S, 14, 30, 90, ['rgba(100,100,98,0.16)', 'rgba(200,200,195,0.14)', 'rgba(70,60,50,0.12)']);
   x.strokeStyle = 'rgba(80,80,80,0.7)'; x.lineWidth = 1.5; x.beginPath(); x.moveTo(S / 2, 0); x.lineTo(S / 2, S); x.moveTo(0, S / 2); x.lineTo(S, S / 2); x.stroke();
   for (let i = 0; i < 3; i++) crack(x, R() * S, R() * S, ri(4, 10), 0.8, 'rgba(60,60,60,0.6)');
   grain(x, S, S, 18);
@@ -327,8 +327,18 @@ function decalTex() {      // 4×4 の シール(シミ・血・ひび・落ち�
   cell(2, 2, () => { x.strokeStyle = 'rgba(15,15,15,0.7)'; x.lineWidth = 9; for (const o of [-18, 18]) { x.beginPath(); x.moveTo(-60, o); x.bezierCurveTo(-20, o - 20, 20, o + 20, 60, o); x.stroke(); } });
   // 3,2 黄色の「危険」線
   cell(3, 2, () => { for (let k = -4; k < 4; k++) { x.fillStyle = k % 2 ? rgb(230, 190, 30, 0.95) : rgb(20, 20, 20, 0.95); x.beginPath(); x.moveTo(k * 16 - 8, -20); x.lineTo(k * 16 + 8, -20); x.lineTo(k * 16 + 24, 20); x.lineTo(k * 16 + 8, 20); x.fill(); } });
-  // 0..3,3 光のたまり用ではない、草のかたまり
-  for (let i = 0; i < 4; i++) cell(i, 3, () => { for (let k = 0; k < 60; k++) { x.strokeStyle = rgb(60 + R() * 40, 90 + R() * 50, 40, 0.9); x.lineWidth = 1.5; const px = rr(-50, 50), py = rr(-30, 50); x.beginPath(); x.moveTo(px, py); x.lineTo(px + rr(-6, 6), py - rr(8, 22)); x.stroke(); } });
+  // 1,3 土の道(上下がぼける。左右はつながる)
+  x.save(); x.beginPath(); x.rect(q, 3 * q, q, q); x.clip();
+  for (let k = 0; k < 90; k++) {
+    const px = q + R() * q, py = 3 * q + q / 2 + (R() - 0.5) * q * 0.45, r = rr(10, 26);
+    const g = x.createRadialGradient(px, py, 0, px, py, r);
+    g.addColorStop(0, 'rgba(125,98,66,0.55)'); g.addColorStop(1, 'rgba(125,98,66,0)');
+    x.fillStyle = g; x.fillRect(px - r, py - r, r * 2, r * 2);
+  }
+  for (let k = 0; k < 140; k++) { x.fillStyle = R() < 0.5 ? 'rgba(80,62,40,0.6)' : 'rgba(170,150,115,0.5)'; x.fillRect(q + R() * q, 3 * q + q * 0.25 + R() * q * 0.5, 2, 2); }
+  x.restore();
+  // 0,3 草のかたまり
+  for (let i = 0; i < 1; i++) cell(i, 3, () => { for (let k = 0; k < 60; k++) { x.strokeStyle = rgb(60 + R() * 40, 90 + R() * 50, 40, 0.9); x.lineWidth = 1.5; const px = rr(-50, 50), py = rr(-30, 50); x.beginPath(); x.moveTo(px, py); x.lineTo(px + rr(-6, 6), py - rr(8, 22)); x.stroke(); } });
   return tex(c, { aniso: 2 });
 }
 function glowTex() {
@@ -362,15 +372,18 @@ function flameTex() {      // 炎(縦長、下が明るい)
 }
 
 // 主人公のまわりを 丸く透かす(壁・ビル・木)
-export function cutout(mat, radius = CUT.r) {
+// near: カメラにこれより近い所(m)を ぼかして消す(カメラの前の木の葉)
+export function cutout(mat, radius = CUT.r, near = CUT.near0) {
   mat.onBeforeCompile = (sh) => {
-    sh.uniforms.uCutPos = CUT.pos; sh.uniforms.uCutR = radius;
+    sh.uniforms.uCutPos = CUT.pos; sh.uniforms.uCutR = radius; sh.uniforms.uNear = near;
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform vec3 uCutPos;\nuniform float uCutR;')
+      .replace('#include <common>', '#include <common>\nuniform vec3 uCutPos;\nuniform float uCutR;\nuniform float uNear;')
       .replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
       {
         vec4 cpv = viewMatrix * vec4(uCutPos, 1.0);
         vec3 fpv = -vViewPosition;
+        float dn = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
+        if (uNear > 0.0 && -fpv.z < uNear && dn > (-fpv.z - uNear + 3.0) / 3.0) discard;
         if (fpv.z > cpv.z + 1.0) {
           vec2 dd = fpv.xy / -fpv.z - cpv.xy / -cpv.z;
           float a = length(dd) / uCutR;
@@ -401,7 +414,7 @@ export function makeMaterials(renderer, quality) {
     ground: std({ map: groundTex(), roughness: 1 }, [16, 16]),
     asphalt: std({ map: asphaltTex(), roughness: 0.95 }, [12, 12]),
     sidewalk: std({ map: sidewalkTex(), roughness: 0.9 }, [4, 4]),
-    pave: std({ map: paveTex(), roughness: 0.9 }, [4, 4]),
+    pave: std({ map: paveTex(), roughness: 0.9 }, [7, 7]),
     paint: std({ map: paintTex(), roughness: 0.8, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 }, [2, 2]),
     office: std({ map: offT, emissiveMap: offE, emissive: 0xffffff, emissiveIntensity: 1.4, roughness: 0.6, metalness: 0.1 }, [12, 14], { cast: true, cut: true }),
     apt: std({ map: aptT, emissiveMap: aptE, emissive: 0xffffff, emissiveIntensity: 1.3 }, [12, 12], { cast: true, cut: true }),
@@ -423,7 +436,7 @@ export function makeMaterials(renderer, quality) {
     pool: new THREE.MeshBasicMaterial({ map: glowT, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -6 }),
     water: new THREE.MeshStandardMaterial({ map: waterTex(), color: 0x9fb8c0, roughness: 0.15, metalness: 0.2, emissive: 0x0a1820, transparent: true, opacity: 0.92 }),
     flame: new THREE.MeshBasicMaterial({ map: flameTex(), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, color: 0xffffff }),
-    foliage: cutout(std({ roughness: 0.95, flatShading: true }, [4, 4], { cast: true }), CUT.rf),
+    foliage: cutout(std({ roughness: 0.95, flatShading: true }, [4, 4], { cast: true }), CUT.rf, CUT.nearF),
     rock: std({ roughness: 1, flatShading: true }, [4, 4], { cast: true }),
     car: std({ roughness: 0.45, metalness: 0.3 }, [4, 4], { cast: true, cut: true }),
   };

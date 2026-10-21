@@ -137,7 +137,7 @@ export const World = {
       const zn = this.zoneAt(x, z);
       const ix = Math.min(100, Math.max(0, Math.round((x + h) / G))), iz = Math.min(100, Math.max(0, Math.round((z + h) / G)));
       const n = 0.82 + noise[iz * 101 + ix] * 0.36;
-      if (zn === 'forest') return [0.4 * n, 0.4 * n, 0.27 * n];
+      if (zn === 'forest') return [0.47 * n, 0.45 * n, 0.3 * n];
       if (zn === 'industrial') return [0.5 * n, 0.5 * n, 0.5 * n];
       if (zn === 'park' || zn === 'suburb') return [0.36 * n, 0.5 * n, 0.27 * n];
       return [0.5 * n, 0.48 * n, 0.42 * n];
@@ -145,6 +145,7 @@ export const World = {
     const T = TOWN.ext;
     for (let z = -h; z < h; z += G) for (let x = -h; x < h; x += G) {
       if (x >= T[0] && x + G <= T[2] && z >= T[1] && z + G <= T[3]) continue;   // 町の中は道路が敷いてある
+      if (x >= T[2] && z >= -208 && z + G <= 208) continue;                       // 工場地帯はコンクリート(world-zones.js)
       const b = B.bucket(M.ground, x + G / 2, z + G / 2), s = M.ground.userData.s;
       const c0 = colAt(x, z + G), c1 = colAt(x + G, z + G), c2 = colAt(x + G, z), c3 = colAt(x, z);
       const base = b.v;

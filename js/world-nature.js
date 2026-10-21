@@ -37,6 +37,7 @@ export function genNature(ctx) {
   clearings(ctx);
   cabin(ctx, 112, -306);
   forest(ctx);
+  outside(ctx);
 }
 
 // 平らな楕円の板(世界の座標で模様を貼る)
@@ -55,7 +56,8 @@ function disk(ctx, mat, x, z, rx, rz, y, col, seg = 40) {
 function lakes(ctx) {
   const { M, rnd } = ctx;
   for (const L of LAKES) {
-    disk(ctx, M.ground, L.x, L.z, L.rx + 5, L.rz + 4, 0.015, [0.28, 0.24, 0.18]);
+    disk(ctx, M.ground, L.x, L.z, L.rx + 4, L.rz + 3, 0.015, [0.33, 0.31, 0.22]);
+    disk(ctx, M.ground, L.x, L.z, L.rx + 1.2, L.rz + 1.2, 0.02, [0.24, 0.21, 0.15]);
     disk(ctx, M.water, L.x, L.z, L.rx, L.rz, 0.05, [1, 1, 1]);
     // 当たり判定: 2m ごとの横長の箱(岸から 1m は歩ける)
     for (let dz = -L.rz; dz < L.rz; dz += 2) {
@@ -71,7 +73,7 @@ function lakes(ctx) {
       const a = rnd() * Math.PI * 2, f = 1.02 + rnd() * 0.12;
       const x = L.x + Math.cos(a) * L.rx * f, z = L.z + Math.sin(a) * L.rz * f;
       const r = rnd();
-      if (r < 0.3) { ctx.I.add('rock', x, 0, z, rnd() * 6, [0.6 + rnd() * 0.8, 0.5 + rnd() * 0.6, 0.6 + rnd() * 0.8]); }
+      if (r < 0.3) { ctx.I.add('rock', x, 0, z, rnd() * 6, [0.6 + rnd() * 0.8, 0.5 + rnd() * 0.6, 0.6 + rnd() * 0.8], null); }
       else ctx.I.add('grass', x, 0, z, rnd() * 6, 1 + rnd() * 0.8);
     }
   }
@@ -89,10 +91,10 @@ function paths(ctx) {
   for (const P of PATHS) {
     for (let i = 0; i < P.length - 1; i++) {
       const [x0, z0] = P[i], [x1, z1] = P[i + 1];
-      const L = Math.hypot(x1 - x0, z1 - z0), rot = Math.atan2(-(z1 - z0), x1 - x0);
-      for (let s = 0; s < L; s += 8) {
-        const t = (s + 4) / L, x = x0 + (x1 - x0) * t, z = z0 + (z1 - z0) * t;
-        B.flat(M.ground, x, 0.012 + (i % 2) * 0.002, z, Math.min(9, L - s + 1), 4.5, { rot, col: [0.58, 0.46, 0.32] });
+      const L = Math.hypot(x1 - x0, z1 - z0), rot = Math.atan2(z1 - z0, x1 - x0);
+      for (let s = 0; s < L; s += 6) {
+        const t = (s + 3) / L, x = x0 + (x1 - x0) * t, z = z0 + (z1 - z0) * t;
+        B.flat(M.decal, x, 0.012 + (i % 2) * 0.002, z, 9, 6, { rot, uv: [0.25, 0, 0.5, 0.25], col: [1, 1, 1] });
         ctx.occupy(x - 4, z - 4, x + 4, z + 4);
         if (rnd() < 0.25) decal(ctx, 5, x + (rnd() - 0.5) * 3, z + (rnd() - 0.5) * 3, 2.5, rnd() * 6, 0.02);
       }
@@ -178,6 +180,25 @@ function forest(ctx) {
   }
 }
 
+// マップの外: 地面と こい森(見えるだけ。外へは出られない)
+function outside(ctx) {
+  const { B, M, rnd, half } = ctx;
+  const W = 70, E = half + W;
+  const col = [0.4, 0.38, 0.26];
+  for (let s = -E; s < E; s += 40) {
+    const L = Math.min(40, E - s);
+    for (const [cx, cz, sx, sz] of [[s + L / 2, -half - W / 2, L, W], [s + L / 2, half + W / 2, L, W]]) B.flat(M.ground, cx, -0.01, cz, sx, sz, { col });
+    if (s >= -half && s < half) for (const [cx, cz, sx, sz] of [[-half - W / 2, s + L / 2, W, L], [half + W / 2, s + L / 2, W, L]]) B.flat(M.ground, cx, -0.01, cz, sx, sz, { col });
+  }
+  const G = 6.5;
+  for (let z = -E; z < E; z += G) for (const [xa, xb] of (Math.abs(z + G / 2) < half - G ? [[-E, -half], [half, E]] : [[-E, E]])) for (let x = xa; x < xb; x += G) {
+    const px = x + rnd() * G, pz = z + rnd() * G;
+    if (Math.abs(px) < half + 1 && Math.abs(pz) < half + 1) continue;
+    const r = rnd(), s = 1.2 + rnd() * 0.7;
+    ctx.I.add(r < 0.75 ? 'pine' : r < 0.9 ? 'broad' : 'dead', px, 0, pz, rnd() * 6.28, s, [0.8 + rnd() * 0.3, 0.85 + rnd() * 0.25, 0.85]);
+  }
+}
+
 // 公園(町の南)と 学校
 function park(ctx) {
   const { B, M, rnd } = ctx;
@@ -189,8 +210,10 @@ function park(ctx) {
   // 噴水の広場
   disk(ctx, M.pave, 0, 250, 16, 16, 0.06, [0.95, 0.9, 0.85]);
   ctx.occupy(-17, 233, 17, 267);
-  ctx.B.geom(M.plain, new THREE.CylinderGeometry(5.2, 5.4, 0.8, 24), new THREE.Matrix4().makeTranslation(0, 0.4, 250), { col: [0.7, 0.68, 0.64] });
-  disk(ctx, M.water, 0, 250, 4.8, 4.8, 0.7, [1, 1, 1], 24);
+  ctx.B.geom(M.plain, new THREE.CylinderGeometry(5.2, 5.4, 0.8, 24, 1, true), new THREE.Matrix4().makeTranslation(0, 0.4, 250), { col: [0.7, 0.68, 0.64] });
+  ctx.B.geom(M.plain, new THREE.RingGeometry(4.7, 5.2, 24).rotateX(-Math.PI / 2), new THREE.Matrix4().makeTranslation(0, 0.8, 250), { col: [0.75, 0.73, 0.69] });
+  ctx.B.geom(M.plain, new THREE.CylinderGeometry(4.7, 4.7, 0.8, 24, 1, true).scale(-1, 1, 1), new THREE.Matrix4().makeTranslation(0, 0.4, 250), { col: [0.5, 0.5, 0.48] });
+  disk(ctx, M.water, 0, 250, 4.8, 4.8, 0.62, [1, 1, 1], 24);
   ctx.B.geom(M.plain, new THREE.CylinderGeometry(0.6, 0.9, 3.2, 10), new THREE.Matrix4().makeTranslation(0, 1.6, 250), { col: [0.7, 0.68, 0.64] });
   ctx.B.geom(M.plain, new THREE.CylinderGeometry(1.8, 1.2, 0.4, 16), new THREE.Matrix4().makeTranslation(0, 3.0, 250), { col: [0.7, 0.68, 0.64] });
   ctx.solid(-4.2, 245.8, 4.2, 254.2, 0.8);

@@ -96,6 +96,11 @@ export function fence(ctx, xa, za, xb, zb, col = [0.9, 0.88, 0.82]) {
 export function genIndustrial(ctx) {
   const { B, M, rnd } = ctx;
   const X0 = 192, X1 = 396;
+  // 地面: コンクリートの板
+  for (let z = -208; z < 208; z += 40) for (let x = X0; x < 400; x += 40) {
+    const z1 = Math.min(208, z + 40);
+    B.flat(M.floorC, x + 20, 0.004, (z + z1) / 2, 40, z1 - z, { col: [0.52, 0.52, 0.5] });
+  }
   road(ctx, X0, X1, -40, 6, true); road(ctx, X0, X1, 40, 6, true);
   road(ctx, -205, 205, 310, 6, false);
   for (const Z of [-40, 40]) for (let x = X0 + 10; x < X1; x += 26) lamp(ctx, x, Z + 7.5, Math.PI / 2);

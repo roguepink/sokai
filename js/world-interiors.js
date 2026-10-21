@@ -229,7 +229,8 @@ function mall(ctx) {
   for (let k = 0; k < 14; k++) decal(ctx, [1, 2, 3, 9, 0][k % 5], 55 + rnd() * 108, -85 + rnd() * 18, 2 + rnd() * 2.5, rnd() * 6, 0.22);
   // 屋根: 天窓とエアコン、屋上看板
   B.flatRoof({ ac: 8, sky: 4 });
-  B.RB.box(M.glow, 95, B.h + 1.1, -53.6, 123, B.h + 3.2, -53.2, { col: SIGN.pink });
+  for (let k = 0; k < 6; k++) B.RB.box(M.glow, 98 + k * 3.8, B.h + 1.1, -53.6, 100.8 + k * 3.8, B.h + 3.0, -53.3, { col: [1.6, 0.35, 1.0] });
+  B.RB.box(M.plain, 96, B.h + 0.4, -53.8, 122, B.h + 3.4, -53.65, { col: [0.15, 0.15, 0.17] });
   B.finish();
   // まわり: 搬入口のトラック
   ctx.prop('truck', 60, -104, 0, { y: 0.15, col: [0.85, 0.85, 0.85] });
