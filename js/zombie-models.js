@@ -791,7 +791,7 @@ export const OUTFITS = {
   soldier: { torso: TILE.camo, legs: [TILE.camoU, TILE.camoL], arms: [[TILE.aSleeve, TILE.fGlove]], heads: [TILE.hGas],
     cloth: [0x6a7a50, 0x7a7a58, 0x5a6a4a, 0x8a8060], pants: 'cloth', sleeve: 'cloth' },
   gold: { torso: TILE.goldT, legs: [TILE.slacksU, TILE.slacksL], arms: [[TILE.aSleeve, TILE.fBare]], heads: [TILE.hShort, TILE.hBald],
-    cloth: [0xffc830, 0xffd850], pants: [0xd0a020], sleeve: 'cloth', skins: [0xe8c050, 0xf0d070] },
+    cloth: [0xffb000, 0xffc020], pants: [0xc08000], sleeve: 'cloth', skins: [0xf0b020, 0xffc830] },
 };
 // 裂けた顔は いろいろな服に まぜる
 for (const k of ['office', 'tee', 'hoodie', 'tank', 'torn', 'flannel', 'shirtless', 'hivis']) OUTFITS[k].heads.push(TILE.hTorn);

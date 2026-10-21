@@ -195,7 +195,8 @@ export const Zombies = {
       }
     }
     if (B) {
-      B.fx[0] = def.gold ? Math.max(e.flash, 0.28 + 0.14 * Math.sin(e.t * 7)) : e.flash;
+      B.fx[0] = e.flash;
+      if (def.gold) glow = 0.12 + 0.06 * Math.sin(e.t * 7);   // 金色に ほんのり光る
       if (def.gold && Math.random() < dt * 6) FX.burst({ x: e.x, y: 1.2, z: e.z, count: 2, color: 0xffe680, speed: 1.5, up: 2, life: 0.6, size: 0.09, grav: -1, drag: 1 });
       if (def.fire) B.fx[2] = 0.45;
       B.fx[1] = e.frozen > 0 ? Math.min(1, B.fx[1] + dt * 8) : Math.max(0, B.fx[1] - dt * 2);
