@@ -257,7 +257,7 @@ export const Gore = {
     B.split = true;
     B.bleedP = P.PELVIS; B.bleedY = 0.1;
     // 切り口から 血が噴きだす
-    FX.burst({ x: rb.x, y: rb.y, z: rb.z, count: 26, color: 0x7a0606, speed: 5, up: 4, life: 0.8, size: 0.14, dirX: dx * 0.5, dirZ: dz * 0.5 });
+    FX.burst({ x: rb.x, y: rb.y, z: rb.z, count: 26, color: 0x7a0606, speed: 5, up: 4, life: 0.8, size: 0.10, dirX: dx * 0.5, dirZ: dz * 0.5 });
   },
 
   // 頭が飛ぶ(体から はなれて 転がる)
@@ -275,8 +275,8 @@ export const Gore = {
     if (B.helmet) { this._gibFrom(B, P.HELMET, -1, 0.19, 0.13, true, dx * 6 + R(-3, 3), R(6, 9), dz * 6 + R(-3, 3), 14); B.hide |= BIT(P.HELMET); }
     this.chunks(_v.x, _v.y, _v.z, lite ? 4 : 9, 7, 5, dx, dz);
     this.chunks(_v.x, _v.y, _v.z, lite ? 1 : 3, 6, 5, dx, dz, 0xd8ccb0, 0.6);
-    FX.burst({ x: _v.x, y: _v.y, z: _v.z, count: lite ? 10 : 24, color: 0x8a0a0a, speed: 7, up: 4, life: 0.6, size: 0.15, dirX: dx * 0.7, dirZ: dz * 0.7 });
-    FX.burst({ x: _v.x, y: _v.y, z: _v.z, count: lite ? 4 : 10, color: 0x5a0404, speed: 3, up: 1.5, life: 0.7, size: 0.16, grav: 2, drag: 3 });
+    FX.burst({ x: _v.x, y: _v.y, z: _v.z, count: lite ? 10 : 24, color: 0x8a0a0a, speed: 7, up: 4, life: 0.6, size: 0.10, dirX: dx * 0.7, dirZ: dz * 0.7 });
+    FX.burst({ x: _v.x, y: _v.y, z: _v.z, count: lite ? 4 : 10, color: 0x5a0404, speed: 3, up: 1.5, life: 0.7, size: 0.11, grav: 2, drag: 3 });
     B.bleed = Math.max(B.bleed, 1.2); B.bleedP = P.TORSO; B.bleedY = 0.55;
   },
   // 腕・脚が ちぎれて飛ぶ(上 + 下 の 2 つで 1 本)
@@ -288,7 +288,7 @@ export const Gore = {
       dx * vh + R(-4, 4), vy * R(0.7, 1.3), dz * vh + R(-4, 4), 14);
     B.hide |= BIT(p) | BIT(lower);
     Render.partPoint(B, p, 0, _v);
-    FX.burst({ x: _v.x, y: _v.y, z: _v.z, count: 10, color: 0x7a0606, speed: 4, up: 3, life: 0.6, size: 0.12, dirX: dx * 0.5, dirZ: dz * 0.5 });
+    FX.burst({ x: _v.x, y: _v.y, z: _v.z, count: 10, color: 0x7a0606, speed: 4, up: 3, life: 0.6, size: 0.08, dirX: dx * 0.5, dirZ: dz * 0.5 });
   },
 
   // 体の部位から ばらばらの部位を作る。cy = 中心の高さ(部位の中の座標)
@@ -388,6 +388,7 @@ export const Gore = {
     for (const B of Render.bodies) {
       if (B.mode !== 2) continue;
       B.age += dt;
+      if (B.fx[0] > 0) B.fx[0] = Math.max(0, B.fx[0] - dt * 5);
       stepRigid(B.ra, dt);
       if (B.split) stepRigid(B.rb, dt);
       const air = B.split ? (!B.ra.settled || !B.rb.ground) : !B.ra.ground;
@@ -413,7 +414,7 @@ export const Gore = {
         const sp = Math.hypot(B.ra.vx, B.ra.vz);
         if (B.age > 0.25 && sp > 3) {
           this.splat(B.ra.x, B.ra.z, R(0.9, 1.4) * B.s, B.ra.vx / sp, B.ra.vz / sp, 1 + Math.min(1.5, sp * 0.12));
-          FX.burst({ x: B.ra.x, y: 0.3, z: B.ra.z, count: 8, color: 0x6a0505, speed: 3, up: 2, life: 0.5, size: 0.12 });
+          FX.burst({ x: B.ra.x, y: 0.3, z: B.ra.z, count: 8, color: 0x6a0505, speed: 3, up: 2, life: 0.5, size: 0.08 });
         }
       }
       if (B.ra.settled && !B.splatted && B.age > 0.4) {
@@ -429,7 +430,7 @@ export const Gore = {
           const m = B.mats, o = B.bleedP * 16;
           const ux = m[o + 4], uy = m[o + 5], uz = m[o + 6], ul = Math.hypot(ux, uy, uz) || 1;
           const sg = B.bleedP === P.TORSO && B.split ? -1 : 1;
-          FX.burst({ x: _v.x, y: _v.y, z: _v.z, count: 3, color: 0x8a0808, speed: 2.5, up: 2 + Math.max(0, uy / ul) * 3 * sg, life: 0.6, size: 0.11, dirX: ux / ul * 4 * sg, dirZ: uz / ul * 4 * sg, spread: 0.4 });
+          FX.burst({ x: _v.x, y: _v.y, z: _v.z, count: 3, color: 0x8a0808, speed: 2.5, up: 2 + Math.max(0, uy / ul) * 3 * sg, life: 0.6, size: 0.08, dirX: ux / ul * 4 * sg, dirZ: uz / ul * 4 * sg, spread: 0.4 });
         }
       }
       // 燃えている死体

@@ -403,7 +403,7 @@ export const Zombies = {
   _bloaterBlast(x, z, s) {
     const R = 4.8 * s;
     FX.burst({ x, y: 1, z, count: 34, color: 0x9aa830, speed: 10, up: 6, life: 0.7, size: 0.22, drag: 2 });
-    FX.burst({ x, y: 1, z, count: 22, color: 0x7a0808, speed: 9, up: 5, life: 0.8, size: 0.18 });
+    FX.burst({ x, y: 1, z, count: 22, color: 0x7a0808, speed: 9, up: 5, life: 0.8, size: 0.13 });
     FX.burst({ x, y: 1, z, count: 16, color: 0x6a7020, speed: 4, up: 2, life: 1, size: 0.22, grav: -0.5, drag: 2.5 });
     Gore.chunks(x, 1, z, 14, 9, 6, 0, 0, 0x5a2a10);
     Gore.chunks(x, 1, z, 8, 8, 5, 0, 0, 0x7a7a20, 0.8);

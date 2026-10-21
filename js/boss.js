@@ -173,8 +173,8 @@ export const Bosses = {
     m.fallAxis = Math.random() < 0.5 ? 1 : -1;
     // 血と肉の大爆発
     for (let i = 0; i < 3; i++) Gore.chunks(x, 1.5 * s * (0.5 + i * 0.4), z, 16, 14, 9, dx * 0.4, dz * 0.4, i === 2 ? 0xd8ccb0 : 0x6a0808, i === 2 ? 1.2 : 2.2);
-    FX.burst({ x, y: 2 * s, z, count: 120, color: 0x8a0a0a, speed: 16, up: 9, life: 1.1, size: 0.22, drag: 1.5 });
-    FX.burst({ x, y: 2 * s, z, count: 50, color: 0x5a0404, speed: 7, up: 4, life: 1.2, size: 0.24, grav: 2, drag: 2.5 });
+    FX.burst({ x, y: 2 * s, z, count: 120, color: 0x8a0a0a, speed: 16, up: 9, life: 1.1, size: 0.15, drag: 1.5 });
+    FX.burst({ x, y: 2 * s, z, count: 50, color: 0x5a0404, speed: 7, up: 4, life: 1.2, size: 0.17, grav: 2, drag: 2.5 });
     FX.burst({ x, y: 1.5 * s, z, count: 40, color: 0xffd0a0, speed: 20, up: 4, life: 0.35, size: 0.18, grav: 0, drag: 3 });
     Gore.splat(x, z, 7.5, 0, 0, 1, 0x3a0202);
     for (let i = 0; i < 7; i++) { const a = Math.random() * 6.28, r = R(3, 8); Gore.splat(x + cos(a) * r, z + sin(a) * r, R(1.5, 3), cos(a), sin(a), 2.2); }
@@ -215,7 +215,7 @@ export const Bosses = {
           d.vx *= 0.6; d.vz *= 0.6; d.wx *= 0.5; d.wy *= 0.5; d.wz *= 0.5;
           if (d.vy === 0 && Math.abs(d.vx) + Math.abs(d.vz) < 0.3) d.rest = true;
         }
-        if (Math.random() < dt * 10 && d.vy !== 0) FX.burst({ x: d.o.position.x, y: d.o.position.y, z: d.o.position.z, count: 2, color: 0x7a0606, speed: 1, up: 0.5, life: 0.5, size: 0.14 });
+        if (Math.random() < dt * 10 && d.vy !== 0) FX.burst({ x: d.o.position.x, y: d.o.position.y, z: d.o.position.z, count: 2, color: 0x7a0606, speed: 1, up: 0.5, life: 0.5, size: 0.10 });
       }
       if (m.deadT > 6) for (const d of m.debris) d.o.position.y -= dt * 0.4;
       if (m.deadT > 8) { this._active.splice(i, 1); this._free(m); }
@@ -293,7 +293,7 @@ const AIS = {
         const c = B._Z.spawn('crawler', e.x + cos(a) * 2.2, e.z + sin(a) * 2.2);
         if (c) { c.kx = cos(a) * 6; c.kz = sin(a) * 6; }
       }
-      FX.burst({ x: e.x, y: 1.5, z: e.z, count: 40, color: 0x7a0808, speed: 8, up: 6, life: 0.8, size: 0.2 });
+      FX.burst({ x: e.x, y: 1.5, z: e.z, count: 40, color: 0x7a0808, speed: 8, up: 6, life: 0.8, size: 0.14 });
       Gore.splat(e.x, e.z, 4, 0, 0, 1);
     }
     if (e.state === 'walk') {

@@ -57,9 +57,15 @@ export const Player = {
     if (obj) hand.add(obj);
   },
   // 銃口の位置(弾が出る所。ワールド座標)
+  // (右手の位置から 前へ 0.45m。撃っている間は腕が前に出ているので だいたい 前 0.95m・高さ 1.4m)
   muzzle(out = new THREE.Vector3()) {
-    const f = this.facing;
-    return out.set(this.pos.x + Math.sin(f) * 0.9 + Math.cos(f) * 0.25, 1.3, this.pos.z - Math.cos(f) * 0.9 + Math.sin(f) * 0.25);
+    const f = this.facing, gm = this.parts.gunMount;
+    if (gm && this.aiming && !(this._spin > 0)) {
+      gm.getWorldPosition(out);
+      out.x += Math.sin(f) * 0.45; out.z -= Math.cos(f) * 0.45;
+      if (Math.hypot(out.x - this.pos.x, out.z - this.pos.z) < 2 && out.y > 0.9 && out.y < 2) return out;
+    }
+    return out.set(this.pos.x + Math.sin(f) * 0.95 + Math.cos(f) * 0.24, 1.4, this.pos.z - Math.cos(f) * 0.95 + Math.sin(f) * 0.24);
   },
 
   _animate(dt, moving) {
@@ -144,7 +150,8 @@ export const Player = {
       const seg = pr.scarf[i];
       const ph = t * 9 + i * 0.9 + seg.userData.off;
       seg.rotation.x = (i === 0 ? 0.55 - 0.5 * k : 0.22 - 0.14 * k) + Math.sin(ph) * (0.06 + 0.16 * k);
-      seg.rotation.z = Math.sin(ph * 0.7) * 0.12 * (0.4 + k);
+      seg.rotation.z = Math.sin(ph * 0.7) * 0.2 * (0.5 + k);
+      seg.rotation.y = Math.sin(ph * 0.5 + 1) * 0.15;
     }
     // 銃の台座は いつも まっすぐ前・水平に(腕の角度に関係なく)
     m.updateMatrixWorld(true);
@@ -214,10 +221,10 @@ function buildHero() {
   mk(new THREE.TorusGeometry(0.09, 0.04, 8, 16), scarfM, 0, 0.5, 0, torso).rotation.x = Math.PI / 2;
   for (const sx of [-0.05, 0.06]) {
     let parent = jn(torso, sx, 0.49, 0.1);
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 5; i++) {
       const seg = new THREE.Object3D(); seg.position.set(0, 0, i ? 0.13 : 0); seg.userData.off = sx * 20;
       parent.add(seg);
-      const piece = mk(new THREE.PlaneGeometry(0.1 - i * 0.008, 0.14), scarfM, 0, 0, 0.065, seg);
+      const piece = mk(new THREE.PlaneGeometry(0.11 - i * 0.012, 0.14), scarfM, 0, 0, 0.065, seg);
       piece.rotation.x = -Math.PI / 2;
       scarf.push(seg); parent = seg;
     }
