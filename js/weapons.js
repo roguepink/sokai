@@ -11,7 +11,7 @@ import { dampAngle } from './util.js';
 import { WEAPONS } from './weapon-defs.js';
 import { buildModel } from './weapon-models.js';
 import { Proj, GRAV } from './weapon-proj.js';
-import { hurt, area, cone } from './weapon-hit.js';
+import { hurt, area, cone, LOW } from './weapon-hit.js';
 
 export { WEAPONS };
 
@@ -124,7 +124,7 @@ export const Weapons = {
       }
     }
     let tgt = null;
-    for (let i = 0; i < n; i++) { const e = _cand[i]; if (World.segmentHit(px, pz, e.x, e.z) >= 0.98) { tgt = e; break; } }
+    for (let i = 0; i < n; i++) { const e = _cand[i]; if (World.segmentHit(px, pz, e.x, e.z, LOW) >= 0.98) { tgt = e; break; } }
     if (w.cluster) {
       this._aoeT -= dt;
       if (this._aoeT <= 0 || (this._aoeE && !this._aoeE.alive)) { this._aoeT = 0.25; this._aoeE = this._bestCluster(n, px, pz, w); }
@@ -146,7 +146,7 @@ export const Weapons = {
       const e = _cand[i];
       const dd = Math.hypot(e.x - px, e.z - pz);
       if (dd < 3.5) continue;
-      if (World.segmentHit(px, pz, e.x, e.z) < 0.98) continue;
+      if (World.segmentHit(px, pz, e.x, e.z, LOW) < 0.98) continue;
       const c = Zombies.queryCircle(e.x, e.z, (w.radius || 5) * 0.8, _near).length;
       const sc = c * 2 - dd * 0.1 + (e.boss ? 10 : 0);
       if (c >= 3 && sc > bs) { bs = sc; best = e; }
@@ -204,7 +204,7 @@ export const Weapons = {
     for (let i = 0; i < w.pellets; i++) {
       const a = this.aimAngle + (rnd() - 0.5) * 2 * w.spread;
       const dx = Math.sin(a), dz = -Math.cos(a);
-      const wt = World.segmentHit(px, pz, px + dx * w.range, pz + dz * w.range);
+      const wt = World.segmentHit(px, pz, px + dx * w.range, pz + dz * w.range, LOW);
       let range = w.range * wt, wall = wt < 1;
       Zombies.raycast(px, pz, dx, dz, range, _hits);
       let pierced = 0;
@@ -232,7 +232,7 @@ export const Weapons = {
   // レールガン: 一直線の敵を ぜんぶ つらぬく太い光
   _rail(w, player, m, dx, dz) {
     const px = player.pos.x, pz = player.pos.z;
-    const wt = World.segmentHit(px, pz, px + dx * w.range, pz + dz * w.range);
+    const wt = World.segmentHit(px, pz, px + dx * w.range, pz + dz * w.range, LOW);
     const range = w.range * wt;
     const st = ++_stamp;
     let kills = 0;
@@ -310,7 +310,7 @@ export const Weapons = {
     for (let i = 0; i < w.salvo; i++) {
       let e = n ? _list[Math.floor(rnd() * Math.min(n, 40))] : null;
       if (i === 0 && this.target) e = this.target;
-      if (e && World.segmentHit(px, pz, e.x, e.z) < 0.98) e = null;
+      if (e && World.segmentHit(px, pz, e.x, e.z, LOW) < 0.98) e = null;
       const a = this.aimAngle + (i - (w.salvo - 1) / 2) * 0.38 + (rnd() - 0.5) * 0.2;
       const sp = 13 + rnd() * 4;
       const p = Proj.spawn('missile', w, m.x, m.y + 0.15, m.z, Math.sin(a) * sp, 6 + rnd() * 4, -Math.cos(a) * sp, px, pz);
@@ -326,7 +326,7 @@ export const Weapons = {
     const px = player.pos.x, pz = player.pos.z;
     let e = this.target;
     if (e && Math.hypot(e.x - px, e.z - pz) > w.range) e = null;
-    if (!e) { e = Zombies.nearest(px, pz, w.range, dx, dz, 0.5); if (e && World.segmentHit(px, pz, e.x, e.z) < 0.98) e = null; }
+    if (!e) { e = Zombies.nearest(px, pz, w.range, dx, dz, 0.5); if (e && World.segmentHit(px, pz, e.x, e.z, LOW) < 0.98) e = null; }
     FX.muzzle(m.x, m.y, m.z, dx, dz, 0x9ad4ff, 1.1, false);
     if (!e) {
       const L = 5 + rnd() * 6, a = this.aimAngle + (rnd() - 0.5) * 0.7;
@@ -356,7 +356,7 @@ export const Weapons = {
         const o = _near[k];
         if (o._zap === st || !o.alive) continue;
         const d2 = (o.x - fx) ** 2 + (o.z - fz) ** 2;
-        if (d2 < nd && World.segmentHit(fx, fz, o.x, o.z) >= 0.98) { nd = d2; nb = o; }
+        if (d2 < nd && World.segmentHit(fx, fz, o.x, o.z, LOW) >= 0.98) { nd = d2; nb = o; }
       }
       _near.length = 0;
       e = nb;
@@ -402,7 +402,7 @@ export const Weapons = {
   // 火炎放射器 / 冷凍銃: 扇の形に ふきつける
   _spray(w, m, dx, dz, player, tick) {
     const px = player.pos.x, pz = player.pos.z, ice = w.kind === 'freeze';
-    const wt = World.segmentHit(px, pz, px + dx * w.range, pz + dz * w.range);
+    const wt = World.segmentHit(px, pz, px + dx * w.range, pz + dz * w.range, LOW);
     const reach = Math.max(1.5, w.range * wt);
     const n = FX.q(ice ? 4 : 5);
     for (let i = 0; i < n; i++) {
@@ -453,7 +453,7 @@ export const Weapons = {
   // レーザー: 押している間 太い光が のびて、線の上の敵を ぜんぶ焼く
   _laser(w, m, dx, dz, player, tick) {
     const px = player.pos.x, pz = player.pos.z;
-    const wt = World.segmentHit(px, pz, px + dx * w.range, pz + dz * w.range);
+    const wt = World.segmentHit(px, pz, px + dx * w.range, pz + dz * w.range, LOW);
     const reach = w.range * wt;
     const ex = px + dx * reach, ez = pz + dz * reach;
     const fl = 0.9 + rnd() * 0.2;
@@ -497,7 +497,7 @@ export const Weapons = {
       const e = _near[i];
       const dx = e.x - px, dz = e.z - pz, d = Math.hypot(dx, dz) || 0.01;
       if (d > 1.6 + e.r && (dx * fx + dz * fz) / d < -0.3) continue;
-      if (d > 1.2 && World.segmentHit(px, pz, e.x, e.z) < 0.97) continue;
+      if (d > 1.2 && World.segmentHit(px, pz, e.x, e.z, LOW) < 0.97) continue;
       if (hurt(e, MELEE_DMG, dx / d, dz / d, 16, 'sword')) kills++;
       FX.spark(e.x - dx / d * 0.3, 1.2, e.z - dz / d * 0.3, 0, 0, 0, 0.07, 0.32, 0xd8f4ff, 2, 0x4ab0ff, 1, 0, 0, 0, 0);
       for (let k = 0; k < 3; k++) FX.spark(e.x, 1.2, e.z, dx / d * 6 + (rnd() - 0.5) * 6, 1 + rnd() * 4, dz / d * 6 + (rnd() - 0.5) * 6, 0.25, 0.05, 0xd8f4ff, 6, 0x4ab0ff, 2);

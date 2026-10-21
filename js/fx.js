@@ -360,7 +360,7 @@ class ChunkPool {
 // ================= 公開する道具 =================
 export const FX = {
   quality: 1,               // 粒の多さ(low 0.4 / mid 0.7 / high 1)
-  killFx: true,             // 敵を倒したときに 血しぶき・血だまり を出す(キャラ係が自分で出すなら false に)
+  killFx: false,            // 倒したときの血は zombie-gore.js が倒れ方ごとに出す(二重にならないよう、ここは出さない)
   glowPool: null, solidPool: null, beams: null, rings: null, decals: null, slashes: null, chunks: null,
   lights: [], _lt: [], _boom: 0, _bloodBudget: 80,
 

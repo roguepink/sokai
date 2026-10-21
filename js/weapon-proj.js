@@ -94,7 +94,7 @@ export const Proj = {
   // 壁に当たったら、当たった所の手前で止める。当たったら true
   _move(p, dt) {
     const nx = p.x + p.vx * dt, nz = p.z + p.vz * dt;
-    const t = World.segmentHit(p.x, p.z, nx, nz);
+    const t = World.segmentHit(p.x, p.z, nx, nz, p.y + 0.15);   // 弾より低い物は こえる
     if (t < 1) {
       const k = Math.max(0, t - 0.02);
       p.x += (nx - p.x) * k; p.z += (nz - p.z) * k;

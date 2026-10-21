@@ -18,7 +18,6 @@ const CELL = 8;           // ぶつかり判定の区画の大きさ(m)
 const NAV = 1;            // 道さがし地図の1マス(m)
 const CHUNK = 80;         // 見た目をまとめる区画(m)
 const OCC = 2;            // 「もう何か置いた」地図の1マス(m)
-const FW = 128;           // 道さがし(流れの地図)の広さ(マス)。主人公のまわり ±64m
 const MAP_PX = 512;       // ミニマップの大きさ
 
 export const World = {
@@ -42,7 +41,6 @@ export const World = {
     this.generate();
     this.buildNav();
     this._buildComponents();
-    this._flowInit();
     this.genMs = Math.round(performance.now() - t0);
   },
 
@@ -385,74 +383,9 @@ export const World = {
     this._mainComp = this._compAt(0, 0);
   },
 
-  // ---------- 道さがし(流れの地図) ----------
-  // 主人公のまわり ±64m の「主人公までの歩数」を、主人公がマスを移るたびに計算する。
-  // flow(x, z, out) → 主人公へ向かう 次の一歩の向き(単位ベクトル)を out.x/out.z に入れて true。範囲外・行けない所は false
-  _flowInit() {
-    this._fd = new Uint16Array(FW * FW);
-    this._fq = new Int32Array(FW * FW);
-    this._fox = 1e9; this._foz = 1e9; this._fpx = -1; this._fpz = -1; this._fT = 0;
-  },
-  _flowUpdate(px, pz) {
-    const nv = this.nav, w = nv.w;
-    const cx = Math.floor((px - nv.ox) / nv.size), cz = Math.floor((pz - nv.oz) / nv.size);
-    if (cx === this._fpx && cz === this._fpz) return;
-    this._fpx = cx; this._fpz = cz;
-    const ox = cx - FW / 2, oz = cz - FW / 2;
-    this._fox = ox; this._foz = oz;
-    const D = this._fd, Q = this._fq, bl = nv.blocked;
-    D.fill(65535);
-    const lx = cx - ox, lz = cz - oz;
-    let qh = 0, qt = 0;
-    D[lz * FW + lx] = 0; Q[qt++] = lz * FW + lx;
-    while (qh < qt) {
-      const c = Q[qh++], x = c % FW, z = (c - x) / FW, d = D[c] + 1;
-      for (let k = 0; k < 8; k++) {
-        const ddx = DX8[k], ddz = DZ8[k];
-        const nx = x + ddx, nz = z + ddz;
-        if (nx < 0 || nz < 0 || nx >= FW || nz >= FW) continue;
-        const ni = nz * FW + nx;
-        if (D[ni] !== 65535) continue;
-        const gx = nx + ox, gz = nz + oz;
-        if (gx < 0 || gz < 0 || gx >= w || gz >= w || bl[gz * w + gx]) continue;
-        if (ddx && ddz) {   // ななめは、両どなりが空いているときだけ
-          const ax = x + ox + ddx, az = z + oz;
-          const bx = x + ox, bz = z + oz + ddz;
-          if (bl[az * w + ax] || bl[bz * w + bx]) continue;
-        }
-        D[ni] = d; Q[qt++] = ni;
-      }
-    }
-  },
-  flow(x, z, out) {
-    const nv = this.nav;
-    const gx = Math.floor((x - nv.ox) / nv.size), gz = Math.floor((z - nv.oz) / nv.size);
-    const lx = gx - this._fox, lz = gz - this._foz;
-    if (lx < 1 || lz < 1 || lx >= FW - 1 || lz >= FW - 1) return false;
-    const D = this._fd;
-    const here = D[lz * FW + lx];
-    if (here === 0) return false;           // 主人公と同じマス: まっすぐ向かえばいい
-    let best = here, bk = -1;
-    for (let k = 0; k < 8; k++) {
-      const v = D[(lz + DZ8[k]) * FW + lx + DX8[k]];
-      if (v < best) { best = v; bk = k; }
-    }
-    if (bk < 0) return false;
-    const tx = (gx + DX8[bk] + 0.5) * nv.size + nv.ox, tz = (gz + DZ8[bk] + 0.5) * nv.size + nv.oz;
-    const dx = tx - x, dz = tz - z, l = Math.hypot(dx, dz) || 1;
-    out.x = dx / l; out.z = dz / l;
-    return true;
-  },
-  // 主人公までの歩数(m くらい)。範囲外・行けないなら -1
-  flowDist(x, z) {
-    const nv = this.nav;
-    const lx = Math.floor((x - nv.ox) / nv.size) - this._fox, lz = Math.floor((z - nv.oz) / nv.size) - this._foz;
-    if (lx < 0 || lz < 0 || lx >= FW || lz >= FW) return -1;
-    const v = this._fd[lz * FW + lx];
-    return v === 65535 ? -1 : v;
-  },
+  // 道さがし(流れの地図)は zombie-flow.js が nav を使って計算する(ここには持たない)
 
-  // 毎フレーム: 入っている建物の屋根を消す・透かしの中心・水と炎のゆらぎ・道さがし
+  // 毎フレーム: 入っている建物の屋根を消す・透かしの中心・水と炎のゆらぎ
   update(dt, player) {
     this._time += dt;
     const px = player.pos.x, pz = player.pos.z;
@@ -493,12 +426,8 @@ export const World = {
       this._emberU.uCenter.value.set(px, 0, pz);
       this._emberU.uScale.value = (Engine.renderer ? Engine.renderer.domElement.height : 400) * 0.12;
     }
-    this._fT -= dt;
-    if (this._fT <= 0) { this._fT = 0.1; this._flowUpdate(px, pz); }
   },
 
   get inside() { return this._cur; },
 };
 
-const DX8 = [1, -1, 0, 0, 1, 1, -1, -1];
-const DZ8 = [0, 0, 1, -1, 1, -1, 1, -1];
