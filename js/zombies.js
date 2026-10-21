@@ -9,7 +9,7 @@ import { Events } from './events.js';
 import { Engine } from './engine.js';
 import { FX } from './fx.js';
 import { Render, P, BIT } from './zombie-render.js';
-import { Gore } from './zombie-gore.js';
+import { Gore, causeKind } from './zombie-gore.js';
 import { Flow } from './zombie-flow.js';
 import { poseAlive } from './zombie-anim.js';
 import { OUTFITS, SKINS, HAIR, TILE } from './zombie-models.js';
@@ -34,6 +34,28 @@ export const TYPES = {
     outfits: ['bloater'] },
   riot:    { hp: 85, speed: 1.9, r: 0.46, points: 30, scale: 1.05, fat: 1.1, color: 0x1c1d22, anim: 'walk', stride: 4.8, name: '機動隊ゾンビ', helmet: true,
     outfits: ['riot'] },
+  // ---- 第2弾 ----
+  // 小鬼: 小さくて速い。群れでわらわら来る(一度にたくさん なぎ倒せる)
+  imp:     { hp: 8, speed: 6.2, r: 0.3, points: 6, scale: 0.62, color: 0x7a8a76, anim: 'run', stride: 3.0, name: '小鬼ゾンビ', headS: 1.3, eye: [1.3, 0.2, 0.06],
+    outfits: ['imp'] },
+  // 跳ぶ: しゃがんでから 大きく飛びかかってくる
+  leaper:  { hp: 30, speed: 4.4, r: 0.4, points: 25, scale: 1.0, fat: 0.85, color: 0x8a7a5a, anim: 'run', stride: 3.4, name: '跳ぶゾンビ', leap: true, eye: [1.2, 0.3, 0.1],
+    outfits: ['torn', 'shirtless', 'tank'] },
+  // 燃えている: 走ってくる。倒すと まわりに火がうつる
+  burner:  { hp: 40, speed: 3.9, r: 0.42, points: 25, scale: 1, color: 0x4a3a30, anim: 'run', stride: 3.6, name: '燃えるゾンビ', fire: true, eye: [1.4, 0.65, 0.15],
+    outfits: ['burnt'] },
+  // ガスマスク兵: 倒すと 毒ガスが広がって まわりのゾンビも倒れる
+  gasmask: { hp: 70, speed: 2.2, r: 0.44, points: 30, scale: 1.04, color: 0x5a6a4a, anim: 'walk', stride: 5.0, name: 'ガスマスク兵', mask: true, gas: true, eye: [0.4, 1.3, 0.3],
+    outfits: ['soldier'] },
+  // 盾持ち: 前からの弾は 盾が受ける。盾をこわすと「盾 破壊!」(爆発・回転斬りは一発で こわれる)
+  shield:  { hp: 90, speed: 1.9, r: 0.52, points: 40, scale: 1.05, fat: 1.1, color: 0x1c1d22, anim: 'walk', stride: 4.8, name: '盾持ちゾンビ', helmet: true, shield: 320,
+    outfits: ['riot'] },
+  // 巨大ゾンビ: 2.4 倍の大きさ。歩くと地面がゆれる
+  giant:   { hp: 650, speed: 1.6, r: 1.05, points: 120, scale: 2.4, fat: 1.15, color: 0x5a6a4a, anim: 'brute', stride: 2.6, name: '巨大ゾンビ', giant: true,
+    outfits: ['tank', 'torn', 'shirtless', 'hivis'] },
+  // 金色ゾンビ(出来事): 逃げまわる。倒すと 大量ボーナス
+  golden:  { hp: 380, speed: 6.4, r: 0.42, points: 300, scale: 1.0, color: 0xe8c050, anim: 'run', stride: 3.4, name: '金色ゾンビ', flee: true, gold: true, eye: [1.8, 1.4, 0.4],
+    outfits: ['gold'] },
   ...BOSS_TYPES,
 };
 
@@ -43,6 +65,7 @@ export const Zombies = {
   _hHead: new Int32Array(NB), _hNext: new Int32Array(MAX + 64), _hEnt: new Array(MAX + 64), _hCx: new Int32Array(MAX + 64), _hCz: new Int32Array(MAX + 64),
   _stamp: 0,
   _pending: [],           // 爆発待ちのふくれゾンビ
+  _gas: [],               // ガスマスク兵の毒ガス
   _atkCool: 0,
   _drawn: 0, _lastDrawn: 0, _noDraw: 0,
   _px: 0, _pz: 0,
@@ -52,6 +75,7 @@ export const Zombies = {
     Gore.init(scene);
     Bosses.init(scene, this);
     for (let i = 0; i < 48; i++) this._pending.push({ on: false, x: 0, z: 0, t: 0, s: 1 });
+    for (let i = 0; i < 14; i++) this._gas.push({ on: false, x: 0, z: 0, t: 0, tick: 0 });
     // 描画の直前に 体の位置を書きこむ(1 フレームに 1 回だけ)
     const prev = scene.onBeforeRender;
     const self = this;
@@ -73,6 +97,7 @@ export const Zombies = {
     this._hHead.fill(-1);
     Render.reset(); Gore.reset(); Flow.reset(); Bosses.reset();
     for (const p of this._pending) p.on = false;
+    for (const g of this._gas) g.on = false;
   },
 
   count() { return this.list.length; },
@@ -91,6 +116,7 @@ export const Zombies = {
       reachL: Math.random() < 0.55 ? 1 : 0, reachR: 0, limp: Math.random() < 0.5 ? Math.random() : 0,
       hunch: Math.random(), tilt: (Math.random() - 0.5) * 2, seed: Math.random() * 100,
       spdMul: 0.85 + Math.random() * 0.3, los: false, losT: Math.random() * 0.4, rise: 0,
+      vy: 0, fall: 0, leapS: 0, leapT: 0, leapT0: 0, leapCool: 1 + Math.random() * 2, lvx: 0, lvz: 0, shieldHp: def.shield || 0, wa: Math.random() * 6,
       _B: null,
     };
     e.reachR = e.reachL && Math.random() < 0.7 ? 1 : Math.random() < 0.3 ? 1 : 0;
@@ -118,6 +144,7 @@ export const Zombies = {
     this._atkCool -= dt;
     // ふくれゾンビの連鎖爆発(少しずつずらして)
     for (const p of this._pending) if (p.on && (p.t -= dt) <= 0) { p.on = false; this._bloaterBlast(p.x, p.z, p.s); }
+    for (const g of this._gas) if (g.on) this._gasTick(g, dt);
 
     const list = this.list;
     for (let i = list.length - 1; i >= 0; i--) {
@@ -158,8 +185,19 @@ export const Zombies = {
         if (this.damage(e, amt, { cause: 'fire', force: 0 })) return;
       }
     }
+    const def = e.def;
+    if (def.fire) {          // 燃えるゾンビ(自分は燃えても平気)
+      glow = 0.45 + 0.25 * Math.sin(e.t * 23 + e.seed);
+      if (Math.random() < dt * 14) {
+        const s = def.scale;
+        FX.burst({ x: e.x + (Math.random() - 0.5) * 0.4, y: (0.5 + Math.random() * 1.2) * s, z: e.z + (Math.random() - 0.5) * 0.4,
+          count: 2, color: Math.random() < 0.5 ? 0xff6a10 : 0xffb030, speed: 0.6, up: 3.5, life: 0.5, size: 0.24, grav: -4, drag: 2 });
+      }
+    }
     if (B) {
-      B.fx[0] = e.flash;
+      B.fx[0] = def.gold ? Math.max(e.flash, 0.28 + 0.14 * Math.sin(e.t * 7)) : e.flash;
+      if (def.gold && Math.random() < dt * 6) FX.burst({ x: e.x, y: 1.2, z: e.z, count: 2, color: 0xffe680, speed: 1.5, up: 2, life: 0.6, size: 0.09, grav: -1, drag: 1 });
+      if (def.fire) B.fx[2] = 0.45;
       B.fx[1] = e.frozen > 0 ? Math.min(1, B.fx[1] + dt * 8) : Math.max(0, B.fx[1] - dt * 2);
       B.fx[2] = e.burn > 0 ? Math.min(0.6, B.fx[2] + dt * 0.3) : B.fx[2];
       B.fx[3] = glow;
@@ -183,6 +221,36 @@ export const Zombies = {
     // 遠すぎるゾンビは消す(出現係が近くに出しなおす。道さがしの範囲 72m の少し外)
     if (d > 80) { this._remove(e); return; }
     if (frozen) { this._separate(e); World.collideCircle(e, e.r); return; }
+    // 空から落ちてくる
+    if (e.fall) {
+      e.t += dt;
+      e.vy -= 22 * dt; e.y += e.vy * dt;
+      if (e.y <= 0) {
+        e.y = 0; e.vy = 0; e.fall = 0; e.stun = 0.8;
+        const s = e.def.scale;
+        FX.burst({ x: e.x, y: 0.2, z: e.z, count: 12, color: 0x5a5048, speed: 4, up: 2, life: 0.6, size: 0.2 * s, drag: 2 });
+        Gore.splat(e.x, e.z, 0.9 * s, 0, 0, 1, 0x3a0303, 0.7);
+        if (d < 18) Engine.shake(0.1);
+        Events.emit('zombieLand', { x: e.x, z: e.z });
+      }
+      World.collideCircle(e, e.r);
+      return;
+    }
+    // 飛びかかり中(空中)
+    if (e.leapS === 2) {
+      e.t += dt;
+      e.x += e.lvx * dt; e.z += e.lvz * dt;
+      e.vy -= 22 * dt; e.y += e.vy * dt;
+      e.face = Math.atan2(e.lvx, -e.lvz);
+      if (e.y <= 0) {
+        e.y = 0; e.vy = 0; e.leapS = 0; e.leapCool = 2.5 + Math.random() * 2.5; e.stun = 0.2;
+        FX.burst({ x: e.x, y: 0.15, z: e.z, count: 8, color: 0x5a5048, speed: 3, up: 1.5, life: 0.5, size: 0.16, drag: 2 });
+      }
+      const ex = e.x - px, ez = e.z - pz, ed = Math.hypot(ex, ez), minD = e.r + pr + 0.05;
+      if (ed < minD && ed > 1e-4) { e.x = px + ex / ed * minD; e.z = pz + ez / ed * minD; }
+      World.collideCircle(e, e.r);
+      return;
+    }
     e.t += dt;
     if (e.rise > 0) e.rise = Math.max(0, e.rise - dt * 0.7);
     if (e.stun > 0) e.stun -= dt;
@@ -201,12 +269,47 @@ export const Zombies = {
     if (e.burn > 0) sp *= 1.25;
     if (e.atk > 0) sp *= 0.2;
     if (d < contact) sp = 0;
+    // 跳ぶゾンビ: 近づいたら しゃがんで → 飛びかかる
+    if (def.leap) {
+      e.leapCool -= dt;
+      if (e.leapS === 0 && e.leapCool <= 0 && d > 4.5 && d < 13 && e.los && e.stun <= 0 && e.rise <= 0) { e.leapS = 1; e.leapT = e.leapT0 = 0.38; }
+      if (e.leapS === 1) {
+        sp = 0; e.face = Math.atan2(dx, -dz);
+        if ((e.leapT -= dt) <= 0) {
+          const T = 0.62, L = Math.max(0, d - 1.1);
+          e.leapS = 2; e.vy = 11 * T; e.y = 0.01; e.lvx = dx / d * L / T; e.lvz = dz / d * L / T;
+          Events.emit('zombieLeap', { x: e.x, z: e.z });
+        }
+      }
+    }
+    // 金色ゾンビ: 近いと逃げる・遠いと少し近づく(見失わないように)
+    if (def.flee) {
+      e.wa += (Math.random() - 0.5) * dt * 4;
+      let ax = -dx / d, az = -dz / d;
+      if (Flow.dir(e.x, e.z, _dir)) { ax = -_dir.x; az = -_dir.z; }
+      const w = Math.sin(e.wa) * 0.8, cw = Math.cos(w), sw = Math.sin(w);
+      const fx = ax * cw - az * sw, fz = ax * sw + az * cw;
+      if (d < 24) { mx = fx; mz = fz; sp = def.speed * (d < 12 ? 1.1 : 0.9); }
+      else if (d > 34) { sp = def.speed * 0.45; }
+      else { mx = -fz; mz = fx; sp = def.speed * 0.35; }
+      if (e.stun > 0) sp = 0;
+    }
     const rate = def.anim === 'run' ? 7 : 4;
     const kk = 1 - Math.exp(-rate * dt);
     e.vx += (mx * sp - e.vx) * kk; e.vz += (mz * sp - e.vz) * kk;
     e.x += e.vx * dt; e.z += e.vz * dt;
     e.spd = Math.hypot(e.vx, e.vz);
     e.ph += dt * e.spd * def.stride / def.scale;
+    // 巨大ゾンビ: 一歩ごとに地面がゆれる
+    if (def.giant) {
+      const st = Math.floor(e.ph / Math.PI);
+      if (st !== e.lastStep) {
+        e.lastStep = st;
+        if (d < 24) Engine.shake(0.05 + 0.18 * (1 - d / 24));
+        FX.burst({ x: e.x, y: 0.1, z: e.z, count: 5, color: 0x5a5048, speed: 2.5, up: 1, life: 0.5, size: 0.3, drag: 2 });
+        if (d < 30) Events.emit('giantStep', { x: e.x, z: e.z, d });
+      }
+    }
     // 向き
     let want = e.face;
     if (d < 3.5) want = Math.atan2(dx, -dz);
@@ -325,6 +428,21 @@ export const Zombies = {
   // ダメージ。opts: { dirX, dirZ, force(ふっとび), cause(武器の名前), crit }
   damage(e, amount, opts = _noOpts) {
     if (!e.alive) return false;
+    // 盾: 前からの弾は盾が受ける。爆発・回転斬りは 盾ごと こわす
+    if (e.shieldHp > 0 && e._B && e._B.shield) {
+      const k = causeKind(opts.cause), dX = opts.dirX || 0, dZ = opts.dirZ || 0;
+      if (k === 'boom' || k === 'spin') this._breakShield(e, dX, dZ);
+      else if ((dX || dZ) && k !== 'fire' && -(Math.sin(e.face) * dX - Math.cos(e.face) * dZ) > 0.3) {
+        e.shieldHp -= amount;
+        e.flash = 0.4;
+        if (Math.random() < 0.5) {
+          const fx = Math.sin(e.face), fz = -Math.cos(e.face), s = e.def.scale;
+          FX.burst({ x: e.x + fx * 0.45 * s, y: 1.1 * s, z: e.z + fz * 0.45 * s, count: 4, color: 0xfff0b0, speed: 6, up: 2, life: 0.25, size: 0.06, grav: 6, drag: 2 });
+        }
+        if (e.shieldHp <= 0) this._breakShield(e, dX, dZ);
+        else { Events.emit('hit', { x: e.x, y: 1.2 * e.def.scale, z: e.z, amount: 0, crit: false, boss: false, cause: 'shield' }); return false; }
+      }
+    }
     e.hp -= amount;
     e.flash = e.flash > 0.5 ? 0.75 : 1;
     const cause = opts.cause;
@@ -369,6 +487,28 @@ export const Zombies = {
     return kills;
   },
 
+  _breakShield(e, dx, dz) {
+    e.shieldHp = 0;
+    const B = e._B; if (!B || !B.shield) return;
+    if (!dx && !dz) { dx = -Math.sin(e.face); dz = Math.cos(e.face); }
+    Gore.shieldOff(B, dx, dz, 1);
+    e.stun = Math.max(e.stun, 0.7); e.kx += dx * 6; e.kz += dz * 6;
+    FX.burst({ x: e.x, y: 1.1, z: e.z, count: 18, color: 0xd8e8ff, speed: 7, up: 3, life: 0.4, size: 0.07, grav: 8, drag: 2 });
+    Events.emit('shieldBreak', { x: e.x, z: e.z });
+  },
+
+  // ガスマスク兵の毒ガス: 3 秒間、まわりのゾンビをむしばむ(連鎖する)
+  _gasCloud(x, z) {
+    for (const g of this._gas) if (!g.on) { g.on = true; g.x = x; g.z = z; g.t = 3.2; g.tick = 0.15; break; }
+    FX.burst({ x, y: 1.2, z, count: 20, color: 0x9ad040, speed: 4, up: 1.5, life: 1.0, size: 0.35, grav: -0.5, drag: 2.5 });
+  },
+  _gasTick(g, dt) {
+    g.t -= dt; g.tick -= dt;
+    if (g.t <= 0) { g.on = false; return; }
+    if (Math.random() < dt * 14 && FX.smoke) FX.smoke(g.x + (Math.random() - 0.5) * 6, 0.6 + Math.random(), g.z + (Math.random() - 0.5) * 6, 1.3, 1.4, 0x7aa030, 0, 0.4, 0, 0.35);
+    if (g.tick <= 0) { g.tick = 0.3; this.damageCircle(g.x, g.z, 4.4, 16, { cause: 'gas', force: 0 }); }
+  },
+
   _remove(e) {
     e.alive = false;
     const i = this.list.indexOf(e);
@@ -391,7 +531,16 @@ export const Zombies = {
       poseAlive(e, B);
       Gore.kill(e, B, opts);
       e._B = null;
-      if (e.def.explode) this._queueBlast(e.x, e.z, e.def.scale);
+      const def = e.def;
+      if (def.explode) this._queueBlast(e.x, e.z, def.scale);
+      if (def.gas) this._gasCloud(e.x, e.z);
+      if (def.fire) {   // 火が まわりに うつる
+        FX.burst({ x: e.x, y: 1, z: e.z, count: 24, color: 0xff7a20, speed: 6, up: 4, life: 0.6, size: 0.3, grav: -2, drag: 2 });
+        const near = this.queryCircle(e.x, e.z, 3.8, _near);
+        for (const o of near) if (o.alive && !o.boss && !o.def.fire) { o.burn = Math.max(o.burn, 3.5); o.burnDps = Math.max(o.burnDps, 40); }
+      }
+      if (def.giant) { Engine.shake(0.6); FX.burst({ x: e.x, y: 0.3, z: e.z, count: 30, color: 0x5a5048, speed: 6, up: 2.5, life: 0.9, size: 0.4, drag: 2 }); }
+      if (def.gold) FX.burst({ x: e.x, y: 1.2, z: e.z, count: 50, color: 0xffd040, speed: 9, up: 8, life: 1, size: 0.12, drag: 1.2 });
     }
     Events.emit('kill', {
       x: e.x, z: e.z, type: e.type, boss: e.boss, points: e.def.points,
@@ -421,6 +570,7 @@ export const Zombies = {
 
 const _dir = { x: 0, z: 0 };
 const _noOpts = {};
+const _near = [];
 const BOSS_ATTACK = new Set(['slam', 'boss', 'cleaver', 'leap', 'stomp']);
 const byT = (a, b) => a.t - b.t;
 function bucket(gx, gz) { return ((gx * 73856093) ^ (gz * 19349663)) & (NB - 1); }
@@ -435,8 +585,12 @@ function dress(B, def) {
   B.s = def.scale * (1 - scaleJ + Math.random() * scaleJ * 2);
   B.fat = (def.fat || 1) * (0.92 + Math.random() * 0.25);
   if (def.anim === 'run') B.fat = Math.min(B.fat, 1.02);
-  B.headS = def.explode ? 1.12 : 1;
-  B.helmet = !!def.helmet;
+  B.headS = def.headS || (def.explode ? 1.12 : 1);
+  B.helmet = !!def.helmet; B.shield = !!def.shield; B.mask = !!def.mask;
+  // 光る目の色(にごった黄色が多め。ときどき赤)
+  const ec = def.eye || (Math.random() < (def.anim === 'run' ? 0.4 : 0.15) ? [1.1, 0.22, 0.1] : [0.95, 0.85, 0.48]);
+  const ev = 0.8 + Math.random() * 0.4;
+  B.eye[0] = ec[0] * ev; B.eye[1] = ec[1] * ev; B.eye[2] = ec[2] * ev;
   // 肌
   _c.setHex(pick(o.skins || SKINS));
   const v = 0.88 + Math.random() * 0.24;
@@ -450,7 +604,7 @@ function dress(B, def) {
   t[P.PELVIS] = legs[0]; t[P.TORSO] = torso; t[P.HEAD] = head;
   t[P.UAL] = t[P.UAR] = arms[0]; t[P.LAL] = t[P.LAR] = arms[1];
   t[P.ULL] = t[P.ULR] = legs[0]; t[P.LLL] = t[P.LLR] = legs[1];
-  t[P.HELMET] = TILE.helmet;
+  t[P.HELMET] = TILE.helmet; t[P.JAW] = TILE.jaw; t[P.SHIELD] = TILE.shieldT; t[P.MASK] = TILE.maskT;
   // 色
   const cloth = pick(o.cloth), cm = 0.85 + Math.random() * 0.25;
   const pants = o.pants === 'cloth' ? cloth : pick(o.pants);
@@ -460,5 +614,5 @@ function dress(B, def) {
   for (const p of [P.UAL, P.UAR, P.LAL, P.LAR]) lin(B, p, sleeve, cm * (o.sleeveDark ? 0.8 : 1));
   const hair = head === TILE.hHood && o.hoodTint ? cloth : head === TILE.hSurg && o.capTint ? cloth : pick(HAIR);
   lin(B, P.HEAD, hair, 1);
-  lin(B, P.HELMET, 0xffffff, 1);
+  lin(B, P.HELMET, 0xffffff, 1); lin(B, P.SHIELD, 0xffffff, 1); lin(B, P.MASK, 0xffffff, 1); lin(B, P.JAW, 0xffffff, 1);
 }

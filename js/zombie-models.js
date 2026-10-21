@@ -25,6 +25,9 @@ export const TILE = {
   // 腕(上腕 / 前腕+手)
   aSleeve: 40, aBare: 41, aShort: 42, aTorn: 43, fBare: 44, fSleeve: 45, fBloody: 46, fGlove: 47,
   helmet: 48, flesh: 49, boneCut: 50,
+  // 第2弾: あご(下の歯)・ガスマスクの頭・迷彩・裂けた顔・小鬼・焦げた体・盾・マスクの部品・金色
+  jaw: 51, hGas: 52, camo: 53, camoU: 54, camoL: 55, hTorn: 56, hImp: 57, burnt: 58, hBurnt: 59,
+  shieldT: 60, maskT: 61, goldT: 62,
 };
 
 const SKIN = '#000000', RAW = '#808080', CLOTH = '#ffffff';
@@ -284,17 +287,25 @@ export function buildAtlas() {
   const face = (eyeCol = '#e8e0a0', gore = 1) => {
     skin();
     ell(64, 60, 30, 26, 'rgba(0,0,0,0.06)');
+    ell(64, 47, 26, 5, 'rgba(0,0,0,0.12)');                      // まゆの下のかげ
     for (const s of [-1, 1]) {
-      ell(64 + s * 11, 58, 7, 5, '#120806', RAW);                 // 目のくぼみ
-      ell(64 + s * 11, 58, 2.6, 2.2, eyeCol, RAW);                // 白くにごった目
-      ell(64 + s * 11, 64, 7, 3, 'rgba(60,20,60,0.35)');          // くま
+      ell(64 + s * 11, 58, 8, 6, '#0c0504', RAW);                 // 目のくぼみ(光る目玉が入る)
+      ell(64 + s * 11, 58, 4.5, 3.6, '#2a0a06', RAW);
+      ell(64 + s * 11, 58, 2.2, 1.8, eyeCol, RAW);                // にごった目(遠くで見える)
+      ell(64 + s * 11, 65, 8, 3.5, 'rgba(70,20,60,0.45)');        // くま
+      ell(64 + s * 15, 70, 6, 4, 'rgba(0,0,0,0.12)');             // こけたほほ
+      line(64 + s * 6, 52, 64 + s * 17, 50, 2, 'rgba(40,10,10,0.35)');   // まゆ
     }
-    ell(64, 69, 3, 4, 'rgba(0,0,0,0.25)');                        // 鼻
-    ell(64, 79, 11, 5, '#1a0505', RAW);                           // 口(開いている)
-    for (let i = -3; i <= 3; i++) rect(64 + i * 3 - 1, 75, 2, 3, '#c8c0a0', RAW);
-    for (let i = -3; i <= 3; i++) rect(64 + i * 3 - 1, 81, 2, 2.5, '#b8b090', RAW);
-    for (let k = 0; k < 3 * gore; k++) { const x = 58 + R(0, 12); line(x, 83, x + R(-2, 2), 83 + R(10, 30), R(2, 4), '#6a0606', RAW); }
-    for (const s of [-1, 1]) ell(64 + s * 30, 62, 4, 7, 'rgba(0,0,0,0.15)');   // 耳
+    ell(64, 68, 4, 5, 'rgba(0,0,0,0.22)');                        // 鼻
+    ell(61.5, 71, 1.4, 1.2, '#1a0404', RAW); ell(66.5, 71, 1.4, 1.2, '#1a0404', RAW);   // 鼻の穴
+    // 口: 上の歯(黄ばんで欠けている)+ 黒い口の中(下はあごの部品)
+    ell(64, 75.5, 13, 3, '#4a1010', RAW);                         // 上くちびる(ただれている)
+    rect(50, 76, 28, 16, '#120202', RAW);                         // 口の中
+    for (let i = -4; i <= 4; i++) if (Math.abs(i) !== 2 || R(0, 1) < 0.5) rect(64 + i * 3 - 1.2, 76.5, 2.4, R(3, 5), i === 0 ? '#d8c8a0' : '#b8a878', RAW);
+    for (const s of [-1, 1]) rect(64 + s * 13, 76, 1.5, 5, '#d0c098', RAW);   // きば
+    for (let k = 0; k < 3 * gore; k++) { const x = 52 + R(0, 24); line(x, 84, x + R(-2, 2), 84 + R(10, 30), R(2, 4), '#6a0606', RAW); }
+    for (const s of [-1, 1]) { ell(64 + s * 30, 62, 4, 7, 'rgba(0,0,0,0.18)'); ell(64 + s * 30, 62, 2, 4, 'rgba(60,0,0,0.25)'); }   // 耳
+    wound(64 + (R(0, 1) < 0.5 ? -1 : 1) * R(14, 24), R(64, 86), R(3, 6), R(2, 4));
     grime(20, 0.12);
   };
   const hair = (yEnd, back) => {
@@ -390,6 +401,108 @@ export function buildAtlas() {
     rect(0, 0, T, 28, '#e8dcc0', RAW); rect(0, 22, T, 6, '#b89a80', RAW);   // まん中(てっぺん)に骨
   });
 
+  // ===== 第2弾 =====
+  // あご(横 = 右ほほ → あご先 → 左ほほ / 上が 下の歯)
+  tile(TILE.jaw, () => {
+    skin();
+    rect(0, 0, T, 30, '#120202', RAW);                            // 口の中(あごの上のふち)
+    rect(0, 12, T, 6, '#5a1414', RAW);                            // 歯ぐき
+    for (let x = 20; x < 108; x += 7) if (R(0, 1) < 0.85) rect(x, 2, 5, R(8, 12), R(0, 1) < 0.5 ? '#d8c8a0' : '#b8a878', RAW);   // 下の歯
+    ell(64, 30, 26, 5, '#3a0808', RAW);                           // 下くちびる
+    for (let k = 0; k < 5; k++) { const x = R(40, 88); line(x, 34, x + R(-2, 2), R(60, 110), R(2, 4), '#5a0404', RAW); }   // よだれと血
+    ell(64, 96, 22, 16, 'rgba(0,0,0,0.18)');                      // あごの下のかげ
+    for (let i = 0; i < 40; i++) rect(R(10, 118), R(40, 100), 1, 1, 'rgba(0,0,0,0.3)');   // ぶしょうひげ
+    wound(R(30, 100), R(50, 90), 6, 4);
+  });
+  // ガスマスクの頭(ゴムのフードと ベルト)
+  tile(TILE.hGas, () => {
+    rect(0, 0, T, T, '#2a2c24', RAW);
+    for (let i = 0; i < 300; i++) { c.fillStyle = `rgba(255,255,255,${R(0.02, 0.06)})`; c.fillRect(R(0, T), R(0, T), 2, 2); }
+    for (const y of [30, 66]) rect(0, y, T, 6, '#181a14', RAW);  // ベルト
+    for (const s of [-1, 1]) { ell(64 + s * 11, 58, 9, 8, '#0a0a08', RAW); }   // ゴーグルの穴
+    rect(46, 70, 36, 26, '#1e2018', RAW);
+    rect(0, 96, T, 32, '#3a3a2e', RAW);                           // 首の布
+    blood(4, 1, 40, 128);
+  });
+  // 迷彩(兵士)の胴・もも・すね
+  const camo = (boots) => {
+    rect(0, 0, T, T, '#c8c8c8', CLOTH);
+    for (let i = 0; i < 40; i++) ell(R(0, T), R(0, T), R(6, 18), R(4, 10), ['#8a8a8a', '#6a6a6a', '#b8b8b8', '#4a4a4a'][i % 4], CLOTH, R(0, 3));
+    grime(30, 0.18);
+    if (boots) { rect(0, 84, T, 44, '#1e1a14', RAW); rect(0, 84, T, 5, '#0e0c08', RAW); for (let y = 92; y < 124; y += 7) line(48, y, 80, y + 3, 1.5, '#3a3428', RAW); }
+  };
+  tile(TILE.camo, () => {
+    camo(false);
+    for (const x of [30, 70]) { rect(x, 30, 28, 24, '#3a3e2c', RAW); rect(x, 30, 28, 4, '#2a2e20', RAW); }   // 胸のポーチ
+    rect(0, 110, T, 18, '#26281e', RAW);                          // ベルト
+    for (let x = 6; x < T; x += 22) rect(x, 106, 12, 18, '#3a3e2c', RAW);
+    line(36, 0, 84, 70, 6, '#26281e', RAW);                       // たすき
+    blood(5, 1, 20, 110); wound(R(30, 100), R(60, 100), 8, 6);
+  });
+  tile(TILE.camoU, () => { camo(false); rect(0, 0, T, 10, '#1a1a14', RAW); rect(84, 40, 26, 30, '#3a3e2c', RAW); blood(3, 1, 10, 120); });
+  tile(TILE.camoL, () => { camo(true); blood(3, 1, 0, 80); });
+  // 顔が裂けた頭(ほほが ちぎれて 歯ぐきと骨が見える)
+  tile(TILE.hTorn, () => {
+    face('#f0e0a0', 2);
+    hair(30, 30);
+    ell(84, 76, 15, 13, '#4a0606', RAW); ell(84, 76, 11, 9, '#8a1a12', RAW);
+    for (let i = 0; i < 4; i++) rect(76 + i * 4, 70, 3, 7, '#d8ccb0', RAW);     // むき出しの歯
+    ell(90, 62, 6, 4, '#d8d0b8', RAW);                                           // ほお骨
+    for (let k = 0; k < 6; k++) line(R(70, 98), 86, R(70, 98), R(96, 124), 2.5, '#5a0404', RAW);
+    blood(3, 1, 30, 128);
+  });
+  // 小鬼(はげ頭・大きな光る目のくぼみ・とがった耳)
+  tile(TILE.hImp, () => {
+    face('#ff5030', 2);
+    for (const s of [-1, 1]) ell(64 + s * 11, 58, 10, 8, '#060202', RAW);
+    for (const s of [-1, 1]) { poly([64 + s * 28, 52, 64 + s * 40, 36, 64 + s * 32, 66], '#d0d0d0', SKIN); }
+    for (let i = 0; i < 8; i++) line(R(0, T), R(0, 40), R(0, T), R(0, 40), 1.5, 'rgba(60,20,60,0.4)', SKIN);   // 血管
+    blood(3, 1, 60, 128);
+  });
+  // 焦げた体
+  tile(TILE.burnt, () => {
+    skin();
+    for (let i = 0; i < 60; i++) ell(R(0, T), R(0, T), R(4, 14), R(3, 10), `rgba(${R(10, 30) | 0},${R(5, 15) | 0},0,0.75)`, RAW, R(0, 3));   // 炭
+    for (let i = 0; i < 26; i++) ell(R(0, T), R(0, T), R(2, 5), R(1, 3), R(0, 1) < 0.5 ? '#ff6a10' : '#ffb040', RAW);   // おき火
+    for (let i = 0; i < 6; i++) { const x = R(10, 118), y = R(10, 118); rect(x - 12, y - 6, 24, 12, '#5a5048', CLOTH); }   // 焼け残った服
+    rect(0, 118, T, 10, '#1a1210', RAW);
+  });
+  tile(TILE.hBurnt, () => {
+    face('#ffa040', 2);
+    for (let i = 0; i < 50; i++) ell(R(0, T), R(0, T), R(3, 12), R(2, 9), `rgba(${R(10, 30) | 0},${R(5, 15) | 0},0,0.7)`, RAW, R(0, 3));
+    for (let i = 0; i < 14; i++) ell(R(0, T), R(0, 50), R(2, 4), R(1, 3), '#ff7a20', RAW);
+    for (const s of [-1, 1]) ell(64 + s * 11, 58, 6, 5, '#060202', RAW);
+  });
+  // 機動隊の盾(くもった透明の板。POLICE の文字・きず・血)
+  tile(TILE.shieldT, () => {
+    rect(0, 0, T, T, '#3a4450', RAW);
+    for (let i = 0; i < 30; i++) line(R(0, T), R(0, T), R(0, T), R(0, T), 1, 'rgba(255,255,255,0.12)');
+    rect(0, 0, T, 6, '#16181c', RAW); rect(0, T - 6, T, 6, '#16181c', RAW); rect(0, 0, 6, T, '#16181c', RAW); rect(T - 6, 0, 6, T, '#16181c', RAW);
+    rect(20, 40, 88, 22, '#e8e8e8', RAW);
+    c.fillStyle = '#1a2a50'; c.font = 'bold 19px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('POLICE', 64, 52);
+    line(30, 90, 60, 70, 3, 'rgba(255,255,255,0.3)');
+    blood(4, 1.1, 60, 128);
+  });
+  // ガスマスクの部品(黒いゴム・オリーブの缶・ガラス)
+  tile(TILE.maskT, () => {
+    rect(0, 0, T, T, '#1c1e18', RAW);
+    for (let i = 0; i < 200; i++) { c.fillStyle = `rgba(255,255,255,${R(0.02, 0.07)})`; c.fillRect(R(0, T), R(0, T), 2, 2); }
+    rect(0, 64, T, 64, '#4a5236', RAW);                           // 缶(下半分)
+    for (let y = 72; y < T; y += 10) rect(0, y, T, 2, '#2a3020', RAW);
+    rect(0, 0, T, 20, '#6a7a80', RAW);                            // ガラス(上のはし)
+    blood(2, 0.8, 0, 128);
+  });
+  // 金色ゾンビの服(金ぴかのスーツ・くさり)
+  tile(TILE.goldT, () => {
+    fabric(240, 10);
+    for (let i = 0; i < 80; i++) ell(R(0, T), R(0, T), R(1, 3), R(1, 3), '#ffffff', CLOTH);
+    poly([46, 0, 64, 52, 82, 0], '#f0f0f0', RAW);
+    c.strokeStyle = '#fff4a0'; c.lineWidth = 3; c.beginPath(); c.arc(64, 10, 26, 0.3, Math.PI - 0.3); c.stroke();   // 金のくさり
+    m.strokeStyle = RAW; m.lineWidth = 3; m.beginPath(); m.arc(64, 10, 26, 0.3, Math.PI - 0.3); m.stroke();
+    ell(64, 38, 6, 6, '#fff080', RAW);
+    blood(2, 0.7, 40, 110);
+  });
+
   // 色(canvas)とぬり方(mask)を 1 つの絵にまとめる(上下を入れかえ: v=0 が下)
   const cd = c.getImageData(0, 0, SIZE, SIZE).data, md = m.getImageData(0, 0, SIZE, SIZE).data;
   const out = new Uint8Array(SIZE * SIZE * 4);
@@ -447,23 +560,109 @@ export function buildGeometries(quality = 'high') {
     if (p.z > 0 && y > 0.3) p.z += 0.03 * sstep(0.3, 0.5, y);   // 背中の丸み
     if (y > 0.4) p.y -= 0.12 * Math.min(1, (p.x / 0.26) ** 2) * sstep(0.4, 0.52, y);   // なで肩
   });
-  // 頭(根元 = 首のつけね)
-  G.head = lathe([[0, -0.04], [0.05, -0.03], [0.052, 0.03], [0.058, 0.065], [0.078, 0.095], [0.088, 0.14], [0.095, 0.19], [0.093, 0.23], [0.08, 0.27], [0.05, 0.295], [0, 0.305]], S + 2, (p) => {
-    const y = p.y;
+  // 頭(根元 = 首のつけね)。下あごは別の部品(口が開く)なので、口から下は少し引っこめる
+  const H = S + (quality === 'low' ? 2 : 6);
+  const skull = lathe([[0, -0.04], [0.05, -0.03], [0.052, 0.03], [0.058, 0.065], [0.078, 0.095], [0.088, 0.14], [0.095, 0.19], [0.093, 0.23], [0.08, 0.27], [0.05, 0.295], [0, 0.305]], H, (p) => {
+    const y = p.y, ax = Math.abs(p.x);
     if (y > 0.07) p.z -= 0.022 * sstep(0.06, 0.1, y);         // 顔は首より前
     if (y > 0.12 && p.z > 0) p.z *= 1.18;                     // 後頭部
     p.x *= 0.9;
-    if (p.z < 0 && y > 0.07 && y < 0.12) p.z *= 1.08;         // あご
-    if (p.z < 0 && Math.abs(p.x) < 0.025 && y > 0.11 && y < 0.165) p.z -= 0.018 * (1 - Math.abs(p.x) / 0.025) * Math.sin((y - 0.11) / 0.055 * Math.PI);   // 鼻
-    if (p.z < 0 && Math.abs(Math.abs(p.x) - 0.034) < 0.018 && Math.abs(y - 0.15) < 0.015) p.z += 0.008;   // 目のくぼみ
+    if (p.z < 0) {
+      if (y > 0.06 && y < 0.108) p.z *= 1 - 0.28 * sstep(0.11, 0.085, y) * (1 - sstep(0.05, 0.075, ax));   // 口から下(あごの部品がかぶる)
+      if (ax < 0.025 && y > 0.11 && y < 0.165) p.z -= 0.02 * (1 - ax / 0.025) * Math.sin((y - 0.11) / 0.055 * Math.PI);   // 鼻
+      if (Math.abs(ax - 0.034) < 0.02 && Math.abs(y - 0.15) < 0.018) p.z += 0.012 * (1 - Math.abs(ax - 0.034) / 0.02) * (1 - Math.abs(y - 0.15) / 0.018);   // 目のくぼみ
+      if (ax < 0.06 && y > 0.163 && y < 0.185) p.z -= 0.008 * Math.sin((y - 0.163) / 0.022 * Math.PI);   // まゆの骨
+      if (Math.abs(ax - 0.05) < 0.018 && Math.abs(y - 0.128) < 0.015) p.z -= 0.005;   // ほお骨
+      if (Math.abs(ax - 0.055) < 0.02 && Math.abs(y - 0.108) < 0.012) p.z += 0.006;   // こけたほほ
+    }
   });
+  // 耳(頭の横。絵の 肌のところを使う)
+  const ear = (sg) => {
+    const g = new THREE.SphereGeometry(1, 6, 5);
+    const pos = g.attributes.position, uv = g.attributes.uv;
+    for (let i = 0; i < pos.count; i++) {
+      pos.setXYZ(i, pos.getX(i) * 0.012 + sg * 0.081, pos.getY(i) * 0.026 + 0.148, pos.getZ(i) * 0.017 + 0.004);
+      uv.setXY(i, sg > 0 ? 0.73 : 0.27, 0.54 + pos.getY(i) * 0.1);
+    }
+    g.computeVertexNormals();
+    return g;
+  };
+  G.head = quality === 'low' ? skull : mergeGeometries([skull, ear(1), ear(-1)]);
+  // 下あご(根元 = 耳の前のちょうつがい。上のふちが 下の歯)
+  {
+    const prof = [[0, -0.068], [0.03, -0.07], [0.048, -0.06], [0.056, -0.04], [0.058, -0.022], [0.055, -0.012], [0.05, -0.006], [0.046, 0.002]];
+    const g = new THREE.LatheGeometry(prof.map(([r, y]) => new THREE.Vector2(Math.max(r, 0.0001), y)), quality === 'low' ? 6 : 10, Math.PI * 0.5, Math.PI);
+    const pos = g.attributes.position, uv = g.attributes.uv;
+    const v = new THREE.Vector3();
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i);
+      uv.setY(i, (v.y + 0.07) / 0.072);
+      v.x *= 0.92; v.z *= 1.55;
+      if (v.z < -0.06 && v.y < -0.05) v.y -= 0.006;              // あご先
+      pos.setXYZ(i, v.x, v.y, v.z);
+    }
+    g.computeVertexNormals();
+    G.jaw = g;
+  }
+  // 光る目玉(2 つで 1 つの形。頭と同じ位置に置く)
+  {
+    // 前の極に 黒目(頂点の色)。にごった目玉が ぼんやり光る
+    const a = new THREE.SphereGeometry(0.0105, 8, 6); a.rotateX(-Math.PI / 2);
+    const pos = a.attributes.position, col = new Float32Array(pos.count * 3);
+    for (let i = 0; i < pos.count; i++) { const z = pos.getZ(i) / 0.0105; const k = z < -0.8 ? 0.12 : z < -0.55 ? 0.55 : 1; col[i * 3] = k; col[i * 3 + 1] = k; col[i * 3 + 2] = k; }
+    a.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    const b = a.clone();
+    a.translate(-0.034, 0.151, -0.093); b.translate(0.034, 0.151, -0.093);
+    G.eyes = mergeGeometries([a, b]);
+  }
+  // 盾(胴に持つ。少し曲がった板)
+  {
+    const g = new THREE.BoxGeometry(0.62, 1.0, 0.035, 6, 1, 1);
+    const pos = g.attributes.position;
+    for (let i = 0; i < pos.count; i++) { const x = pos.getX(i); pos.setZ(i, pos.getZ(i) + 0.12 * (x / 0.31) ** 2); }
+    g.computeVertexNormals();
+    g.translate(0.02, 0.16, -0.36);
+    G.shield = g;
+  }
+  // ガスマスク(頭と同じ位置。口の前の筒と缶・ゴーグルのふち)
+  {
+    const parts = [];
+    const snout = new THREE.CylinderGeometry(0.03, 0.045, 0.06, 8); snout.rotateX(Math.PI / 2); snout.translate(0, 0.098, -0.105);
+    const can = new THREE.CylinderGeometry(0.03, 0.03, 0.06, 10); can.rotateX(Math.PI / 2 - 0.5); can.translate(0, 0.07, -0.15);
+    for (const g of [snout, can]) { const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setY(i, 0.1 + uv.getY(i) * 0.38); }
+    parts.push(snout, can);
+    for (const sg of [-1, 1]) {
+      const r = new THREE.TorusGeometry(0.017, 0.005, 5, 10); r.translate(sg * 0.034, 0.151, -0.104);
+      const uv = r.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setY(i, 0.6 + uv.getY(i) * 0.3);
+      parts.push(r);
+    }
+    G.mask = mergeGeometries(parts.map((g) => g.toNonIndexed()));
+  }
   // 上腕(根元 = 肩)
   G.uarm = lathe([[0, 0.06], [0.05, 0.045], [0.066, 0], [0.06, -0.1], [0.052, -0.2], [0.045, -0.28], [0, -0.31]], S - 2, (p) => { p.z *= 0.9; });
-  // 前腕 + 手(根元 = ひじ)
-  G.larm = lathe([[0, 0.02], [0.045, 0], [0.048, -0.06], [0.04, -0.18], [0.031, -0.26], [0.036, -0.29], [0.04, -0.34], [0.033, -0.39], [0.018, -0.425], [0, -0.43]], S - 2, (p) => {
+  // 前腕 + 手(根元 = ひじ)。中・高画質では 指(つめを立てて つかみかかる形)
+  const fore = lathe([[0, 0.02], [0.045, 0], [0.048, -0.06], [0.04, -0.18], [0.031, -0.26], [0.036, -0.29], [0.04, -0.33], [0.034, -0.37], [0.02, -0.385], [0, -0.39]], S - 2, (p) => {
     if (p.y < -0.265) { const k = sstep(-0.265, -0.3, p.y); p.x *= 1 - 0.45 * k; p.z *= 1 + 0.25 * k; }
-    if (p.y < -0.36) p.z -= (-0.36 - p.y) * 0.6;              // 指が曲がる(つかむ形)
   });
+  if (quality === 'low') G.larm = fore;
+  else {
+    const fingers = [fore];
+    const fz = [-0.034, -0.012, 0.01, 0.031];
+    for (let i = 0; i < 4; i++) {
+      const L = i === 0 || i === 3 ? 0.06 : 0.07;
+      const f1 = new THREE.CylinderGeometry(0.0085, 0.0075, L, 5, 1); f1.translate(0, -L / 2, 0);
+      const f2 = new THREE.CylinderGeometry(0.0072, 0.003, L * 0.8, 5, 1); f2.translate(0, -L * 0.4, 0); f2.rotateX(0.9); f2.translate(0, -L, 0);
+      const f = mergeGeometries([f1, f2]); f.rotateX(0.35 + i * 0.04); f.rotateZ((i - 1.5) * 0.06); f.translate(0, -0.365, fz[i]);
+      fingers.push(f);
+    }
+    const th = new THREE.CylinderGeometry(0.009, 0.004, 0.06, 5, 1); th.translate(0, -0.03, 0); th.rotateX(0.6); th.rotateZ(-0.7); th.translate(-0.012, -0.33, -0.03);
+    fingers.push(th);
+    for (let k = 1; k < fingers.length; k++) {
+      const uv = fingers[k].attributes.uv, pos = fingers[k].attributes.position;
+      for (let i = 0; i < uv.count; i++) uv.setXY(i, 0.5, Math.max(0.01, Math.min(0.3, 0.35 + (pos.getY(i) + 0.33) * 2.5)));
+    }
+    G.larm = mergeGeometries(fingers.map((g) => g.index ? g : g));
+  }
   // もも(根元 = 股関節)
   G.uleg = lathe([[0, 0.05], [0.07, 0.04], [0.09, 0], [0.086, -0.12], [0.072, -0.28], [0.058, -0.42], [0.05, -0.455], [0, -0.47]], S - 2, (p) => { if (p.z < 0 && p.y > -0.3) p.z *= 1.08; });
   // すね + 足(根元 = ひざ)
@@ -584,7 +783,18 @@ export const OUTFITS = {
     cloth: [0xffffff], pants: [0xffffff], sleeve: 0x1c1d22 },
   bloater: { torso: TILE.bloater, legs: [[TILE.tornU, TILE.tornL]], arms: [[TILE.aBare, TILE.fBloody]], heads: [TILE.hBloat],
     cloth: [0xffffff], pants: [0x4a4a4a, 0x3a5a8a, 0x5a5040], sleeve: 'cloth', skins: [0x8a9a5e, 0x9aa070, 0x7a8a50] },
+  // 第2弾
+  imp: { torso: TILE.bare, legs: [[TILE.tornU, TILE.tornL]], arms: [[TILE.aBare, TILE.fBloody]], heads: [TILE.hImp],
+    cloth: [0xffffff], pants: [0x2a2a26, 0x3a3428], sleeve: 'cloth', skins: [0x7a8a76, 0x6e7a70, 0x8a8a7a, 0x6a7468] },
+  burnt: { torso: TILE.burnt, legs: [[TILE.tornU, TILE.tornL]], arms: [[TILE.aBare, TILE.fBloody]], heads: [TILE.hBurnt],
+    cloth: [0x4a4038, 0x3a3a3a, 0x5a4a3a], pants: [0x2a2420, 0x3a3028], sleeve: 'cloth', skins: [0x5a4438, 0x4a3a30, 0x64503e] },
+  soldier: { torso: TILE.camo, legs: [TILE.camoU, TILE.camoL], arms: [[TILE.aSleeve, TILE.fGlove]], heads: [TILE.hGas],
+    cloth: [0x6a7a50, 0x7a7a58, 0x5a6a4a, 0x8a8060], pants: 'cloth', sleeve: 'cloth' },
+  gold: { torso: TILE.goldT, legs: [TILE.slacksU, TILE.slacksL], arms: [[TILE.aSleeve, TILE.fBare]], heads: [TILE.hShort, TILE.hBald],
+    cloth: [0xffc830, 0xffd850], pants: [0xd0a020], sleeve: 'cloth', skins: [0xe8c050, 0xf0d070] },
 };
+// 裂けた顔は いろいろな服に まぜる
+for (const k of ['office', 'tee', 'hoodie', 'tank', 'torn', 'flannel', 'shirtless', 'hivis']) OUTFITS[k].heads.push(TILE.hTorn);
 
 // 腐った肌の色(灰色・病的な緑・あざの紫・黄ばみ・黒ずみ)
 export const SKINS = [0x8f9680, 0x80905e, 0x8f7a8c, 0xa89e78, 0x6e625a, 0x8a949e, 0x9e8e7c, 0x5e544a, 0x7a8a6a, 0x94888e];

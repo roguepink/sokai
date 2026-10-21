@@ -37,9 +37,16 @@ export class Popups {
       if (t >= 1) { p.on = false; p.el.style.opacity = '0'; continue; }
       const sc = Engine.project(p.x, p.y, p.z, _pt);
       if (!sc) { p.el.style.opacity = '0'; continue; }
+      // 肩越し・一人称: 近いほど大きく、遠いほど小さく。カメラのすぐ前・後ろは出さない
+      let ds = 1;
+      if (Engine.viewMode && Engine.viewMode !== 'top') {
+        const c = Engine.camera.position, d = Math.hypot(p.x - c.x, p.y - c.y, p.z - c.z);
+        if (d < 1.6) { p.el.style.opacity = '0'; continue; }
+        ds = Math.max(0.55, Math.min(1.5, 9 / d));
+      }
       // 最初にぽんと大きく → ふつう。上に上がって最後に消える
       const pop = t < 0.12 ? 1.5 - (t / 0.12) * 0.5 : 1;
-      const up = (1 - (1 - t) * (1 - t)) * p.rise;
+      const up = (1 - (1 - t) * (1 - t)) * p.rise * ds;
       let op = t > 0.55 ? 1 - (t - 0.55) / 0.45 : 1;
       const x = sc.x + p.jx * t, y = sc.y - up;
       // 上の点数の帯・右下のボタンの上には出さない。主人公の真上は うすく(まわりが見えるように)
@@ -48,7 +55,7 @@ export class Popups {
         const dx = x - Avoid.hx, dy = y - Avoid.hy, d2 = dx * dx + dy * dy;
         if (d2 < Avoid.r * Avoid.r) op *= 0.25 + 0.75 * Math.sqrt(d2) / Avoid.r;
       }
-      p.el.style.transform = `translate3d(${x.toFixed(1)}px,${y.toFixed(1)}px,0) translate(-50%,-50%) scale(${(pop * p.s).toFixed(3)})`;
+      p.el.style.transform = `translate3d(${x.toFixed(1)}px,${y.toFixed(1)}px,0) translate(-50%,-50%) scale(${(pop * p.s * ds).toFixed(3)})`;
       p.el.style.opacity = op.toFixed(2);
     }
   }

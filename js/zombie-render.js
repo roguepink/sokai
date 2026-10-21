@@ -7,14 +7,15 @@ import { Engine } from './engine.js';
 import { buildAtlas, buildGeometries, makeZombieMaterial, makePartMesh, TILE } from './zombie-models.js';
 import { NJ, HIP_H, poseAlive } from './zombie-anim.js';
 
-// 部位の番号
-export const P = { PELVIS: 0, TORSO: 1, HEAD: 2, UAL: 3, UAR: 4, LAL: 5, LAR: 6, ULL: 7, ULR: 8, LLL: 9, LLR: 10, HELMET: 11 };
-export const NP = 12;
+// 部位の番号(第2弾: 下あご・盾・ガスマスク)
+export const P = { PELVIS: 0, TORSO: 1, HEAD: 2, UAL: 3, UAR: 4, LAL: 5, LAR: 6, ULL: 7, ULR: 8, LLL: 9, LLR: 10, HELMET: 11, JAW: 12, SHIELD: 13, MASK: 14 };
+export const NP = 15;
 export const BIT = (p) => 1 << p;
-// 部位 → 形(メッシュ)の番号: 0 腰 1 胴 2 頭 3 上腕 4 前腕 5 もも 6 すね 7 ヘルメット 8 切り口
-export const PART_MESH = [0, 1, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7];
-const GEO_NAMES = ['pelvis', 'torso', 'head', 'uarm', 'larm', 'uleg', 'lleg', 'helmet', 'cap'];
+// 部位 → 形(メッシュ)の番号: 0 腰 1 胴 2 頭 3 上腕 4 前腕 5 もも 6 すね 7 ヘルメット 8 切り口 9 あご 10 盾 11 マスク
+export const PART_MESH = [0, 1, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 9, 10, 11];
+const GEO_NAMES = ['pelvis', 'torso', 'head', 'uarm', 'larm', 'uleg', 'lleg', 'helmet', 'cap', 'jaw', 'shield', 'mask'];
 export const CAP_MESH = 8;
+const EYE_DIST = 30;      // 目が光って見える距離(カメラから)
 
 export const MAX_ALIVE = CONFIG.ZOMBIES.MAX;
 export const MAX_CORPSE = 150;
@@ -28,7 +29,7 @@ function rigid() {
 function newBody(i) {
   return {
     i, mode: 0,               // 0 空き / 1 生きている / 2 死体
-    e: null, s: 1, fat: 1, headS: 1,
+    e: null, s: 1, fat: 1, headS: 1, helmet: false, shield: false, mask: false, eye: new Float32Array(3),
     tile: new Uint8Array(NP), cloth: new Float32Array(NP * 3), skin: new Float32Array(3),
     pose: new Float32Array(NJ * 3), poseA: new Float32Array(NJ * 3), poseB: new Float32Array(NJ * 3),
     mats: new Float32Array(NP * 16),
@@ -55,7 +56,7 @@ export const Render = {
   gibs: [],
   frame: 0,
   _free: [],
-  _cursor: new Int32Array(9),
+  _cursor: new Int32Array(16),
   _born: 0,
 
   init(scene) {
@@ -64,17 +65,25 @@ export const Render = {
     this.material = makeZombieMaterial(tex);
     this.geos = geos;
     // 部位ごとの数: 体の数 × (左右なら 2) + ばらばらの部位
-    const per = [1, 1, 1, 2, 2, 2, 2, 0.3, 0];
+    const per = [1, 1, 1, 2, 2, 2, 2, 0.3, 0, 1, 0.15, 0.2];
     for (let k = 0; k < GEO_NAMES.length; k++) {
-      const cap = k === CAP_MESH ? MAX_BODY * 2 + MAX_GIB : Math.ceil(MAX_BODY * per[k]) + MAX_GIB * (k === 7 ? 0.3 : 1) | 0;
+      const cap = k === CAP_MESH ? MAX_BODY * 2 + MAX_GIB : Math.ceil(MAX_BODY * per[k]) + MAX_GIB * (k === 7 || k >= 10 ? 0.3 : 1) | 0;
       const m = makePartMesh(geos[GEO_NAMES[k]], this.material, cap);
       m.userData.cap = cap;
-      const shadow = Engine.quality === 'high' ? k !== CAP_MESH && k !== 7 : (k === 1 || k === 5 || k === 2);
+      const shadow = Engine.quality === 'high' ? k !== CAP_MESH && k !== 7 && k !== 9 && k !== 11 : (k === 1 || k === 5 || k === 2 || k === 10);
       m.castShadow = shadow;
       m.receiveShadow = false;
       scene.add(m);
       this.meshes.push(m);
     }
+    // 光る目(生きている間だけ。近くのゾンビだけ描く)
+    const em = new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false, vertexColors: true });
+    this.eyes = new THREE.InstancedMesh(geos.eyes, em, MAX_ALIVE);
+    this.eyes.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.eyes.setColorAt(0, new THREE.Color());
+    this.eyes.instanceColor.setUsage(THREE.DynamicDrawUsage);
+    this.eyes.frustumCulled = false; this.eyes.count = 0; this.eyes.castShadow = false;
+    scene.add(this.eyes);
     for (let i = 0; i < MAX_BODY; i++) this.bodies.push(newBody(i));
     for (let i = 0; i < MAX_GIB; i++) this.gibs.push(newGib());
     this.reset();
@@ -139,6 +148,7 @@ export const Render = {
     joint(8, JM[0], P_, 8, 0.095 * fh, -0.06, 0);
     joint(9, JM[7], P_, 9, 0, -0.44, 0);
     joint(10, JM[8], P_, 10, 0, -0.44, 0);
+    joint(11, JM[2], P_, 11, 0, 0.115, -0.012);
     const M = B.mats;
     const ta = 1 + (fat - 1) * 0.6, tb = 1 + (fat - 1) * 0.4, tl = 1 + (fat - 1) * 0.65, tm = 1 + (fat - 1) * 0.35, hs = B.headS;
     put(M, 0, JM[0], fat, 1, fat * 0.95);
@@ -149,10 +159,18 @@ export const Render = {
     put(M, 7, JM[7], tl, 1, tl); put(M, 8, JM[8], tl, 1, tl);
     put(M, 9, JM[9], tm, 1, tm); put(M, 10, JM[10], tm, 1, tm);
     put(M, 11, JM[2], hs, hs, hs);
+    put(M, 12, JM[11], hs, hs, hs);
+    put(M, 13, JM[1], 1, 1, 1);
+    put(M, 14, JM[2], hs, hs, hs);
   },
 
   // 部位 p の位置の行列を out に
   partMatrix(B, p, out) { return out.fromArray(B.mats, p * 16); },
+  // 部位 p のローカル点 (lx, ly, lz) の世界の位置
+  partLocal(B, p, lx, ly, lz, out) {
+    const m = B.mats, o = p * 16;
+    return out.set(m[o + 12] + m[o] * lx + m[o + 4] * ly + m[o + 8] * lz, m[o + 13] + m[o + 1] * lx + m[o + 5] * ly + m[o + 9] * lz, m[o + 14] + m[o + 2] * lx + m[o + 6] * ly + m[o + 10] * lz);
+  },
   // 部位 p のローカル点 (0, ly, 0) の世界の位置
   partPoint(B, p, ly, out) {
     const m = B.mats, o = p * 16;
@@ -166,8 +184,12 @@ export const Render = {
     _pm.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse);
     _fr.setFromProjectionMatrix(_pm);
     const cx = Engine.camTarget.x, cz = Engine.camTarget.z;
+    const cp = cam.position, close = Engine.viewMode && Engine.viewMode !== 'top';
+    const lx = close ? cp.x : cx, lz = close ? cp.z : cz;          // 近い・遠いを測る場所
     const cur = this._cursor; cur.fill(0);
     const meshes = this.meshes;
+    const eyes = this.eyes, eyeArr = eyes.instanceMatrix.array, eyeCol = eyes.instanceColor.array;
+    let ne = 0;
     for (let bi = 0; bi < MAX_BODY; bi++) {
       const B = this.bodies[bi];
       if (B.mode === 0) continue;
@@ -178,7 +200,7 @@ export const Render = {
       if (!_fr.intersectsSphere(_sph)) { B.visible = false; continue; }
       B.visible = true;
       if (B.mode === 1) {
-        const d = Math.abs(x - cx) + Math.abs(z - cz);
+        const d = Math.abs(x - lx) + Math.abs(z - lz);
         const skip = d > 50 ? 3 : d > 32 ? 2 : 1;
         if (this.frame - B.lastPose >= skip || B.e.flash > 0) {
           poseAlive(B.e, B);
@@ -190,7 +212,7 @@ export const Render = {
       const hide = B.hide;
       for (let p = 0; p < NP; p++) {
         if (hide & (1 << p)) continue;
-        if (p === P.HELMET && !B.helmet) continue;
+        if ((p === P.HELMET && !B.helmet) || (p === P.SHIELD && !B.shield) || (p === P.MASK && !B.mask)) continue;
         const k = PART_MESH[p], m = meshes[k];
         const n = cur[k];
         if (n >= m.userData.cap) continue;
@@ -199,7 +221,20 @@ export const Render = {
       }
       // 切り口(取れた部位のあと)
       if (hide || B.split) this._caps(B, cur);
+      // 光る目(生きていて、頭があって、カメラに近い)
+      if (B.mode === 1 && !(hide & BIT(P.HEAD)) && B.e.frozen <= 0) {
+        const dx = x - cp.x, dz = z - cp.z;
+        if (dx * dx + dz * dz < EYE_DIST * EYE_DIST) {
+          const o = P.HEAD * 16, mt = B.mats;
+          for (let i = 0; i < 16; i++) eyeArr[ne * 16 + i] = mt[o + i];
+          const fl = 1 + B.e.flash * 0.8;
+          eyeCol[ne * 3] = B.eye[0] * fl; eyeCol[ne * 3 + 1] = B.eye[1] * fl; eyeCol[ne * 3 + 2] = B.eye[2] * fl;
+          ne++;
+        }
+      }
     }
+    eyes.count = ne;
+    if (ne) { eyes.instanceMatrix.needsUpdate = true; eyes.instanceColor.needsUpdate = true; }
     // ばらばらの部位
     for (const g of this.gibs) {
       if (!g.used) continue;
@@ -241,6 +276,7 @@ export const Render = {
     const fat = B.fat, fs = 1 + (fat - 1) * 0.75, fh = 1 + (fat - 1) * 0.8;
     const h = B.hide;
     if (h & BIT(P.HEAD) && !(h & BIT(P.TORSO))) this._cap(B, cur, P.TORSO, 0, 0.545, 0, 0, 0.075 / fat, 0.07, 0.075 / fat);
+    if (h & BIT(P.JAW) && !(h & BIT(P.HEAD))) this._cap(B, cur, P.HEAD, 0, 0.085, -0.03, Math.PI, 0.05, 0.03, 0.06);
     if (B.split) {
       if (!(h & BIT(P.TORSO))) this._cap(B, cur, P.TORSO, 0, 0.015, 0, Math.PI, 0.15, 0.09, 0.12);
       this._cap(B, cur, P.PELVIS, 0, 0.1, 0, 0, 0.15, 0.09, 0.12);

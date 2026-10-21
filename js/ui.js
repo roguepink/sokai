@@ -1,5 +1,6 @@
 // 画面係: 点数(数字がくるくる上がる)・コンボ・最高記録・倒した数・ミニマップ・武器の列・回転斬りのたまり具合・
 // ボスの体力・飛び出す数字・大きな文字の演出・タイトル/設定/一時停止/結果の画面。
+// 第2弾: 無双モードのゲージと演出・出来事(worldEvent)の文字・チャレンジの残り・自己ベスト・大量撃破のスロー(キルカム)・結果の記録。
 import { Events } from './events.js';
 import { Score, jpNum } from './score.js';
 import { Weapons, WEAPONS } from './weapons.js';
@@ -10,6 +11,7 @@ import { Audio } from './audio.js';
 import { Bosses } from './ui-boss.js';
 import { Minimap } from './ui-minimap.js';
 import { Popups, Banner, Confetti, flash, Avoid } from './ui-fx.js';
+import { Happenings } from './zombie-events.js';
 
 const $ = (id) => document.getElementById(id);
 const fmt = (n) => Math.floor(n).toLocaleString();
@@ -30,6 +32,7 @@ export const UI = {
   _subT: -9999, _subPrio: 0, _multiT: -9999, _multiN: 0, _multiPts: 0,
   _zoneT: 0, _zone: '', _zoneWant: '', _zoneStable: 0, _zoneShownT: -9999, _zoneHideT: 0,
   _barFitKey: '', _rotT: 0,
+  _fever: -1, _feverOn: false, _feverTxt: '', _chKey: '', _killcamT: 0, _boostTxt: '',
 
   init(root) {
     this.root = root;
@@ -37,12 +40,15 @@ export const UI = {
     hud.id = 'hud';
     hud.className = 'hidden';
     hud.innerHTML = `
+      <div class="fever-tint" id="feverTint"></div>
       <div class="pop-layer" id="popLayer"></div>
       <div class="vignette" id="vignette"></div>
       <div class="hud-tl">
         <canvas class="minimap" id="minimap" aria-hidden="true"></canvas>
         <div class="hud-stats"><span class="kills"><i>☠</i><b id="hudKills">0</b></span><span class="time" id="hudTime">0:00</span></div>
+        <div class="hud-challenge hidden" id="hudChallenge"><small id="chText"></small><b id="chCount"></b><div class="ch-bar"><i id="chBar"></i></div><em id="chTime"></em></div>
       </div>
+      <div class="hud-fever" id="hudFever"><span class="fv-label">無双</span><div class="fv-bar"><i id="fvFill"></i></div><b id="fvText"></b></div>
       <div class="hud-score" id="hudScoreBox">
         <b id="hudScore">0</b>
         <small id="hudBest"></small>
@@ -86,6 +92,8 @@ export const UI = {
       boss: q('hudBoss'), bossName: q('hudBossName'), bossFill: q('hudBossFill'), bossLag: q('hudBossLag'),
       bossArrow: q('bossArrow'), bossDist: q('bossDist'), vignette: q('vignette'),
       sub: q('subBanner'), pause: q('btnPause'), zone: q('hudZone'), rot: q('rotHint'),
+      fever: q('hudFever'), fvFill: q('fvFill'), fvText: q('fvText'), feverTint: q('feverTint'),
+      ch: q('hudChallenge'), chText: q('chText'), chCount: q('chCount'), chBar: q('chBar'), chTime: q('chTime'),
       flash: $('flash'),
       spin: document.querySelector('.btn-spin'),
     };
@@ -206,6 +214,39 @@ export const UI = {
       flash(this.el.flash, '#ff7a1f', 0.25, 500);
     });
 
+    // ---- 無双モード ----
+    Events.on('feverStart', (f) => {
+      const mult = f && f.mult ? f.mult : 2;
+      this.banner.show('無双モード!!', `点数 ×${mult % 1 ? mult.toFixed(1) : mult} ・ ${Math.round((f && f.dur) || 12)}秒`, 'fever', 2.2, 3);
+      flash(this.el.flash, '#ffd23f', 0.45, 600);
+      this.el.hud.classList.add('fever');
+      if (Engine.quality !== 'low') this.confetti.burst(24);
+      Engine.shake(0.5);
+    });
+    Events.on('feverEnd', (f) => {
+      this.el.hud.classList.remove('fever');
+      if (f && f.kills > 0) this._sub(`無双モード 終了 <b>${fmt(f.kills)}体</b> <em>+${fmt(f.points || 0)}</em>`, 'big', 3);
+    });
+    // ---- 出来事 ----
+    Events.on('worldEvent', (w) => this._worldEvent(w || {}));
+    Events.on('worldChange', (w) => { if (w && w.text && Score.active) this._sub(`<b>${w.text}</b>`, 'ms', 1); });
+    Events.on('personalBest', (p) => {
+      const what = p.kind === 'combo' ? '最大コンボ' : p.kind === 'kills' ? '倒した数' : 'まとめ倒し';
+      this._sub(`🏅 自己ベスト更新! <b>${what}</b> <em>これまで ${fmt(p.prev)}</em>`, 'pb', 4);
+      flash(this.el.flash, '#7dff6b', 0.15, 300);
+    });
+    Events.on('shieldBreak', (s) => { if (s && !this.paused) this.pts.spawn(s.x, 2.3, s.z, '盾 破壊!', 'pts shield', 1.25, 0.9, 50); });
+    // 大量撃破: 一瞬スロー(キルカム)。ときどきだけ
+    Events.on('multiKill', (m) => {
+      if (!Score.active || this.paused || !m) return;
+      const need = Score.feverActive ? 45 : 28, now = performance.now();
+      if (m.count < need || now - this._killcamT < 14000) return;
+      this._killcamT = now;
+      Engine.slowMo(0.55, 0.3);
+      flash(this.el.flash, '#ffffff', 0.18, 260);
+      this.el.hud.classList.remove('killcam'); void this.el.hud.offsetWidth; this.el.hud.classList.add('killcam');
+    });
+
     Events.on('comboEnd', (c) => {
       if (c.combo >= 30) this._sub(`コンボ <b>${fmt(c.combo)}</b> 達成!`, '', 0);
     });
@@ -237,6 +278,8 @@ export const UI = {
     this.el.boss.classList.add('hidden');
     this.el.bossArrow.classList.add('hidden');
     this.el.sub.classList.remove('on');
+    this.el.hud.classList.remove('fever', 'killcam');
+    this.el.ch.classList.add('hidden'); this._chKey = ''; this._fever = -1;
     this._subT = -9999; this._multiT = -9999;
     this._zone = ''; this._zoneWant = ''; this.el.zone.classList.remove('on');
     this.el.rot.classList.remove('on');
@@ -257,6 +300,50 @@ export const UI = {
       this._subT = now;
     }
     this._subPrio = prio;
+  },
+
+  // 出来事の文字(大きな文字 / 下の 1 行)
+  _worldEvent(w) {
+    if (!Score.active) return;
+    const k = w.kind, t = w.text || '', s = w.sub || '';
+    const B = (style, dur, prio) => this.banner.show(t, s, style, dur, prio);
+    switch (k) {
+      case 'supply': B('supply', 2.2, 2); break;
+      case 'supplyOpen': B('gold', 2.0, 3); flash(this.el.flash, '#ffd23f', 0.3, 400); if (Engine.quality !== 'low') this.confetti.burst(20); break;
+      case 'golden': B('golden', 2.4, 2); flash(this.el.flash, '#ffe680', 0.2, 400); break;
+      case 'goldenDown': B('golden', 2.2, 3); this.confetti.burst(Engine.quality === 'low' ? 16 : 36); break;
+      case 'march': case 'tsunami': case 'skyfall': B('horde', 2.3, 2); flash(this.el.flash, '#ff7a1f', 0.22, 450); break;
+      case 'airstrike': B('airstrike', 2.0, 2); break;
+      case 'bossrush': B('boss', 2.6, 3); flash(this.el.flash, '#ff1a1a', 0.4, 600); this.el.vignette.classList.add('boss'); break;
+      case 'bossrushClear': case 'challengeClear': B('gold', 2.2, 3); this.confetti.burst(Engine.quality === 'low' ? 16 : 30); flash(this.el.flash, '#ffe680', 0.3, 450); break;
+      case 'challenge': B('challenge', 2.2, 2); break;
+      case 'discover': B('discover', 1.9, 1); break;
+      case 'airstrikeDone': this._sub(`<b>${t}</b> <em>${s}</em>`, 'big', 2); break;
+      default: this._sub(`<b>${t}</b>${s ? ' ' + s : ''}`, '', 1);
+    }
+  },
+
+  // 無双ゲージ・チャレンジの残り(毎フレーム)
+  _updateFever() {
+    const el = this.el, f = Math.round((Score.fever || 0) * 200) / 200, on = !!Score.feverActive;
+    if (f !== this._fever || on !== this._feverOn) {
+      this._fever = f; this._feverOn = on;
+      el.fvFill.style.transform = `scaleX(${f.toFixed(3)})`;
+      el.fever.classList.toggle('on', on);
+      el.fever.classList.toggle('near', !on && f >= 0.8);
+    }
+    let txt = on ? Math.ceil(Score.feverT) + '秒' : Math.floor(f * 100) + '%';
+    if (Score.boostT > 0) txt = `×${Score.boostMult} ` + Math.ceil(Score.boostT) + '秒';
+    if (txt !== this._feverTxt) { this._feverTxt = txt; el.fvText.textContent = txt; }
+    // チャレンジ
+    const c = Happenings.challenge;
+    if (!c) { if (this._chKey) { this._chKey = ''; el.ch.classList.add('hidden'); } return; }
+    if (this._chKey !== c.text) { this._chKey = c.text; el.ch.classList.remove('hidden', 'done'); el.chText.textContent = c.text; }
+    const cnt = Math.min(c.count, c.goal) + ' / ' + c.goal, tm = Math.max(0, Math.ceil(c.t)) + '秒';
+    if (el.chCount.textContent !== cnt) el.chCount.textContent = cnt;
+    if (el.chTime.textContent !== tm) el.chTime.textContent = tm;
+    el.chBar.style.transform = `scaleX(${Math.min(1, c.count / c.goal).toFixed(3)})`;
+    el.ch.classList.toggle('hurry', c.t < 6);
   },
 
   // 縦向きのとき、横向きをすすめる(数秒だけ)
@@ -369,11 +456,12 @@ export const UI = {
 
     this._updateCombo(dt);
     this._updateSpin();
+    this._updateFever();
     Bosses.update(gdt);
     this._updateBoss(dt);
 
     // 数字をよける場所: 主人公のまわり・上の点数の帯・右下のボタン
-    const hp = Engine.project(Player.pos.x, 1.0, Player.pos.z, _pt2);
+    const hp = Engine.viewMode === 'fps' ? null : Engine.project(Player.pos.x, 1.0, Player.pos.z, _pt2);
     Avoid.hx = hp ? hp.x : -999; Avoid.hy = hp ? hp.y : -999;
     if ((this._avoidT = (this._avoidT || 0) - dt) <= 0) {        // 大きさを測るのは ときどき(重くしない)
       this._avoidT = 0.5;
@@ -536,6 +624,20 @@ export const UI = {
     }
     if (res) res.classList.toggle('rec', !!Score.newRecord);
     this._titleRecords();
+    // このプレイの記録(いちばん使った武器・最大まとめ倒し・無双モード・出来事・見つけた場所)
+    const ex = $('resultExtra');
+    if (ex) {
+      const st = Score.stats || {}, fav = Score.favoriteWeapon();
+      const items = [];
+      if (fav && fav.n > 0) items.push(['いちばん倒した武器', `${fav.name} <small>${fmt(fav.n)}体</small>`]);
+      if (st.bestMulti) items.push(['最大まとめ倒し', fmt(st.bestMulti) + '体']);
+      if (st.fevers) items.push(['無双モード', st.fevers + '回' + (st.feverBest ? ` <small>最高 ${fmt(st.feverBest)}体</small>` : '')]);
+      if (st.events) items.push(['出来事クリア', st.events + '回']);
+      if (st.found) items.push(['見つけた場所', st.found + 'か所']);
+      if (st.golden) items.push(['金色ゾンビ', st.golden + '体']);
+      ex.innerHTML = items.map(([a, b]) => `<div><small>${a}</small><b>${b}</b></div>`).join('');
+      ex.classList.toggle('hidden', !items.length);
+    }
     // スコアを 0 からくるくる数える
     const final = Score.score, sEl = $('resultScore'), t0 = performance.now(), dur = Math.min(1600, 500 + Math.log10(final + 1) * 180);
     const tick = (now) => {

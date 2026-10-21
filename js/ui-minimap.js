@@ -4,6 +4,7 @@ import { World } from './world.js';
 import { Zombies } from './zombies.js';
 import { Player } from './player.js';
 import { Bosses } from './ui-boss.js';
+import { Happenings } from './zombie-events.js';
 
 const VIEW = 55;            // 見える半径(m)
 const MAX_DOTS = 140;
@@ -83,6 +84,17 @@ export const Minimap = {
       g.fillStyle = '#ff2050'; g.fill();
       g.lineWidth = 1.5 * this.dpr; g.strokeStyle = '#fff'; g.stroke();
     }
+    // 出来事の印(物資・金色ゾンビ・空爆 …)。遠ければ縁に
+    for (const m of Happenings.markers) {
+      let x = R + (m.x - px) * k, y = R + (m.z - pz) * k;
+      const dx = x - R, dy = y - R, l = Math.hypot(dx, dy), lim = R - 7 * this.dpr;
+      if (l > lim) { x = R + dx / l * lim; y = R + dy / l * lim; }
+      const s = (5 + Math.sin(t * 10) * 1.4) * this.dpr;
+      g.fillStyle = m.color || '#ffd23f'; g.strokeStyle = '#000'; g.lineWidth = 1.5 * this.dpr;
+      if (m.kind === 'supply') { g.fillRect(x - s, y - s, s * 2, s * 2); g.strokeRect(x - s, y - s, s * 2, s * 2); }
+      else if (m.kind === 'golden') { star(g, x, y, s * 1.3); g.fill(); g.stroke(); }
+      else { g.beginPath(); g.arc(x, y, s, 0, Math.PI * 2); g.fill(); g.stroke(); }
+    }
     // 自分(向きのある三角)
     const f = Player.facing || 0;
     g.translate(R, R); g.rotate(f);
@@ -96,3 +108,9 @@ export const Minimap = {
 
   reset() { this.base = null; },
 };
+
+function star(g, x, y, r) {
+  g.beginPath();
+  for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * 0.45 : r; g.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); }
+  g.closePath();
+}

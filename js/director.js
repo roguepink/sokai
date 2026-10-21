@@ -4,7 +4,9 @@
 // - 大群: 35〜50 秒ごとに、1 つの方向から一気に押しよせる(`horde` イベント)。種類も変わる
 // - 地面から はい出てくるゾンビ(画面の中でも出る。見ていて楽しい)
 // - 建物の中・森からも出る
-// - ボス: 最初は 40 秒、そのあと 70 秒ごと。4 種類を順番に(だんだん強くなる)
+// - ボス: 最初は 40 秒、そのあと 70 秒ごと。種類を順番に(だんだん強くなる)
+// - 出来事(zombie-events.js): 30〜45 秒ごとに 物資投下・金色ゾンビ・空爆・津波 … / 新しい場所の発見
+// - 無双モード中(Score.feverActive): 数を増やし、まわりから波のように押しよせる(なぎ倒す相手)
 import { Zombies } from './zombies.js';
 import { World } from './world.js';
 import { Events } from './events.js';
@@ -12,6 +14,8 @@ import { Engine } from './engine.js';
 import { FX } from './fx.js';
 import { BOSS_ORDER, BOSS_TYPES } from './boss.js';
 import { CONFIG } from './config.js';
+import { Score } from './score.js';
+import { Happenings } from './zombie-events.js';
 
 const MAX = CONFIG.ZOMBIES.MAX;
 const R = (a, b) => a + Math.random() * (b - a);
@@ -23,6 +27,12 @@ const HORDES = [
   { text: '機動隊ゾンビが来る!', mix: { riot: 0.5, walker: 0.35, runner: 0.15 }, n: 0.7, from: 90 },
   { text: '巨漢ゾンビの群れ!', mix: { brute: 0.4, walker: 0.4, runner: 0.2 }, n: 0.6, from: 120 },
   { text: '四方八方から大群が来る!', mix: { walker: 0.6, runner: 0.25, crawler: 0.08, bloater: 0.07 }, n: 1.3, from: 150, all: true },
+  { text: '小鬼ゾンビの大群だ!', mix: { imp: 0.8, runner: 0.2 }, n: 1.3, from: 45 },
+  { text: '燃えるゾンビの群れ! 火が うつるぞ!', mix: { burner: 0.5, walker: 0.5 }, n: 0.7, from: 80 },
+  { text: '跳ぶゾンビが 飛びかかってくる!', mix: { leaper: 0.6, runner: 0.4 }, n: 0.6, from: 100 },
+  { text: 'ガスマスク部隊! 倒すと 毒ガスが広がる!', mix: { gasmask: 0.6, shield: 0.15, walker: 0.25 }, n: 0.6, from: 110 },
+  { text: '盾の部隊! 盾ごと ぶっとばせ!', mix: { shield: 0.55, riot: 0.25, walker: 0.2 }, n: 0.6, from: 130 },
+  { text: '巨大ゾンビの群れ!!', mix: { giant: 0.3, brute: 0.3, walker: 0.4 }, n: 0.45, from: 170 },
 ];
 
 export const Director = {
@@ -37,7 +47,23 @@ export const Director = {
 
   reset() {
     this.time = 0; this._acc = 0; this._nextBoss = 40; this._bossIdx = 0;
-    this._nextHorde = 26; this._hordeIdx = 0; this._queue.length = 0;
+    this._nextHorde = 26; this._hordeIdx = 0; this._queue.length = 0; this._waveT = 0;
+    Happenings.reset();
+  },
+
+  // 出来事を すぐ起こす(確認用: __game.Director.happen('airstrike'))
+  happen(kind) { if (!Happenings._scene) Happenings.init(Engine.scene, this); return Happenings.start(kind, this._player || { pos: { x: 0, z: 0 } }); },
+  bossTypes() { return BOSS_ORDER.slice(); },
+  // ボスを出す(体力は時間とともに強く。hpMul で調整)
+  spawnBoss(type, x, z, hpMul = 1) {
+    const def = BOSS_TYPES[type]; if (!def) return null;
+    const lap = Math.floor(this._bossIdx / BOSS_ORDER.length);
+    const e = Zombies.spawn(type, x, z);
+    if (e) {
+      e.hp = e.maxHp = Math.round(def.hp * (1 + this.time / 150) * (1 + lap * 0.3) * hpMul);
+      if (lap > 0) e.name = def.name + ' ' + ['', 'II', 'III', 'IV', 'V'][Math.min(4, lap)];
+    }
+    return e;
   },
 
   // 今の時間に、まわりに何体いてほしいか(ゆっくり増えて、ときどき波がある)
@@ -45,7 +71,7 @@ export const Director = {
     const t = this.time;
     const base = 90 + t * 2;
     const wave = 1 + 0.15 * Math.sin(t / 9);
-    return Math.min(280, base * wave) * this.perfScale();
+    return Math.min(Score.feverActive ? 300 : 280, base * wave * (Score.feverActive ? 1.5 : 1)) * this.perfScale();
   },
   // スマホが重いときは数を減らす(解像度を下げても追いつかないとき)
   perfScale() {
@@ -56,7 +82,7 @@ export const Director = {
   // 主人公の近く(だいたい画面のまわり 26m)に いてほしい数。画面がからっぽにならないように
   nearCount() {
     const t = this.time;
-    return Math.min(100, 40 + t * 0.4) * (1 + 0.2 * Math.sin(t / 7)) * this.perfScale();
+    return Math.min(Score.feverActive ? 150 : 100, (40 + t * 0.4) * (Score.feverActive ? 1.8 : 1)) * (1 + 0.2 * Math.sin(t / 7)) * this.perfScale();
   },
 
   // 時間とともに 種類がまざってくる
@@ -67,17 +93,48 @@ export const Director = {
     const brute = t > 50 ? Math.min(0.06, 0.02 + t / 4000) : 0;
     const bloater = t > 35 ? Math.min(0.08, 0.03 + t / 3000) : 0;
     const riot = t > 70 ? Math.min(0.08, 0.02 + t / 3000) : 0;
+    // 第2弾の種類(少しずつ まざる)
+    const imp = t > 30 ? 0.05 : 0;
+    const leaper = t > 60 ? Math.min(0.05, 0.015 + t / 6000) : 0;
+    const burner = t > 75 ? 0.03 : 0;
+    const gas = t > 90 ? Math.min(0.05, 0.01 + t / 6000) : 0;
+    const shield = t > 110 ? Math.min(0.05, 0.01 + t / 6000) : 0;
+    const giant = t > 160 ? Math.min(0.02, 0.005 + t / 20000) : 0;
     let a = runner; if (r < a) return 'runner';
     a += crawler; if (r < a) return 'crawler';
     a += brute; if (r < a) return 'brute';
     a += bloater; if (r < a) return 'bloater';
     a += riot; if (r < a) return 'riot';
+    a += imp; if (r < a) return 'imp';
+    a += leaper; if (r < a) return 'leaper';
+    a += burner; if (r < a) return 'burner';
+    a += gas; if (r < a) return 'gasmask';
+    a += shield; if (r < a) return 'shield';
+    a += giant; if (r < a) return 'giant';
     return 'walker';
   },
 
   update(dt, player) {
     this.time += dt;
+    this._player = player;
     const px = player.pos.x, pz = player.pos.z;
+    if (!Happenings._scene) Happenings.init(Engine.scene, this);
+    Happenings.update(dt, player);
+
+    // ---- 無双モード: まわりから 波のように押しよせる(なぎ倒す相手) ----
+    if (Score.feverActive) {
+      if ((this._waveT -= dt) <= 0) {
+        this._waveT = 2.2;
+        const n = Math.round(26 * this.perfScale());
+        if (Zombies.count() + n > MAX - 10) this._recycleFar(px, pz, n);
+        const a0 = Math.random() * Math.PI * 2;
+        for (let i = 0; i < n; i++) {
+          const a = a0 + (i / n) * Math.PI * 2 + R(-0.1, 0.1), d = World.inside ? R(12, 18) : R(19, 25);
+          const r = Math.random();
+          this._queue.push({ type: r < 0.45 ? 'runner' : r < 0.6 ? 'imp' : r < 0.66 ? 'bloater' : 'walker', x: px + Math.cos(a) * d, z: pz + Math.sin(a) * d, t: (i / n) * 0.6, rush: true });
+        }
+      }
+    } else this._waveT = 0.5;
 
     // ---- ふだんの出現 ----
     this._acc += dt;
@@ -120,7 +177,7 @@ export const Director = {
       const choices = HORDES.filter((h) => h.from <= t);
       const h = this._hordeIdx === 0 ? HORDES[0] : choices[(Math.random() * choices.length) | 0];
       this._hordeIdx++;
-      const count = Math.round(Math.min(110, (35 + t * 0.35)) * h.n);
+      const count = Math.round(Math.min(110, (35 + t * 0.35)) * h.n * this.perfScale());
       const ang = Math.random() * Math.PI * 2;
       for (let i = 0; i < count; i++) {
         const a = h.all ? Math.random() * Math.PI * 2 : ang + R(-0.45, 0.45);
@@ -142,7 +199,8 @@ export const Director = {
         if (!p || onScreen(p.x, p.z)) continue;
         x = p.x; z = p.z;
       }
-      Zombies.spawn(q.type, x, z);
+      const e = Zombies.spawn(q.type, x, z);
+      if (e && q.rush) { e.spdMul *= 1.25; e.reachL = 1; }
     }
 
     // ---- ボス(必ず出る) ----
@@ -154,15 +212,8 @@ export const Director = {
         const p = this._offscreenPoint(px, pz, 24, 34, false, 2.5) || World.spawnPoint(px, pz, 20, 34);
         if (p) {
           const type = BOSS_ORDER[this._bossIdx % BOSS_ORDER.length];
-          const lap = Math.floor(this._bossIdx / BOSS_ORDER.length);
+          this.spawnBoss(type, p.x, p.z);
           this._bossIdx++;
-          // 出す前に 体力を決める(時間とともに強く)
-          const def = BOSS_TYPES[type];
-          const e = Zombies.spawn(type, p.x, p.z);
-          if (e) {
-            e.hp = e.maxHp = Math.round(def.hp * (1 + this.time / 150) * (1 + lap * 0.3));
-            if (lap > 0) e.name = def.name + ' ' + ['', 'II', 'III', 'IV', 'V'][Math.min(4, lap)];
-          }
           this._nextBoss = this.time + 70;
         } else this._nextBoss = this.time + 2;
       }
