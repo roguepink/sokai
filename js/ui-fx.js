@@ -99,6 +99,7 @@ export class Banner {
     this.el.classList.add('on');
     this.el.style.setProperty('--dur', it.dur + 's');
     this.t = it.dur; this.prio = it.prio;
+    if (this.onPlay) this.onPlay(it);
   }
 
   update(dt) {

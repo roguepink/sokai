@@ -11,6 +11,7 @@ import { Score } from './score.js';
 import { Bosses } from './ui-boss.js';
 import { Music } from './audio-bgm.js';
 import { SOUNDS2, GAP2, LEN2, IMPORTANT2, bossRoar } from './audio-sfx2.js';
+import { SOUNDS3, GAP3, LEN3, Weather } from './audio-world.js';
 
 const MAX_VOICES = 36;
 // 同じ音を続けて鳴らすときの最短の間隔(秒)
@@ -74,6 +75,13 @@ export const Audio = {
     Events.on('zombieLand', () => this.play('thud'));
     Events.on('giantStep', (g) => this.play('stomp', g));
     Events.on('propExplode', (p) => this.explosion((p && p.radius) || 4));
+    // ---- マップの音(こわれる物・雷・ヘリ・遠くの爆発・カラス) ----
+    const BREAK = { glass: 'glass', wood: 'wood', metal: 'metalBreak', plastic: 'plastic', water: 'water', cloth: 'cloth' };
+    Events.on('propBreak', (b) => this.play(BREAK[b && b.fx] || 'wood', b));
+    Events.on('lightning', (l) => this.play(l && l.near ? 'thunderNear' : 'thunderFar', l));
+    Events.on('heliPass', (h) => { if (this._state === 'play') this.play('heli', h); });
+    Events.on('distantBoom', (d) => this.play('distantBoom', d));
+    Events.on('crows', (c) => this.play('crows', c));
     Events.on('bossAct', (b) => {
       const s = { grab: 'bossgrab', throw: 'bossthrow', birth: 'birth', spit: 'spit', acidHit: 'sizzle', rev: 'rev', charge: 'carhorn' }[b && b.act];
       if (s) this.play(s);
@@ -194,6 +202,7 @@ export const Audio = {
       this.music.setFever(fever);
       this.music.setMode(fever ? 'fever' : boss ? 'boss' : 'normal');
     } else if (this.music && this._state === 'title') { this.music.setLevel(0); }
+    try { Weather.update(this, this.muted ? 'paused' : this._state); } catch (e) { /* 音で止めない */ }
     if (playing && !this.muted) {
       const n = safeCount();
       this._groanT -= dt;
@@ -550,8 +559,8 @@ const SOUNDS = {
   },
 };
 
-Object.assign(SOUNDS, SOUNDS2);
-Object.assign(MIN_GAP, GAP2);
-Object.assign(LEN, LEN2);
+Object.assign(SOUNDS, SOUNDS2, SOUNDS3);
+Object.assign(MIN_GAP, GAP2, GAP3);
+Object.assign(LEN, LEN2, LEN3);
 for (const k of IMPORTANT2) IMPORTANT.add(k);
 Audio.SOUNDS = SOUNDS;   // 確認用(音の大きさを測るテストで使う)

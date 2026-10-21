@@ -269,7 +269,7 @@ body.pc #hud .weapon-name { bottom: calc(var(--sab) + 172px); }
   :root { --lane: calc(var(--sat) + 96px); --laneSub: calc(var(--sat) + 158px); --mm: 80px; }
   .hud-score b { font-size: 30px; }
   .minimap { width: 80px; height: 80px; }
-  .hud-boss { top: calc(var(--sat) + 58px); }
+  .hud-boss { top: calc(var(--sat) + 62px); }
   .boss-name { font-size: 13px; }
   .banner b { font-size: min(30px, 6vw); }
   .banner small { font-size: 14px; }
@@ -287,7 +287,7 @@ body.pc #hud .weapon-name { bottom: calc(var(--sab) + 172px); }
   :root { --lane: calc(var(--sat) + 86px); --laneSub: calc(var(--sat) + 146px); }
   .hud-score b { font-size: 27px; }
   .hud-score small { font-size: 11px; }
-  .hud-boss { top: calc(var(--sat) + 50px); }
+  .hud-boss { top: calc(var(--sat) + 56px); }
   .boss-bar { height: 10px; }
   .banner b { font-size: min(28px, 6vw); }
   .banner.massacre b, .banner.boss b, .banner.bossdown b, .banner.record b { font-size: min(32px, 7vw); }
@@ -301,18 +301,19 @@ body.pc #hud .weapon-name { bottom: calc(var(--sab) + 172px); }
 }
 /* 縦長の画面(遊べるけれど、横向きをすすめる) */
 @media (orientation: portrait) {
-  :root { --lane: 28%; --laneSub: calc(28% + 80px); --mm: 72px; }
+  :root { --lane: max(28%, calc(var(--sat) + 232px)); --laneSub: calc(var(--lane) + 80px); --mm: 72px; }
   .minimap { width: 72px; height: 72px; }
   /* 縦: 武器の列は下(ボタンの上)へ。上は 点数・コンボ・ボスの体力・まんなかの文字 */
   .weapon-bar { top: auto; bottom: calc(var(--sab) + 216px); left: 50%; right: auto; transform: translateX(-50%); max-width: calc(100vw - 24px); }
-  .weapon-name { bottom: calc(var(--sab) + 266px); }
+  .weapon-name { bottom: calc(var(--sab) + 272px); }
   .hud-score { top: calc(var(--sat) + 8px); min-width: 0; }
   .hud-score b { font-size: 26px; }
-  .hud-boss { top: calc(var(--sat) + 150px); width: 80vw; }
-  .hud-combo { top: calc(var(--sat) + 58px); }
+  .hud-boss { top: calc(var(--sat) + 196px); width: 80vw; }
+  .hud-combo { top: calc(var(--sat) + 66px); }
   .hud-combo b { font-size: 34px; } .hud-combo.t2 b { font-size: 38px; } .hud-combo.t3 b, .hud-combo.t4 b, .hud-combo.t5 b { font-size: 42px; }
   .hud-zone { top: auto; bottom: calc(var(--sab) + 14px); left: calc(var(--sal) + 12px); max-width: 45vw; }
   .rot-hint, .rotate-hint { display: block; }
+  .rot-hint { top: calc(var(--lane) + 84px); }
   .res-grid { grid-template-columns: repeat(2, auto); }
   .banner b { font-size: min(34px, 8.5vw); }
   .banner.massacre b, .banner.boss b, .banner.bossdown b, .banner.record b { font-size: min(40px, 9.5vw); }
@@ -405,3 +406,56 @@ body.pc #hud .weapon-name { bottom: calc(var(--sab) + 172px); }
   .banner.fever b { font-size: min(44px, 11vw); }
   .res-extra { grid-template-columns: repeat(2, auto); }
 }
+
+/* ================= 第2弾の画面の整理(テスト係B) ================= */
+/* 横画面: 無双ゲージは ダッシュ・回転斬りのボタンに かからないよう、まんなかより少し左へ(広い画面では まんなか) */
+@media (orientation: landscape) {
+  .hud-fever { left: auto; right: max(calc(var(--sar) + 352px), calc(50% - 125px)); transform: none; width: 250px; }
+  .hud-fever.on { width: min(40vw, 330px); }
+}
+@media (orientation: landscape) and (max-height: 430px) {
+  .hud-fever { width: min(30vw, 250px); }
+}
+@media (orientation: landscape) and (min-width: 1100px) and (min-height: 600px) {
+  .hud-fever { right: calc(50% - 140px); width: 280px; }
+  .hud-fever.on { right: calc(50% - 190px); width: 380px; }
+}
+/* 肩越し・一人称(横画面): まんなかの照準のあたりを あけるため、大きな文字は 点数(ボスの体力)のすぐ下に 1 行で出す。
+   下の段の 1 行も 同じ場所(大きな文字が出ている間は 順番待ち) */
+@media (orientation: landscape) {
+  #hud.close .banner, #hud.close .sub-banner { top: var(--laneC, var(--lane)); }
+  #hud.close .banner b, #hud.close .banner small { display: inline-block; vertical-align: baseline; }
+  #hud.close .banner small { margin-left: .6em; }
+}
+@media (orientation: landscape) and (max-height: 430px) {
+  #hud.close .banner b { font-size: min(28px, 5.5vw); }
+  #hud.close .banner.massacre b, #hud.close .banner.boss b, #hud.close .banner.bossdown b, #hud.close .banner.record b, #hud.close .banner.fever b { font-size: min(32px, 6vw); }
+  #hud.close .banner small, #hud.close .banner.boss small, #hud.close .banner.bossdown small, #hud.close .banner.fever small, #hud.close .banner.challenge small { font-size: 14px; }
+}
+
+/* 武器の列の いちばん左「▦ 全部」(横に送っても いつも見える) */
+.wbtn.wall { position: sticky; left: 0; z-index: 1; opacity: 1; background: rgba(20,20,30,.85); border-color: rgba(255,255,255,.55);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; font-size: 18px; }
+.wbtn.wall small { font-size: 9px; line-height: 1; font-weight: 900; }
+/* 武器を ぜんぶ ならべて えらぶ画面 */
+.weapon-grid { z-index: 22; justify-content: flex-start; gap: 8px; background: rgba(8, 4, 6, .82); }
+.wg-head { position: relative; width: min(980px, 100%); display: flex; justify-content: center; align-items: center; }
+.wg-head h2 { font-size: 22px; } .wg-head h2 small { font-size: 13px; opacity: .75; margin-left: 6px; }
+.wg-close { position: absolute; right: 0; top: -2px; width: 44px; height: 44px; padding: 0; font-size: 18px; }
+.wg-list { width: min(980px, 100%); display: grid; grid-template-columns: repeat(auto-fill, minmax(98px, 1fr)); gap: 6px; }
+.wg-item { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 6px 4px 5px;
+  border-radius: 12px; font-size: 11px; line-height: 1.15; min-height: 56px; border-width: 1.5px; }
+.wg-item b { font-size: 24px; line-height: 1; }
+.wg-item span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.wg-item sub { position: absolute; left: 6px; top: 4px; font-size: 9px; opacity: .6; }
+.wg-item.on { border-color: var(--gold); background: rgba(255,170,40,.35); box-shadow: 0 0 10px rgba(255,210,63,.7); }
+.wg-note { margin: 0; font-size: 12px; opacity: .75; }
+body:not(.pc) .pc-only { display: none; }
+@media (max-height: 430px) {
+  .weapon-grid { gap: 5px; padding-top: calc(var(--sat) + 6px); }
+  .wg-head h2 { font-size: 18px; }
+  .wg-list { gap: 4px; }
+  .wg-item { min-height: 50px; padding: 4px 3px; } .wg-item b { font-size: 21px; }
+}
+@media (orientation: portrait) { .wg-list { grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); } }
+.wg-item.long span { font-size: 9.5px; letter-spacing: -.03em; }

@@ -139,7 +139,8 @@ export const ViewCam = {
       this.pivot.x = damp(this.pivot.x, target.x, T.LAG, dt);
       this.pivot.z = damp(this.pivot.z, target.z, T.LAG, dt);
       this.pivot.y = damp(this.pivot.y, target.y * 0.5, 9, dt);   // 跳んだときは 半分だけ ついていく(高く跳んだ感じ)
-      const back = T.BACK * (1 - (1 - T.FIRE_BACK) * this.aimK), side = T.SIDE * (1 - 0.2 * this.aimK);
+      // 縦長の画面は 横はばが せまいので、肩を まんなか寄りに(主人公が 画面の左はしに 切れないように)
+      const back = T.BACK * (1 - (1 - T.FIRE_BACK) * this.aimK), side = T.SIDE * (1 - 0.2 * this.aimK) * (innerWidth < innerHeight ? 0.45 : 1);
       const px = this.pivot.x, pz = this.pivot.z, py = this.pivot.y + T.PIVOT - this.dip;
       // 肩: 体の横が壁なら 肩を引っこめる
       const t1 = camRay(target.x, target.z, px + rx * (side + MARGIN), pz + rz * (side + MARGIN), 1.2);

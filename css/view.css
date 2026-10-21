@@ -25,7 +25,7 @@ body.pc .btn-dash::after { content: 'F(2回で叩きつけ)'; }
 }
 /* 縦長: 左の親指(スティック)とぶつからないように、回転斬りの上へ */
 @media (orientation: portrait) {
-  #controls .btn-dash { right: calc(var(--sar) + 170px); bottom: calc(var(--sab) + 114px); width: 64px; height: 64px; font-size: 13px; }
+  #controls .btn-dash { right: calc(var(--sar) + 170px); bottom: calc(var(--sab) + 120px); width: 64px; height: 64px; font-size: 13px; }
   .btn-dash small { font-size: 7.5px; }
   #controls .btn-prev { right: calc(var(--sar) + 90px); }   /* ◀▶ を 撃つボタンの上に ならべる(ダッシュの場所をあける) */
 }
@@ -86,6 +86,19 @@ body.pc .btn-dash::after { content: 'F(2回で叩きつけ)'; }
 @keyframes swipe { 0%, 100% { transform: translateX(-16px); } 50% { transform: translateX(16px); } }
 @keyframes hintIn { from { opacity: 0; } }
 @media (orientation: portrait) { .view-hint.look { right: 12px; top: 24%; } }
+/* 背の低い横画面: 小さめに(主人公・チャレンジの札に かぶらない)。チャレンジの札が出ているときは その下(view-hud.js) */
+@media (orientation: landscape) and (max-height: 430px) {
+  .view-hint { padding: 7px 12px; gap: 8px; font-size: 14px; border-radius: 12px; }
+  .view-hint b { font-size: 24px; }
+  .view-hint small { font-size: 10px; }
+  .view-hint.slam { top: 50%; }
+}
+/* 縦長: 照準より下、無双ゲージより上 */
+@media (orientation: portrait) {
+  .view-hint { font-size: 15px; padding: 8px 12px; }
+  .view-hint b { font-size: 24px; }
+  .view-hint.slam { top: auto; bottom: calc(var(--sab) + 302px); left: calc(var(--sal) + 12px); }
+}
 body.pc .view-hint.look { right: auto; left: calc(var(--sal) + 14px); top: 40%; }
 
 /* ---- 視点の設定(👁 を長押し) ---- */
