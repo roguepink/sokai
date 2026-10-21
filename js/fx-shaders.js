@@ -72,7 +72,7 @@ export const SOLID_FS = /* glsl */`
     float a;
     if (vShape < 0.5) {
       float ang = atan(vUv.y, vUv.x);
-      float w = 1.0 + 0.12 * sin(ang * 5.0) + 0.08 * sin(ang * 9.0 + 1.3);
+      float w = 1.0 + 0.07 * sin(ang * 3.0) + 0.04 * sin(ang * 7.0 + 1.3);
       float r = sqrt(r2) * w;
       a = smoothstep(1.0, 0.15, r) * 0.85;
     } else a = smoothstep(1.0, 0.55, r2);
@@ -232,7 +232,7 @@ export const SLASH_FS = /* glsl */`
     float inner = smoothstep(1.0, 0.6, vV);
     float k = a * inner * (0.35 + 2.2 * edge);
     if (k < 0.01) discard;
-    vec3 c = vCol.rgb * k + vec3(1.0) * edge * a * 0.9;
+    vec3 c = vCol.rgb * k + vec3(1.0) * edge * a * 0.35 * max(vCol.r, max(vCol.g, vCol.b));
     gl_FragColor = vec4(c, vCol.a);
     ${OUT}
   }

@@ -11,8 +11,8 @@ function mats() {
     metal: std(0x2c3038, 0.35, 0.8), dark: std(0x16181c, 0.6, 0.3), steel: std(0x8a9099, 0.3, 0.9),
     wood: std(0x6b4224, 0.7, 0.05), olive: std(0x4b5631, 0.7, 0.2), tan: std(0x8a7a58, 0.7, 0.1),
     white: std(0xd9dde2, 0.35, 0.3), red: std(0x9a1818, 0.5, 0.3), brass: std(0xc89a40, 0.35, 0.9), copper: std(0xb8683a, 0.35, 0.9),
-    gRed: glow(0xff2a2a, 4), gCyan: glow(0x40c8ff, 4), gBlue: glow(0x3a8cff, 4), gPurple: glow(0xa050ff, 4),
-    gOrange: glow(0xff7a20, 4), gIce: glow(0x9ae4ff, 3), gGreen: glow(0x60ff80, 3), void: std(0x050308, 0.2, 0.6),
+    gRed: glow(0xff2a2a, 3), gCyan: glow(0x40c8ff, 2.2), gBlue: glow(0x3a8cff, 2.5), gPurple: glow(0xa050ff, 2.5),
+    gOrange: glow(0xff7a20, 2.5), gIce: glow(0x9ae4ff, 1.4), gGreen: glow(0x60ff80, 3), gDim: glow(0xff7a20, 1.2), void: std(0x050308, 0.2, 0.6),
   });
   return M;
 }
@@ -52,7 +52,7 @@ const B = {
       tube(g, 0.012, 0.04, x, 0.07, -0.22, m.dark, 6);
       ball(g, 0.008, x, 0.105, -0.17, m.gGreen, 4);
     };
-    one(0); one(-0.84);
+    one(0); one(-0.66);
   },
   shotgun(g, m) {
     tube(g, 0.028, 0.8, 0, 0.1, -0.45, m.metal);
@@ -69,7 +69,7 @@ const B = {
     const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.08, 16), m.olive);
     drum.rotation.z = Math.PI / 2; drum.position.set(0, -0.1, -0.15); g.add(drum);
     box(g, 0.07, 0.13, 0.25, 0, 0.04, 0.22, m.dark);
-    box(g, 0.05, 0.03, 0.4, 0, 0.17, -0.2, m.gOrange);
+    box(g, 0.012, 0.012, 0.4, 0.045, 0.15, -0.2, m.gOrange);
   },
   sniper(g, m) {
     tube(g, 0.02, 0.95, 0, 0.09, -0.65, m.metal);
@@ -115,7 +115,7 @@ const B = {
     box(g, 0.26, 0.2, 0.42, 0, 0.14, -0.15, m.dark);
     for (let i = 0; i < 3; i++) for (let j = 0; j < 2; j++) ball(g, 0.028, -0.08 + i * 0.08, 0.09 + j * 0.1, -0.37, m.gRed, 6);
     box(g, 0.05, 0.11, 0.05, 0, -0.01, 0.0, m.dark, -0.3);
-    box(g, 0.27, 0.025, 0.43, 0, 0.255, -0.15, m.gOrange);
+    box(g, 0.27, 0.012, 0.02, 0, 0.245, -0.36, m.gOrange); box(g, 0.27, 0.012, 0.02, 0, 0.245, 0.06, m.gOrange);
   },
   flame(g, m) {
     tube(g, 0.04, 0.55, 0, 0.09, -0.4, m.metal);
@@ -144,7 +144,7 @@ const B = {
     box(g, 0.14, 0.16, 0.5, 0, 0.07, -0.15, m.dark);
     ring(g, 0.1, 0.022, 0, 0.08, -0.45, m.metal);
     ball(g, 0.065, 0, 0.08, -0.45, m.gPurple, 12);
-    box(g, 0.02, 0.17, 0.3, 0.075, 0.07, -0.12, m.gPurple);
+    box(g, 0.012, 0.05, 0.3, 0.075, 0.1, -0.12, m.gPurple);
     tube(g, 0.05, 0.15, 0, 0.08, -0.6, m.metal, 10, 0.065);
     box(g, 0.045, 0.11, 0.05, 0, -0.04, 0.04, m.dark, -0.3);
   },

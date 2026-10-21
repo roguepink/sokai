@@ -510,23 +510,23 @@ export const Weapons = {
     const px = player.pos.x, pz = player.pos.z;
     const kills = area(px, pz, SPIN_R, SPIN_DMG, 46, 'spin', false, true);
     const R = SPIN_R;
-    FX.slash(px, 1.1, pz, 0, Math.PI * 2.05, R * 0.3, R * 0.6, 0x48b8ff, 0.32, 1, 0, 2.5, 1.1, 0.4);
-    FX.slash(px, 1.3, pz, Math.PI, Math.PI * 2.05, R * 0.6, R * 0.98, 0x9ad8ff, 0.42, 1, 0.06, 2.2, 1.1, 0.7);
-    FX.ring(px, pz, 1, R * 1.2, 0.55, 0x7ac8ff, 0.7, 2.2, 1, 0);
-    FX.ring(px, pz, 0.5, R * 0.95, 0.32, 0xffffff, 0.3, 3, 1, 0);
-    const g = FX.q(60);
+    FX.slash(px, 1.1, pz, 0, Math.PI * 2.05, R * 0.42, R * 0.62, 0x48b8ff, 0.3, 1, 0, 1.0, 1.1, 0.35);
+    FX.slash(px, 1.3, pz, Math.PI, Math.PI * 2.05, R * 0.78, R * 1.0, 0x9ad8ff, 0.4, 1, 0.05, 0.9, 1.1, 0.6);
+    FX.ring(px, pz, 1, R * 1.2, 0.5, 0x7ac8ff, 0.6, 1.6, 1, 0);
+    FX.ring(px, pz, 0.5, R * 0.9, 0.3, 0xffffff, 0.25, 2, 1, 0);
+    const g = FX.q(50);
     for (let i = 0; i < g; i++) {
-      const a = (i / g) * Math.PI * 2 + rnd() * 0.1, s = 16 + rnd() * 14;
-      FX.spark(px + Math.cos(a), 1 + rnd() * 0.6, pz + Math.sin(a), Math.cos(a) * s, 1 + rnd() * 3, Math.sin(a) * s, 0.35 + rnd() * 0.25, 0.08, 0xd8f4ff, 6, 0x3a90ff, 2, 0.03, 4, 2.5, 1);
+      const a = (i / g) * Math.PI * 2 + rnd() * 0.1, s = 16 + rnd() * 14, r0 = 1.5 + rnd() * 3;
+      FX.spark(px + Math.cos(a) * r0, 1 + rnd() * 0.6, pz + Math.sin(a) * r0, Math.cos(a) * s, 1 + rnd() * 3, Math.sin(a) * s, 0.35 + rnd() * 0.25, 0.06, 0xd8f4ff, 2, 0x3a90ff, 1, 0.03, 4, 2.5, 1);
     }
-    const dn = FX.q(36);
+    const dn = FX.q(28);
     for (let i = 0; i < dn; i++) {
       const a = rnd() * Math.PI * 2, s = 10 + rnd() * 8;
-      FX.smoke(px + Math.cos(a) * 1.5, 0.35, pz + Math.sin(a) * 1.5, 0.45, 0.9 + rnd() * 0.4, 0x7a6e60, Math.cos(a) * s, 0.4 + rnd(), Math.sin(a) * s, 0.55);
+      FX.smoke(px + Math.cos(a) * 1.5, 0.3, pz + Math.sin(a) * 1.5, 0.4, 0.8 + rnd() * 0.4, 0x6a6052, Math.cos(a) * s, 0.3 + rnd(), Math.sin(a) * s, 0.45);
     }
     FX.debris(px, 0.3, pz, 16, 10, 0x5a5048, 0.16, 2);
-    FX.decal(px, pz, 4, 'scorch', 12);
-    FX.flash(px, 3, pz, 0x80c8ff, 90, 26, 0.4);
+    FX.decal(px, pz, 2.4, 'scorch', 8);
+    FX.flash(px, 3.5, pz, 0x80c8ff, 22, 22, 0.35);
     Engine.shake(1.1);
     Engine.hitStop(0.09);
     Events.emit('spin', { x: px, z: pz, kills });

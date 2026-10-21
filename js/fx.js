@@ -199,7 +199,7 @@ class RingPool {
         if (age >= life) { n--; if (i < n) d.copyWithin(o, n * RS, n * RS + RS); continue; }
         const t = age / life, e = 1 - (1 - t) * (1 - t) * (1 - t);
         r = d[o + 3] + (d[o + 4] - d[o + 3]) * e;
-        al *= (1 - t) * (1 - t); th *= 1 - t * 0.5;
+        al *= (1 - t) * (1 - t) * Math.min(1, t * 7); th *= 1 - t * 0.5;
       }
       const j = w * 4;
       P[j] = d[o]; P[j + 1] = d[o + 1]; P[j + 2] = d[o + 2]; P[j + 3] = r;
@@ -549,9 +549,9 @@ export const FX = {
   // 銃口の火(dir は撃つ向き)。size 1 = ふつう
   muzzle(x, y, z, dirX, dirZ, color = 0xffc060, size = 1, light = true) {
     const g = this.glowPool;
-    g.emit(x, y, z, 0, 0, 0, 0.05, 0.28 * size, 0.42 * size, 0xffffff, 6, color, 4, 1, 0, 0, 0, 0, 0);
-    g.emit(x + dirX * 0.25 * size, y, z + dirZ * 0.25 * size, dirX * 14 * size, 0, dirZ * 14 * size, 0.05, 0.14 * size, 0.2 * size, color, 7, color, 3, 1, 0, 6, 0.03, 0, 0);
-    g.emit(x, y, z, 0, 0, 0, 0.04, 0.38 * size, 0.2 * size, color, 4, color, 2, 1, 0, 0, 0, 2, 0);
+    g.emit(x, y, z, 0, 0, 0, 0.05, 0.2 * size, 0.3 * size, 0xffffff, 2.2, color, 1.6, 1, 0, 0, 0, 0, 0);
+    g.emit(x + dirX * 0.25 * size, y, z + dirZ * 0.25 * size, dirX * 14 * size, 0, dirZ * 14 * size, 0.05, 0.12 * size, 0.18 * size, color, 3.5, color, 1.5, 1, 0, 6, 0.03, 0, 0);
+    g.emit(x, y, z, 0, 0, 0, 0.04, 0.34 * size, 0.2 * size, color, 2.2, color, 1, 1, 0, 0, 0, 2, 0);
     const n = this.q(2 * size);
     for (let i = 0; i < n; i++) {
       const s = 8 + rnd() * 10;
