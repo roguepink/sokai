@@ -67,7 +67,7 @@ export const Engine = {
     sun.castShadow = r.shadowMap.enabled;
     const S = CONFIG.RENDER.SHADOW_AREA;
     sun.shadow.mapSize.set(this.quality === 'high' ? CONFIG.RENDER.SHADOW_SIZE : 1024, this.quality === 'high' ? CONFIG.RENDER.SHADOW_SIZE : 1024);
-    Object.assign(sun.shadow.camera, { left: -S, right: S, top: S, bottom: -S, near: 1, far: 160 });
+    Object.assign(sun.shadow.camera, { left: -S, right: S, top: S, bottom: -S, near: 1, far: 200 });
     sun.shadow.bias = -0.0004;
     sun.shadow.normalBias = 0.03;
     scene.add(sun, sun.target);
@@ -172,6 +172,46 @@ export const Engine = {
     } else if (demo && ViewCam.cine(this, realDt, target)) mode = 'close';
     else this._topCamera(realDt, target, inside, demo);
     ViewCam.post(this, realDt, mode, innerWidth < innerHeight ? C.FOV * 1.35 : C.FOV);
+    this._updateSun(target, close);
+  },
+
+  // 太陽(夜は月)の向きを 時間に合わせる。影は主人公のまわりだけ計算する(肩越し・一人称は 見ている方を広めに)。
+  // マップ係が World.sunDir / World.moonDir を持っていれば それを使う。なければ World.timeOfDay から 空と同じ式で出す
+  _updateSun(target, close) {
+    const sun = this.sun; if (!sun) return;
+    let t = 0.22;
+    try { t = World.timeOfDay ?? 0.22; } catch (e) {}
+    const sa = t * Math.PI * 2;
+    if (World.sunDir && World.sunDir.isVector3) _sd.copy(World.sunDir).normalize();
+    else _sd.set(-Math.sin(sa) * 0.92, Math.cos(sa) * 0.9 + 0.06, 0.38).normalize();
+    if (World.moonDir && World.moonDir.isVector3) _md.copy(World.moonDir).normalize();
+    else _md.set(Math.sin(sa) * 0.7 + 0.2, Math.max(0.25, -Math.cos(sa) * 0.75), -0.5).normalize();
+    // 太陽が しずむ前後で 月の向きへ なめらかに うつす
+    const day = Math.max(0, Math.min(1, (_sd.y + 0.02) / 0.16));
+    const k = day * day * (3 - 2 * day);
+    _ld.copy(_md).lerp(_sd, k);
+    // 低すぎると 影が のびすぎて ちらつくので、高さは 24° 以上にする
+    const MIN_Y = 0.42;
+    if (_ld.y < MIN_Y) { const h = Math.hypot(_ld.x, _ld.z) || 1; const s = Math.sqrt(1 - MIN_Y * MIN_Y) / h; _ld.x *= s; _ld.z *= s; _ld.y = MIN_Y; }
+    _ld.normalize();
+    // 夜(月)と くもり・雨は 影を うすく
+    if ('intensity' in sun.shadow) {
+      let w = 'clear'; try { w = World.weather || 'clear'; } catch (e) {}
+      const wk = w === 'storm' ? 0.5 : w === 'rain' || w === 'fog' || w === 'snow' || w === 'ash' ? 0.65 : 1;
+      sun.shadow.intensity = (0.45 + 0.55 * k) * wk;
+    }
+    // 影の中心: 見下ろし = 主人公 / 肩越し・一人称 = 見ている方へ 少し先
+    let cx = target.x, cz = target.z;
+    if (close) { cx += this.viewDir.x * 20; cz += this.viewDir.z * 20; }
+    // 影の ちらつき止め: 影の地図の 1 マスきざみに 中心をそろえる(光から見た 横・縦の向きで)
+    const S = CONFIG.RENDER.SHADOW_AREA, texel = (2 * S) / sun.shadow.mapSize.x;
+    _rt.set(-_ld.z, 0, _ld.x).normalize();               // 光から見た 横
+    _up.crossVectors(_ld, _rt);                           // 光から見た 縦
+    _c.set(cx, 0, cz);
+    const a = Math.round(_c.dot(_rt) / texel) * texel, b = Math.round(_c.dot(_up) / texel) * texel, n = _c.dot(_ld);
+    _c.copy(_rt).multiplyScalar(a).addScaledVector(_up, b).addScaledVector(_ld, n);
+    sun.target.position.copy(_c);
+    sun.position.copy(_c).addScaledVector(_ld, 90);
   },
 
   // 見下ろしのカメラ(いつもの)
@@ -207,9 +247,6 @@ export const Engine = {
       this._shake = Math.max(0, this._shake - realDt * 2.2);
     }
     cam.lookAt(this.camTarget);
-    // 影はプレイヤーの周りだけ計算する
-    this.sun.position.set(target.x + 30, 60, target.z + 20);
-    this.sun.target.position.set(target.x, 0, target.z);
   },
 
   render(realDt) {
@@ -264,6 +301,7 @@ export const Engine = {
 };
 
 const _v = new THREE.Vector3();
+const _sd = new THREE.Vector3(), _md = new THREE.Vector3(), _ld = new THREE.Vector3(), _rt = new THREE.Vector3(), _up = new THREE.Vector3(), _c = new THREE.Vector3();
 
 function isMobile() { return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && innerWidth < 1100); }
 

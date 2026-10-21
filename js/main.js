@@ -201,17 +201,22 @@ function loop(now) {
 }
 
 // 主人公とカメラの間(画面の手前 = 南)に 高い壁があるか。あれば 1(カメラを真上に近づける)
+// マップが広い(壁の箱が多い)ので、World.grid(8m の区画)で 主人公の手前の区画だけ しらべる
 let streetT = 0;
 function streetCheck(px, pz) {
   const B = World.boxes; if (!B || World.inside) return 0;
-  let hit = 0;
-  for (let i = 0; i < B.length; i++) {
-    const b = B[i];
-    if (b.h < 6 || b.maxZ < pz + 1 || b.minZ > pz + 11 || b.maxX < px - 6 || b.minX > px + 6) continue;
-    if (b.maxX - b.minX < 2 && b.maxZ - b.minZ < 2) continue;     // 細い柱・街灯は数えない
-    hit = 1; break;
+  const x0 = px - 6, x1 = px + 6, z0 = pz + 1, z1 = pz + 11;
+  const hit = (b) => !(b.h < 6 || b.maxZ < z0 || b.minZ > z1 || b.maxX < x0 || b.minX > x1) && !(b.maxX - b.minX < 2 && b.maxZ - b.minZ < 2);   // 細い柱・街灯は数えない
+  if (World.grid && World._cell && World.gw) {
+    const c0 = World._cell(x0, z0), c1 = World._cell(x1, z1);
+    for (let gz = c0.z; gz <= c1.z; gz++) for (let gx = c0.x; gx <= c1.x; gx++) {
+      const cell = World.grid[gz * World.gw + gx];
+      if (cell) for (let k = 0; k < cell.length; k++) if (hit(B[cell[k]])) return 1;
+    }
+    return 0;
   }
-  return hit;
+  for (let i = 0; i < B.length; i++) if (hit(B[i])) return 1;
+  return 0;
 }
 
 // PC: T = 武器の一覧 / 同じ数字を もう一度 = 11〜・21〜(31 種類あるので)
