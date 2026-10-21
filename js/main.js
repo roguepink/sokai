@@ -14,6 +14,7 @@ import { FX } from './fx.js';
 import { Score } from './score.js';
 import { UI } from './ui.js';
 import { Audio } from './audio.js';
+import { Flow } from './zombie-flow.js';
 
 export const Game = {
   state: 'title',           // 'title'(見本プレイ) | 'play' | 'paused' | 'result'
@@ -155,12 +156,30 @@ function loop(now) {
       while (acc >= CONFIG.DT && steps < 6) { step(CONFIG.DT); acc -= CONFIG.DT; steps++; }
       if (steps === 6) acc = 0;
     }
+    if ((streetT -= real) <= 0) { streetT = 0.3; Engine.street = streetCheck(Player.pos.x, Player.pos.z); }
     Engine.updateCamera(real, Player.pos, !!World.inside, Game.state === 'title');
     if (Game.state !== 'title') UI.update(real);
     Engine.render(real);
     if (Game.state === 'play' && (saveT += real) > 5) { saveT = 0; Score.save(); }
+    // 1 フレームの計算にかかった時間(ミリ秒。確認用。16 をこえるとカクつく)
+    const cost = performance.now() - now;
+    stats.ms = Math.round((stats.ms * 0.95 + cost * 0.05) * 10) / 10;
     stats.fps = Math.round(Engine.fps); stats.zombies = Zombies.count(); stats.kills = Score.kills; stats.score = Score.score; stats.state = Game.state;
   } catch (e) { console.error(e); }
+}
+
+// 主人公とカメラの間(画面の手前 = 南)に 高い壁があるか。あれば 1(カメラを真上に近づける)
+let streetT = 0;
+function streetCheck(px, pz) {
+  const B = World.boxes; if (!B || World.inside) return 0;
+  let hit = 0;
+  for (let i = 0; i < B.length; i++) {
+    const b = B[i];
+    if (b.h < 6 || b.maxZ < pz + 1 || b.minZ > pz + 11 || b.maxX < px - 6 || b.minX > px + 6) continue;
+    if (b.maxX - b.minX < 2 && b.maxZ - b.minZ < 2) continue;     // 細い柱・街灯は数えない
+    hit = 1; break;
+  }
+  return hit;
 }
 
 function step(dt) {
@@ -175,8 +194,8 @@ function step(dt) {
 }
 
 // 確認用に外から見られる数字
-const stats = window.__stats = { fps: 0, zombies: 0, kills: 0, score: 0, state: '' };
-window.__game = { Game, Engine, Player, Zombies, Weapons, World, Score, Director, FX, Input, start, pause, resume, finish };
+const stats = window.__stats = { ms: 0, fps: 0, zombies: 0, kills: 0, score: 0, state: '' };
+window.__game = { Game, Engine, Flow, Player, Zombies, Weapons, World, Score, Director, FX, Input, start, pause, resume, finish };
 
 boot().catch((e) => {
   console.error(e);

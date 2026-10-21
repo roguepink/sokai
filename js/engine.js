@@ -20,6 +20,7 @@ export const Engine = {
   camDist: C.DIST,
   camDistWant: C.DIST,
   camPitch: C.PITCH,
+  street: 0,               // 高い建物にはさまれた道にいる(0..1。main が入れる)
   camYaw: 0,                // 0 = 北(-z)を上に見る。固定(スティックの向きと画面の向きをそろえるため)
   _shake: 0, _hitStop: 0, _slow: 0, _slowScale: 1,
   _fpsAcc: 0, _fpsN: 0, _lowFpsTime: 0,
@@ -116,9 +117,11 @@ export const Engine = {
       this.camPitch = damp(this.camPitch, 0.78, 1.5, realDt);
     } else {
       if (this.camYaw) this.camYaw = 0;             // スティックの向き = 画面の向き にするため、すぐもどす
-      this.camPitch = damp(this.camPitch, C.PITCH, 4, realDt);
+      // 高い建物にはさまれた道では、真上に近い角度にして 壁で主人公がかくれないように(main が street を 0..1 で入れる)
+      this._street = damp(this._street || 0, inside ? 0 : this.street, 2.5, realDt);
+      this.camPitch = damp(this.camPitch, C.PITCH + 0.25 * this._street, 4, realDt);
     }
-    const want = (inside ? C.INSIDE_DIST : C.DIST) * (this._zoomMult || 1) * (demo ? 1.12 + 0.08 * Math.sin(this.camYaw * 2.3) : 1);
+    const want = (inside ? C.INSIDE_DIST : C.DIST) * (this._zoomMult || 1) * (demo ? 1.12 + 0.08 * Math.sin(this.camYaw * 2.3) : 1 + 0.08 * (this._street || 0));
     this.camDist = damp(this.camDist, want, 3, realDt);
     this.camTarget.x = damp(this.camTarget.x, target.x, C.LERP, realDt);
     this.camTarget.z = damp(this.camTarget.z, target.z, C.LERP, realDt);

@@ -129,6 +129,8 @@ export const Audio = {
   vibrate(p, force) {
     if (this._state !== 'play' && !force) return;
     try {
+      // まだ一度も画面にさわっていないときは ぶるぶるさせない(ブラウザがエラーを出す)
+      if (navigator.userActivation && !navigator.userActivation.hasBeenActive) return;
       const s = loadSettings();
       if (s.vibrate === false || !navigator.vibrate) return;
       const now = performance.now(); if (now - this._vibT < 150) return; this._vibT = now;

@@ -42,6 +42,7 @@ def main():
     ap.add_argument("--pc", action="store_true")
     ap.add_argument("--hash", default="")
     ap.add_argument("--js", default="")
+    ap.add_argument("--first", default="", help="起動してすぐに実行する JS")
     a = ap.parse_args()
     mobile = not a.pc
 
@@ -81,6 +82,8 @@ def main():
             page.goto(url)
             page.wait_for_function("window.__stats && window.__stats.state", timeout=60000)
             print(f"boot {time.time() - t0:.1f}s  url={url}")
+            if a.first:
+                print("first:", page.evaluate(a.first))
             S = Scenes(page, cdp, out, a, w, h)
             getattr(S, a.scene)()
             if a.js:
@@ -267,7 +270,13 @@ class Scenes:
         page = self.page
         page.wait_for_timeout(2000)
         self.click("#btnPlay")
-        for i in range(3):
+        page.wait_for_timeout(500)
+        # 先に全部の武器を 1 回ずつ出しておく(はじめて出る形の数を、もれと まちがえないように)
+        for k in range(20):
+            self.ev(f"__game.Weapons.select({k % 17}); __game.Input.fire = true")
+            page.wait_for_timeout(250)
+        print("after all weapons: geo", self.ev("__game.Engine.renderer.info.memory.geometries"))
+        for i in range(max(3, self.a.shots)):
             page.wait_for_timeout(500)
             self.ev("__game.Input.auto = true")
             page.wait_for_timeout(int(self.a.secs * 1000))
