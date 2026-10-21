@@ -6,7 +6,7 @@ import { Zombies } from './zombies.js';
 import { World } from './world.js';
 import { FX } from './fx.js';
 import { Engine } from './engine.js';
-import { hurt, explode } from './weapon-hit.js';
+import { hurt, explode, LOW } from './weapon-hit.js';
 
 const MAXP = 420;
 export const GRAV = 24;
@@ -227,9 +227,13 @@ export const Proj = {
     for (let i = 0; i < _tmp.length; i++) {
       const e = _tmp[i];
       const dx = p.x - e.x, dz = p.z - e.z, d = Math.hypot(dx, dz) || 0.001;
-      const pull = (8 + 22 * (1 - d / R)) * Math.min(1, a * 3) * dt;
-      const sw = 7 * dt * (1 - d / R);
-      if (d > 0.6) { e.x += (dx / d) * Math.min(pull, d - 0.5) - (dz / d) * sw; e.z += (dz / d) * Math.min(pull, d - 0.5) + (dx / d) * sw; }
+      // 壁の向こうの敵は 吸わない(壁をすりぬけるので)。見通しは 0.1 秒ごとに調べる
+      if (tick || e._bh !== p.stamp) { e._bh = p.stamp; e._bhOk = d < 1.5 || World.segmentHit(p.x, p.z, e.x, e.z, LOW) >= 0.97; }
+      if (!e._bhOk) continue;
+      const bm = e.boss ? 0.25 : 1;   // ボスは重いので 少しだけ
+      const pull = (8 + 22 * (1 - d / R)) * Math.min(1, a * 3) * dt * bm;
+      const sw = 7 * dt * (1 - d / R) * bm;
+      if (d > 0.6) { e.x += (dx / d) * Math.min(pull, d - 0.5) - (dz / d) * sw; e.z += (dz / d) * Math.min(pull, d - 0.5) + (dx / d) * sw; World.collideCircle(e, e.r); }
       e.stun = Math.max(e.stun || 0, 0.15);
       if (tick && d < 2.4) hurt(e, 70, -dx / d, -dz / d, 0, 'blackhole');
     }

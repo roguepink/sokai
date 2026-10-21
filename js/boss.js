@@ -14,11 +14,12 @@ import { Flow } from './zombie-flow.js';
 import { Gore } from './zombie-gore.js';
 import { lathe, sstep } from './zombie-models.js';
 
+// 体力: 主人公が強すぎて数秒で倒れていたので 2 倍(テスト係A)。それでも 数秒〜10 秒くらいで倒せる
 export const BOSS_TYPES = {
-  tyrant:      { boss: true, hp: 2600, speed: 2.7, r: 1.5, points: 1500, scale: 2.2, color: 0x8a6a6a, name: '巨人タイラント', anim: 'boss' },
-  abomination: { boss: true, hp: 2200, speed: 3.0, r: 1.8, points: 1500, scale: 2.0, color: 0x7a5a5a, name: '異形アボミネーション', anim: 'boss' },
-  butcher:     { boss: true, hp: 2400, speed: 2.5, r: 1.3, points: 1500, scale: 1.7, color: 0x6a4a3a, name: '処刑人ブッチャー', anim: 'boss' },
-  crawlerKing: { boss: true, hp: 1900, speed: 5.6, r: 1.6, points: 1500, scale: 2.0, color: 0x9a9080, name: '大這い屍クローラー', anim: 'boss' },
+  tyrant:      { boss: true, hp: 5200, speed: 2.7, r: 1.5, points: 1500, scale: 2.2, color: 0x8a6a6a, name: '巨人タイラント', anim: 'boss' },
+  abomination: { boss: true, hp: 4400, speed: 3.0, r: 1.8, points: 1500, scale: 2.0, color: 0x7a5a5a, name: '異形アボミネーション', anim: 'boss' },
+  butcher:     { boss: true, hp: 4800, speed: 2.5, r: 1.3, points: 1500, scale: 1.7, color: 0x6a4a3a, name: '処刑人ブッチャー', anim: 'boss' },
+  crawlerKing: { boss: true, hp: 3800, speed: 5.6, r: 1.6, points: 1500, scale: 2.0, color: 0x9a9080, name: '大這い屍クローラー', anim: 'boss' },
 };
 export const BOSS_ORDER = ['tyrant', 'butcher', 'abomination', 'crawlerKing'];
 

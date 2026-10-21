@@ -170,7 +170,10 @@ export const Zombies = {
     const def = e.def, frozen = e.frozen > 0;
     // ふっとび(ノックバック)
     if (e.kx || e.kz) {
-      e.x += e.kx * dt; e.z += e.kz * dt;
+      // 強くふっとぶと 1 ステップで壁をすりぬけるので、細かく分けて壁で止める
+      const sx = e.kx * dt, sz = e.kz * dt, n = Math.min(6, Math.ceil(Math.hypot(sx, sz) / 0.2));
+      if (n <= 1) { e.x += sx; e.z += sz; }
+      else for (let k = 0; k < n; k++) { e.x += sx / n; e.z += sz / n; World.collideCircle(e, e.r); }
       const k = Math.exp(-7 * dt); e.kx *= k; e.kz *= k;
       if (Math.abs(e.kx) + Math.abs(e.kz) < 0.2) e.kx = e.kz = 0;
     }
@@ -353,6 +356,7 @@ export const Zombies = {
       for (let i = 0; i < arr.length; i++) {
         const e = arr[i];
         if (!e.alive) continue;
+        if (e.boss && BOSS_ATTACK.has(opts.cause)) continue;   // ボスの攻撃は ボス自身(とほかのボス)には当たらない
         const dx = e.x - x, dz = e.z - z, d = Math.hypot(dx, dz) || 1;
         const fall = opts.falloff ? Math.max(0.3, 1 - d / r) : 1;
         o.dirX = dx / d; o.dirZ = dz / d; o.force = (opts.force || 0) * fall; o.cause = opts.cause; o.crit = opts.crit;
@@ -417,6 +421,7 @@ export const Zombies = {
 
 const _dir = { x: 0, z: 0 };
 const _noOpts = {};
+const BOSS_ATTACK = new Set(['slam', 'boss', 'cleaver', 'leap', 'stomp']);
 const byT = (a, b) => a.t - b.t;
 function bucket(gx, gz) { return ((gx * 73856093) ^ (gz * 19349663)) & (NB - 1); }
 
