@@ -63,7 +63,7 @@ export const WEAPONS = [
   { id: 'shuriken', name: '手裏剣', icon: '✴️', sound: 'shuriken', kind: 'shuriken',
     rate: 8, dmg: 120, range: 36, count: 3, hops: 3, force: 11, color: 0xbfe6ff, recoil: 0.15, shake: 0.03, muz: 0.3 },
   { id: 'drone', name: '攻撃ドローン', icon: '🛸', sound: 'drone', kind: 'drone',
-    rate: 2.5, dmg: 48, range: 32, max: 5, life: 16, droneRate: 8, force: 8, color: 0x5affd0, recoil: 0.1, shake: 0, muz: 0.45 },
+    rate: 2.5, dmg: 40, range: 30, max: 4, life: 13, droneRate: 4.5, force: 8, color: 0x5affd0, recoil: 0.1, shake: 0, muz: 0.45 },
   { id: 'rocketgat', name: 'ガトリングロケット', icon: '🎇', sound: 'gatling', kind: 'rocket', spinUp: 0.55, rateMin: 3, small: true,
     rate: 13, dmg: 210, radius: 4.6, range: 60, spread: 0.07, force: 28, color: 0xff9040, recoil: 0.35, shake: 0.14, muz: 0.95 },
   { id: 'emp', name: 'EMP衝撃波', icon: '🌀', sound: 'emp', kind: 'emp',

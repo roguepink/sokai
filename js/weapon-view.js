@@ -169,7 +169,11 @@ export const VM = {
     this.setWeapon(0, true);
 
     // 本編を描いたあとに重ねる
-    Engine.scene.onAfterRender = (r, s, cam) => { if (cam === Engine.camera && this.active) this.render(r); };
+    const prev = Engine.scene.onAfterRender;
+    Engine.scene.onAfterRender = function (r, s, cam, t) {
+      if (prev) prev.call(this, r, s, cam, t);
+      if (cam === Engine.camera && VM.active) VM.render(r);
+    };
     // 材質の準備を先にすませる(初めて一人称にしたとき固まらないように)
     try {
       for (const m of this.models) m.visible = true;
@@ -209,6 +213,7 @@ export const VM = {
   },
   // 剣の光の弧(画面いっぱいの三日月)。dir = +1 / -1
   slash(dir = 1, color = 0x4ab0ff) {
+    if (this._slashT < 0.8) return;          // ふっている途中は 出し直さない(画面がちらつかないように)
     this._slashT = 0; this._slashDir = dir;
     const m = this.arcs[0], u = m.material.uniforms;
     // 画面の少し下を中心に、上を通って 右→左(または 左→右)へ。少し斜めに
@@ -237,9 +242,10 @@ export const VM = {
       out.set(0.25, -0.2, -1).applyQuaternion(cam.quaternion).normalize().multiplyScalar(dist).add(cam.position);
       return out;
     }
-    _v.copy(tips[Math.min(tipIndex, tips.length - 1)]).applyMatrix4(mdl.matrixWorld);
-    // 手元の舞台はカメラと同じ所にあるので、その向きを そのまま使う
-    _v.sub(this.root.position).normalize();
+    // 見えている銃口の画面の位置(手元用のカメラで)→ 本編のカメラで同じ画面の位置の 光の線 → dist m 先
+    _v.copy(tips[Math.min(tipIndex, tips.length - 1)]).applyMatrix4(mdl.matrixWorld).project(this.cam);
+    _v.z = 0.5;
+    _v.unproject(cam).sub(cam.position).normalize();
     out.copy(cam.position).addScaledVector(_v, dist);
     return out;
   },
@@ -251,7 +257,9 @@ export const VM = {
     this._lastNow = now;
     this._animate(dt);
     const cam = Engine.camera, vc = this.cam;
-    if (vc.fov !== cam.fov || vc.aspect !== cam.aspect) { vc.fov = cam.fov; vc.aspect = cam.aspect; vc.updateProjectionMatrix(); }
+    // 手元の武器は 決まった画角で描く(走る・ダッシュで本編の画角が変わっても 武器はゆがまない)
+    const fov = cam.aspect < 1 ? 84 : 64;
+    if (vc.fov !== fov || vc.aspect !== cam.aspect) { vc.fov = fov; vc.aspect = cam.aspect; vc.updateProjectionMatrix(); }
     cam.matrixWorld.decompose(vc.position, vc.quaternion, _s);
     vc.updateMatrixWorld();
     const ac = renderer.autoClear;

@@ -113,7 +113,7 @@ export const Summon = {
       // 主人公のまわりを回る(ならび方は機数で等分)
       const a = t0 * 1.3 + (i / N) * Math.PI * 2;
       const R = 2.6 + 0.3 * Math.sin(t0 * 2 + i);
-      const wx = player.pos.x + Math.cos(a) * R, wz = player.pos.z + Math.sin(a) * R, wy = 2.9 + 0.25 * Math.sin(t0 * 3 + i * 1.7);
+      const wx = player.pos.x + Math.cos(a) * R, wz = player.pos.z + Math.sin(a) * R, wy = (player.pos.y || 0) + 2.9 + 0.25 * Math.sin(t0 * 3 + i * 1.7);
       const k = Math.min(1, dt * 5);
       d.vx = (wx - d.x) / Math.max(dt, 1e-3) * k; d.vz = (wz - d.z) / Math.max(dt, 1e-3) * k;
       d.x += (wx - d.x) * k; d.z += (wz - d.z) * k; d.y += (wy - d.y) * k;
@@ -131,7 +131,7 @@ export const Summon = {
           d.tilt = Math.atan2(dx, -dz);
           const ey = 1.1 * ((e.def && e.def.scale) || 1);
           hurt(e, w.dmg * (w.fever ? 1.5 : 1), dx / dd, dz / dd, w.force, 'drone', rnd() < 0.15);
-          FX.tracer(d.x, d.y - 0.1, d.z, e.x, ey, e.z, w.fever ? RAINBOW[(i + (this._rb = (this._rb || 0) + 1)) % RAINBOW.length] : 0x7affe0, 0.05, 0.06);
+          FX.tracer(d.x, d.y - 0.1, d.z, e.x, ey, e.z, w.fever ? RAINBOW[(i + (this._rb = (this._rb || 0) + 1)) % RAINBOW.length] : 0x7affe0, 0.05, 0.035);
           FX.glow(d.x + dx / dd * 0.25, d.y - 0.1, d.z + dz / dd * 0.25, 0.22, 0xb0fff0, 4, 2);
           FX.blood(e.x, ey, e.z, dx / dd, dz / dd, 0.4);
           if (this._sfxT <= 0) { this._sfxT = 0.07; Events.emit('weaponSfx', { name: 'droneShot', x: d.x, z: d.z }); }

@@ -14,6 +14,7 @@ const OPT = { dirX: 0, dirZ: 0, force: 0, cause: '', crit: false };
 
 // 当たった記録(照準の「当たった印」用。weapons.js が まとめて hitMarker イベントにする)
 export const HIT = { n: 0, crit: false, kill: 0, boss: false, step: 0 };
+const NO_MARK = new Set(['sword', 'spin', 'fire', 'drone', 'acid']);
 
 export function hurt(e, dmg, dirX, dirZ, force, cause, crit = false) {
   if (!e.alive) return false;
@@ -22,10 +23,14 @@ export function hurt(e, dmg, dirX, dirZ, force, cause, crit = false) {
   OPT.dirX = dirX; OPT.dirZ = dirZ; OPT.force = force; OPT.cause = cause; OPT.crit = crit;
   const killed = Zombies.damage(e, dmg, OPT);
   if (killed && frozen) FX.shatter(e.x, 0.6, e.z, (e.def && e.def.scale) || 1);
-  HIT.n++;
-  if (crit) HIT.crit = true;
-  if (e.boss) HIT.boss = true;
-  if (killed) { HIT.kill++; HIT.step++; }
+  if (killed) HIT.step++;
+  // 照準の「当たった印」は 弾・飛ぶ物の当たりだけ(剣・回転斬り・炎・ドローン・酸の水たまりは出さない)
+  if (!NO_MARK.has(cause)) {
+    HIT.n++;
+    if (crit) HIT.crit = true;
+    if (e.boss) HIT.boss = true;
+    if (killed) HIT.kill++;
+  }
   return killed;
 }
 

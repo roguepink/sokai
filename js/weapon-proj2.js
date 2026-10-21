@@ -389,11 +389,15 @@ export const P2 = {
       FX.ring(p.x + lean, p.z + lean * 0.6, r * 0.6, r, -1, col, 0.28 + k * 0.05, 0.4, 0.5, 0, 0.1 + h);
     }
     FX.ring(p.x, p.z, 0, R, -1, col, 0.6, 0.25, 0.4, 1, 0.08);
-    const n = FX.q(6) + 1;
+    // じょうごの表面を ぐるぐる回る ほこり(横から見ても 竜巻の形に見える)
+    const n = FX.q(12) + 2;
     for (let k = 0; k < n; k++) {
-      const a = rnd() * Math.PI * 2, r0 = 0.5 + rnd() * 2.5 * grow, s = 7 + rnd() * 6;
-      FX.smoke(p.x + Math.cos(a) * r0, 0.3 + rnd() * H * 0.6, p.z + Math.sin(a) * r0, 0.5 + rnd() * 0.5, 0.7 + rnd() * 0.4, 0x8a8478,
-        -Math.sin(a) * s + Math.cos(a) * 1.5, 4 + rnd() * 5, Math.cos(a) * s + Math.sin(a) * 1.5, 0.5);
+      const h = rnd() * H, a = rnd() * Math.PI * 2, r0 = (0.4 + h * 0.42) * (0.8 + rnd() * 0.3);
+      const lean = Math.sin(p.age * 1.7 + h * 0.4 + p.seed) * h * 0.12;
+      const s = 9 + h * 1.2;
+      FX.solidPool.emit(p.x + Math.cos(a) * r0 + lean, h, p.z + Math.sin(a) * r0 + lean * 0.6,
+        -Math.sin(a) * s, 2.5 + rnd() * 2, Math.cos(a) * s, 0.35 + rnd() * 0.2, 0.35 + h * 0.06, 0.7 + h * 0.1,
+        w.fever ? 0xc0a060 : 0x9a9284, 1, 0x6a645a, 1, 0.6, 0, 0.5, 0, 0, 0);
     }
     if (rnd() < 0.3 * FX.quality) { const a = rnd() * Math.PI * 2; FX.chunks.add(p.x + Math.cos(a) * 2, 0.5, p.z + Math.sin(a) * 2, -Math.sin(a) * 9, 10 + rnd() * 6, Math.cos(a) * 9, 0.12, 0.08, 0.12, 0x5a5048, 1.5); }
     if (rnd() < 0.08) FX.bolt(p.x, H * 0.9, p.z, p.x + (rnd() - 0.5) * 3, H * 0.4, p.z + (rnd() - 0.5) * 3, 0xc8e0ff, 0.06, 0.08, 0.6, 5);

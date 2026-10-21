@@ -171,7 +171,7 @@ export const Weapons = {
     this._fxT -= dt;
     if (this._fxT <= 0) {
       this._fxT = 0.05;
-      const a = rnd() * Math.PI * 2, r = 0.6 + rnd() * 0.7;
+      const a = rnd() * Math.PI * 2, r = this.close ? 1.8 + rnd() * 1.5 : 0.6 + rnd() * 0.7;
       FX.spark(p.x + Math.cos(a) * r, 0.2 + rnd() * 1.6, p.z + Math.sin(a) * r, 0, 2 + rnd() * 2, 0, 0.6, 0.06, RAINBOW[(this._rb++) % RAINBOW.length], 5, 0xffd040, 2, 0, -2, 1, 0);
     }
   },
@@ -180,11 +180,13 @@ export const Weapons = {
   _feverNova() {
     const p = Player.pos;
     const kills = area(p.x, p.z, 14, 500, 52, 'spin', true, true);
-    FX.explosion(p.x, p.z, 6, 'gold');
-    FX.ring(p.x, p.z, 1, 22, 0.8, 0xffd040, 1, 3, 1, 0);
-    FX.ring(p.x, p.z, 0.5, 16, 0.6, 0xffffff, 0.3, 3, 1, 0, 1);
-    for (let i = 0; i < FX.q(60); i++) { const a = rnd() * Math.PI * 2, s = 10 + rnd() * 18; FX.spark(p.x, 1.2, p.z, Math.cos(a) * s, 2 + rnd() * 8, Math.sin(a) * s, 0.7, 0.07, RAINBOW[i % RAINBOW.length], 6, 0xffd040, 2, 0.03, 8, 1.6); }
-    FX.flash(p.x, 4, p.z, 0xffd040, 150, 40, 0.5);
+    // 一人称・肩越しでは 目の前が真っ白にならないように、主人公の所の爆発は出さず 輪と光の粒だけ
+    if (!this.close) FX.explosion(p.x, p.z, 4, 'gold');
+    FX.ring(p.x, p.z, 1, 22, 0.8, 0xffd040, 1, 2, 1, 0);
+    if (!this.close) FX.ring(p.x, p.z, 0.5, 16, 0.6, 0xffffff, 0.25, 1.6, 0.8, 0, 1);
+    const r0 = this.close ? 2.5 : 0;
+    for (let i = 0; i < FX.q(60); i++) { const a = rnd() * Math.PI * 2, s = 10 + rnd() * 18; FX.spark(p.x + Math.cos(a) * r0, 1.2, p.z + Math.sin(a) * r0, Math.cos(a) * s, 2 + rnd() * 8, Math.sin(a) * s, 0.7, 0.07, RAINBOW[i % RAINBOW.length], 6, 0xffd040, 2, 0.03, 8, 1.6); }
+    FX.flash(p.x, 4, p.z, 0xffd040, 90, 40, 0.5);
     Engine.shake(1.4); Engine.slowMo(0.5, 0.3);
     if (Engine.viewMode === 'fps') VM.spin(0xffd040);
     Events.emit('spin', { x: p.x, z: p.z, kills, fever: true });
