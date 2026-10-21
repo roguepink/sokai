@@ -25,7 +25,11 @@
 <body>
 <div id="app"></div>
 
-<div id="loading" class="overlay"><div class="spinner"></div>読みこみ中…</div>
+<div id="loading" class="overlay">
+  <h1 class="logo small"><span>爽快</span>ゾンビ無双</h1>
+  <div class="load-bar"><i id="loadBar"></i></div>
+  <p id="loadText" class="load-text">読みこみ中…</p>
+</div>
 
 <div id="title" class="overlay hidden">
   <button id="btnSettings" class="corner-btn" type="button">⚙ 設定</button>
@@ -33,6 +37,7 @@
   <p class="lead">最初から最強。絶対に死なない。<br>押しよせるゾンビの大群を、なぎ倒せ!</p>
   <div id="titleBest" class="title-best hidden"></div>
   <button id="btnPlay" class="big" type="button">あそぶ</button>
+  <p class="rotate-hint">📱 横向きにすると 大きく遊べます</p>
   <ul class="howto">
     <li><b>🕹️</b>左で 移動</li>
     <li><b>🔥</b>右を 押すと 撃つ</li>
@@ -85,10 +90,22 @@
 <script>
   // 起動に失敗したときの案内(古いブラウザなど)
   window.addEventListener('error', function (e) {
-    var l = document.getElementById('loading');
-    if (l && !l.classList.contains('hidden')) l.textContent = 'うまく起動できませんでした。ブラウザを新しくするか、Chrome / Safari で開いてください。';
+    var l = document.getElementById('loading'), t = document.getElementById('loadText');
+    if (l && t && !l.classList.contains('hidden')) t.textContent = 'うまく起動できませんでした。ブラウザを新しくするか、Chrome / Safari で開いてください。';
   });
-  if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(function () {});
+  // オフライン用: 一度開いたら、読みこんだファイルを全部 覚えてもらう(sw.js)
+  if ('serviceWorker' in navigator && location.protocol === 'https:') {
+    navigator.serviceWorker.register('sw.js').catch(function () {});
+    window.addEventListener('load', function () {
+      setTimeout(function () {
+        navigator.serviceWorker.ready.then(function (reg) {
+          var urls = performance.getEntriesByType('resource').map(function (e) { return e.name; })
+            .filter(function (u) { return u.indexOf(location.origin) === 0; });
+          if (reg.active) reg.active.postMessage({ cache: urls });
+        }).catch(function () {});
+      }, 4000);
+    });
+  }
 </script>
 <script type="module" src="js/main.js"></script>
 </body>

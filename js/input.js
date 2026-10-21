@@ -75,7 +75,22 @@ export const Input = {
     tapButton(this.el.querySelector('.btn-next'), () => { this.weaponDelta = 1; });
     tapButton(this.el.querySelector('.btn-prev'), () => { this.weaponDelta = -1; });
 
+    // --- 画面がずれたり大きくなったりしないように(2本指の拡大・長押しメニュー・引っぱって再読みこみ) ---
+    const free = (t) => t && t.closest && t.closest('.overlay, .weapon-bar');
+    document.addEventListener('touchmove', (e) => { if (e.touches.length > 1 || !free(e.target)) e.preventDefault(); }, { passive: false });
+    document.addEventListener('gesturestart', (e) => e.preventDefault());
+    document.addEventListener('dblclick', (e) => e.preventDefault());
+    root.addEventListener('contextmenu', (e) => e.preventDefault());
+
     // --- PC: キーボードとマウス ---
+    // マウスだけの PC は 印をつける(武器の ◀▶ をかくし、ボタンにキーを書く)
+    try {
+      if (matchMedia('(hover: hover) and (pointer: fine)').matches && !(navigator.maxTouchPoints > 0)) document.body.classList.add('pc');
+    } catch (e) {}
+    // 画面のどこをクリックしても撃つ(ボタンの上は のぞく)
+    root.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'mouse' && e.button === 0 && !(e.target.closest && e.target.closest('button'))) this._mouseDown = true;
+    });
     addEventListener('keydown', (e) => {
       if (e.repeat) return;
       const k = e.key.toLowerCase();
