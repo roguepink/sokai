@@ -119,7 +119,7 @@ export const VM = {
     const sp = this.swordPivot = new THREE.Group();
     root.add(sp);
     const sword = this.sword = new THREE.Group();
-    const bladeM = new THREE.MeshStandardMaterial({ color: 0x1a2a3a, emissive: 0x4ab0ff, emissiveIntensity: 2.6, roughness: 0.3, metalness: 0.6 });
+    const bladeM = new THREE.MeshStandardMaterial({ color: 0x1a2a3a, emissive: 0x4ab0ff, emissiveIntensity: 1.6, roughness: 0.3, metalness: 0.6 });   // 目の前なので 光りすぎないように
     const blade = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.012, 1.0), bladeM);
     blade.position.z = -0.6;
     const guard = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.03, 0.035), armor);

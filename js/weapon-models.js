@@ -9,7 +9,9 @@ function mats(set = 'world') {
   const M = MS[set];
   if (M.metal) return M;
   const std = (color, rough, metal, extra) => new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: metal, ...extra });
-  const glow = (color, k = 3) => new THREE.MeshStandardMaterial({ color: 0x111111, emissive: color, emissiveIntensity: k, roughness: 0.4 });
+  // 一人称の手元の銃は 画面の大きな部分をしめるので、光る部品を弱く(光のにじみで 画面が白く・緑に うまらないように)
+  const gk = set === 'vm' ? 0.4 : 1;
+  const glow = (color, k = 3) => new THREE.MeshStandardMaterial({ color: 0x111111, emissive: color, emissiveIntensity: Math.max(0.8, k * gk), roughness: 0.4 });
   Object.assign(M, {
     metal: std(0x2c3038, 0.35, 0.8), dark: std(0x16181c, 0.6, 0.3), steel: std(0x8a9099, 0.3, 0.9),
     wood: std(0x6b4224, 0.7, 0.05), olive: std(0x4b5631, 0.7, 0.2), tan: std(0x8a7a58, 0.7, 0.1),

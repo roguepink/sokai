@@ -12,7 +12,7 @@ import { WEAPONS } from './weapon-defs.js';
 import { buildModel } from './weapon-models.js';
 import { Proj, GRAV } from './weapon-proj.js';
 import { P2 } from './weapon-proj2.js';
-import { hurt, area, cone, LOW, HIT } from './weapon-hit.js';
+import { hurt, area, cone, LOW, HIT, propLine, propRay } from './weapon-hit.js';
 import { Extra } from './weapon-extra.js';
 import { Summon, RAINBOW } from './weapon-summon.js';
 import { VM } from './weapon-view.js';
@@ -413,11 +413,14 @@ export const Weapons = {
       _hits.length = 0;
       const ex = px + dx * range, ez = pz + dz * range;
       if (ey < 0) ey = this.close ? this._rayY(range) : 1.2;
+      // 車・ガラスなど 低い物にも当たる(弾は止めない)。当たったら そこに火花
+      const pt = propLine(px, pz, ex, ez, w.dmg, w.id);
+      if (pt < 0.999 && (pierced === 0 || rnd() < 0.3)) FX.impact(px + dx * range * pt - dx * 0.1, 0.5 + rnd() * 0.6, pz + dz * range * pt - dz * 0.1, dx, dz, w.color);
       const tw = (w.tracerW || (w.pellets > 1 ? 0.05 : 0.075)) * (w.fever ? 1.6 : 1) * (fps ? 0.7 : 1);
       FX.tracer(m.x, m.y, m.z, ex, ey, ez, w.color, 0.06, tw);
       if (wall) {
         FX.impact(ex - dx * 0.05, ey, ez - dz * 0.05, dx, dz, w.color);
-        if (World.damage) World.damage(ex, ez, 0.4, w.dmg, { cause: w.id });
+        if (pt >= 0.999 && World.damage) World.damage(ex, ez, 0.4, w.dmg, { cause: w.id });
       } else if (this.close && range < R0 - 0.1 && pierced === 0) {
         FX.impact(ex, 0.08, ez, dx, dz, w.color);          // 下を向いて撃った: 地面に当たる
       } else if (this.close && R0 < w.range && pierced === 0) {
@@ -468,7 +471,8 @@ export const Weapons = {
     }
     FX.muzzle(m.x, m.y, m.z, dx, dz, 0x9ad8ff, 2.2);
     FX.ring(m.x, m.z, 0.2, 3, 0.3, 0x80c8ff, 0.3, 4, 1, 0, m.y - 0.2);
-    if (wt < 1) { FX.impact(ex - dx * 0.1, 1.2, ez - dz * 0.1, dx, dz, 0xbfe6ff); FX.flash(ex - dx * 0.5, 2.5, ez - dz * 0.5, 0x80c0ff, 40, 10, 0.25); if (World.damage) World.damage(ex, ez, 1.2, w.dmg, { cause: 'rail' }); }
+    if (wt < 1) { FX.impact(ex - dx * 0.1, 1.2, ez - dz * 0.1, dx, dz, 0xbfe6ff); FX.flash(ex - dx * 0.5, 2.5, ez - dz * 0.5, 0x80c0ff, 40, 10, 0.25); }
+    propRay(px, pz, ex, ez, w.dmg, 'rail');   // 通り道の車・ガラスを ぜんぶ
     FX.flash(m.x, 2.8, m.z, 0x80c0ff, 50, 14, 0.25);
     if (kills >= 4) Engine.hitStop(0.045);
   },
@@ -609,6 +613,8 @@ export const Weapons = {
   // 火炎放射器 / 冷凍銃: 扇の形に ふきつける
   _spray(w, m, dx, dz, player, tick) {
     const px = player.pos.x, pz = player.pos.z, ice = w.kind === 'freeze';
+    // 一人称: 炎・冷気の流れを 目の高さで まっすぐ見るので、うすく(画面が白く・黄色く うまらないように)
+    const fps = Engine.viewMode === 'fps', fa = fps ? (ice ? 0.5 : 0.75) : 1.3;
     const wt = World.segmentHit(px, pz, px + dx * w.range, pz + dz * w.range, LOW);
     const reach = Math.max(1.5, w.range * wt);
     const n = FX.q(ice ? 4 : 5);
@@ -617,10 +623,10 @@ export const Weapons = {
       const vx = Math.sin(a) * sp + player.vel.x * 0.6, vz = -Math.cos(a) * sp + player.vel.z * 0.6, vy = (rnd() - 0.35) * 1.6;
       const life = Math.min(0.62 + rnd() * 0.15, (reach + 0.6) / sp * 1.9);
       if (ice) {
-        FX.flame(m.x, m.y, m.z, vx, vy, vz, 0.24, life, 0xe0f6ff, 0x4a90d0, 1.4);
+        FX.flame(m.x, m.y, m.z, vx, vy, vz, 0.24, life, 0xe0f6ff, 0x4a90d0, fps ? 0.85 : 1.4, fa);
         if (rnd() < 0.5) FX.spark(m.x, m.y, m.z, vx * 0.9, vy + 0.5, vz * 0.9, life * 0.9, 0.05, 0xe8faff, 4, 0x80c0ff, 2, 0, 0, 1.6, 0);
       } else {
-        FX.flame(m.x, m.y, m.z, vx, vy, vz, 0.3, life);
+        FX.flame(m.x, m.y, m.z, vx, vy, vz, 0.3, life, 0xffb050, 0xc02a06, fps ? 1.8 : 2.4, fa);
         if (rnd() < 0.35) FX.ember(m.x, m.y, m.z, vx * 0.95, vy + 0.6, vz * 0.95, 0.14, life * 0.9);
       }
     }
@@ -636,6 +642,8 @@ export const Weapons = {
       FX.decal(px + dx * k + (rnd() - 0.5), pz + dz * k + (rnd() - 0.5), ice ? 0.6 + rnd() * 0.5 : 0.9 + rnd() * 0.7, ice ? 'ice' : 'scorch', 8);
     }
     if (!tick) return;
+    // 炎は車・ドラム缶に火がつく(爆発する物は 炎に弱い)。冷凍はガラスを割る
+    if (World.damage) World.damage(px + dx * reach * 0.55, pz + dz * reach * 0.55, reach * 0.45, w.dmg * 0.6, { cause: ice ? 'freeze' : 'fire' });
     cone(px, pz, dx, dz, reach + 0.8, w.cone, _list);
     for (let i = 0; i < _list.length; i++) {
       const e = _list[i];
@@ -666,7 +674,7 @@ export const Weapons = {
     const fl = 0.9 + rnd() * 0.2, lw = Engine.viewMode === 'fps' ? 0.6 : 1;
     FX.beam(m.x, m.y, m.z, ex, ey, ez, w.color, 0.42 * fl * lw, -1, 2.4);
     FX.beam(m.x, m.y, m.z, ex, ey, ez, 0xff9aa8, 0.12 * lw, -1, 5);
-    if (tick && wt < 1 && World.damage) World.damage(ex, ez, 0.6, w.dmg, { cause: 'laser' });
+    if (tick && propLine(px, pz, ex, ez, w.dmg, 'laser') >= 0.999 && wt < 1 && World.damage) World.damage(ex, ez, 0.6, w.dmg, { cause: 'laser' });
     FX.glow(m.x, m.y, m.z, 0.55 * fl, w.color, 4);
     FX.glow(m.x, m.y, m.z, 0.22, 0xffffff, 4, 2);
     FX.muzzleLight(m.x + dx, m.y + 0.4, m.z + dz, w.color, 8);
@@ -711,8 +719,9 @@ export const Weapons = {
       for (let k = 0; k < 3; k++) FX.spark(e.x, 1.2, e.z, dx / d * 6 + (rnd() - 0.5) * 6, 1 + rnd() * 4, dz / d * 6 + (rnd() - 0.5) * 6, 0.25, 0.05, 0xd8f4ff, 6, 0x4ab0ff, 2);
     }
     _near.length = 0;
-    FX.slash(px, 1.15, pz, ang, 3.9, 1.7, MELEE_R + 0.6, this.fever ? 0xffc840 : 0x4ab0ff, 0.2, this._slashDir, this._slashDir * 0.2, 1.6, 0.75, 0.25);
-    if (Engine.viewMode === 'fps') VM.slash(this._slashDir, this.fever ? 0xffc840 : 0x4ab0ff);
+    // 一人称は 手元の剣の弧(VM.slash)だけ。世界の弧は カメラをかこんで 画面に帯が出るので出さない
+    if (Engine.viewMode !== 'fps') FX.slash(px, 1.15, pz, ang, 3.9, 1.7, MELEE_R + 0.6, this.fever ? 0xffc840 : 0x4ab0ff, 0.2, this._slashDir, this._slashDir * 0.2, 1.6, 0.75, 0.25);
+    else VM.slash(this._slashDir, this.fever ? 0xffc840 : 0x4ab0ff);
     if (kills >= 3) Engine.hitStop(0.025);
     Engine.shake(0.12);
     Events.emit('melee', { x: px, z: pz, kills });
@@ -727,8 +736,9 @@ export const Weapons = {
     const px = player.pos.x, pz = player.pos.z;
     const kills = area(px, pz, SPIN_R, SPIN_DMG, 46, 'spin', false, true);
     const R = SPIN_R;
-    FX.slash(px, 1.1, pz, 0, Math.PI * 2.05, R * 0.42, R * 0.62, 0x48b8ff, 0.3, 1, 0, 1.0, 1.1, 0.35);
-    FX.slash(px, 1.3, pz, Math.PI, Math.PI * 2.05, R * 0.78, R * 1.0, 0x9ad8ff, 0.4, 1, 0.05, 0.9, 1.1, 0.6);
+    const sk = Engine.viewMode === 'fps' ? 0.45 : 1;   // 一人称: カメラをかこむ光の輪は うすく
+    FX.slash(px, 1.1, pz, 0, Math.PI * 2.05, R * 0.42, R * 0.62, 0x48b8ff, 0.3, 1, 0, 1.0 * sk, 1.1, 0.35);
+    FX.slash(px, 1.3, pz, Math.PI, Math.PI * 2.05, R * 0.78, R * 1.0, 0x9ad8ff, 0.4, 1, 0.05, 0.9 * sk, 1.1, 0.6);
     FX.ring(px, pz, 1, R * 1.2, 0.5, 0x7ac8ff, 0.6, 1.6, 1, 0);
     FX.ring(px, pz, 0.5, R * 0.9, 0.3, 0xffffff, 0.25, 2, 1, 0);
     const g = FX.q(50);
