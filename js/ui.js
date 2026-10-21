@@ -594,7 +594,7 @@ export const UI = {
     if (x > W - 330 && y < 70) y = 70;
     const BW = W > H ? 360 : 250, BH = W > H ? 230 : 330;   // 右下のボタン(撃つ・回転斬り・ダッシュ・武器)の場所
     if (x > W - BW && y > H - BH) { if (ux > 0.5 && uy < 0.5) y = H - BH; else x = W - BW; }
-    if (W > H && x > W - 200 && y > 50 && y < H - BH) x = W - 200;   // 右の コンボ・武器の名前 にかぶらない
+    if (W > H && x > W - 200 && y > 50 && y <= H - BH + 1) x = W - 200;   // 右の コンボ・武器の名前 にかぶらない
     // まんなかの大きな文字に かぶらない(横へ よける)
     const br = this.banner.t > 0 ? this._banRect : null;
     if (br && y > br.top - 30 && y < br.bottom + 30 && x > br.left - 30 && x < br.right + 30) x = x < (br.left + br.right) / 2 ? br.left - 30 : br.right + 30;

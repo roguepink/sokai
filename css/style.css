@@ -305,7 +305,7 @@ body.pc #hud .weapon-name { bottom: calc(var(--sab) + 172px); }
   .minimap { width: 72px; height: 72px; }
   /* 縦: 武器の列は下(ボタンの上)へ。上は 点数・コンボ・ボスの体力・まんなかの文字 */
   .weapon-bar { top: auto; bottom: calc(var(--sab) + 216px); left: 50%; right: auto; transform: translateX(-50%); max-width: calc(100vw - 24px); }
-  .weapon-name { bottom: calc(var(--sab) + 266px); }
+  .weapon-name { bottom: calc(var(--sab) + 272px); }
   .hud-score { top: calc(var(--sat) + 8px); min-width: 0; }
   .hud-score b { font-size: 26px; }
   .hud-boss { top: calc(var(--sat) + 196px); width: 80vw; }
