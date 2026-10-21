@@ -157,7 +157,7 @@ export function defineProps(ctx) {
   P('tires', [{ geo: makeGeo((b) => { for (let i = 0; i < 4; i++) { const g = new THREE.TorusGeometry(0.38, 0.14, 6, 12); _m.makeRotationX(Math.PI / 2); _m.setPosition(0, 0.14 + i * 0.27, 0); b.geom(null, g, _m, { col: DARK }); } }), mat: plain }], 1, 1, 1.1);
   P('busstop', [{ geo: makeGeo((b) => {
     for (const x of [-1.9, 1.9]) bx(b, x - 0.06, 0, 0.5, x + 0.06, 2.5, 0.62, METAL);
-    bx(b, -2.1, 2.5, -0.5, 2.1, 2.62, 0.75, [0.3, 0.32, 0.35]);
+    bx(b, -2.1, 2.5, -0.5, 2.1, 2.62, 0.75, [0.3, 0.32, 0.35], { skip: '' });
     bx(b, -1.9, 0.2, 0.55, 1.9, 2.4, 0.58, [0.25, 0.32, 0.38]);
     bx(b, -1.5, 0.45, 0.2, 1.5, 0.52, 0.5, [0.4, 0.4, 0.42]);
     bx(b, 1.95, 0.5, 0.52, 2.0, 2.2, 0.6, [2.0, 1.9, 1.6]);

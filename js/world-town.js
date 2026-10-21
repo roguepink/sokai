@@ -226,7 +226,7 @@ export function tower(ctx, x0, z0, x1, z1, H, o = {}) {
   const Y = o.y ?? PAD_H, G = 4.5;
   B.box(M.shop, x0, Y, z0, x1, G, z1, { skip: 'bt', uo: Math.floor(rnd() * 4) * 0.5, s: [12, G - Y] });
   B.box(style, x0, G, z0, x1, H, z1, { top: M.roof, uo: Math.floor(rnd() * 4) * 0.25, vo: Math.floor(rnd() * 4) * 0.25, col: tint });
-  B.box(M.plain, x0 - 0.3, G - 0.1, z0 - 0.3, x1 + 0.3, G + 0.35, z1 + 0.3, { col: [0.45 * tint[0], 0.44 * tint[1], 0.42 * tint[2]] });
+  B.box(M.plain, x0 - 0.3, G - 0.1, z0 - 0.3, x1 + 0.3, G + 0.35, z1 + 0.3, { col: [0.45 * tint[0], 0.44 * tint[1], 0.42 * tint[2]], skip: '' });
   // 屋上のふち
   const pc = [0.55 * tint[0], 0.54 * tint[1], 0.52 * tint[2]];
   B.box(M.plain, x0, H, z0, x1, H + 0.9, z0 + 0.35, { col: pc }); B.box(M.plain, x0, H, z1 - 0.35, x1, H + 0.9, z1, { col: pc });
@@ -251,8 +251,8 @@ export function tower(ctx, x0, z0, x1, z1, H, o = {}) {
     if (rnd() < 0.5) {
       const col = [[0.6, 0.15, 0.12], [0.15, 0.35, 0.5], [0.2, 0.45, 0.25], [0.55, 0.45, 0.15]][Math.floor(rnd() * 4)];
       const a0 = 2 + rnd() * Math.max(0, along - 12), a1 = a0 + 6 + rnd() * 4;
-      if (nx) B.box(M.plain, nx > 0 ? c : c - 1.6, 3.5, z0 + a0, nx > 0 ? c + 1.6 : c, 3.7, Math.min(z1 - 1, z0 + a1), { col });
-      else B.box(M.plain, x0 + a0, 3.5, nz > 0 ? c : c - 1.6, Math.min(x1 - 1, x0 + a1), 3.7, nz > 0 ? c + 1.6 : c, { col });
+      if (nx) B.box(M.plain, nx > 0 ? c : c - 1.6, 3.5, z0 + a0, nx > 0 ? c + 1.6 : c, 3.7, Math.min(z1 - 1, z0 + a1), { col, skip: '' });
+      else B.box(M.plain, x0 + a0, 3.5, nz > 0 ? c : c - 1.6, Math.min(x1 - 1, x0 + a1), 3.7, nz > 0 ? c + 1.6 : c, { col, skip: '' });
     }
     if (rnd() < 0.35) {
       const nc = NEON[Math.floor(rnd() * NEON.length)], a = 2 + rnd() * Math.max(0, along - 4), y0 = 6 + rnd() * 4;
@@ -411,11 +411,11 @@ function overpass(ctx) {
   for (let x = -half; x < half; x += 40) {
     const xb = Math.min(half, x + 40);
     B.box(M.concrete, x, Y0, Z - W, xb, Y1, Z + W, { top: deckTop, col: conc, skip: (x > -half ? 'w' : '') + (xb < half ? 'e' : '') });
-    B.box(M.concrete, x, Y0 - 0.6, Z - W + 1, xb, Y0, Z + W - 1, { col: [0.5, 0.48, 0.46], skip: 'tb' });
+    B.box(M.concrete, x, Y0 - 0.6, Z - W + 1, xb, Y0, Z + W - 1, { col: [0.5, 0.48, 0.46], skip: 't' + (x > -half ? 'w' : '') + (xb < half ? 'e' : '') });
     for (const s of [-1, 1]) B.box(M.concrete, x, Y1, s > 0 ? Z + W - 0.4 : Z - W, xb, Y1 + 1.0, s > 0 ? Z + W : Z - W + 0.4, { col: conc, skip: (x > -half ? 'w' : '') + (xb < half ? 'e' : '') });
     for (let k = 0; k < 40; k += 7) B.flat(M.paint, x + k + 2, Y1 + 0.01, Z, 3.5, 0.15, { col: [0.9, 0.9, 0.88] });
   }
-  for (let x = -half + 20; x < half; x += 40) B.box(M.concrete, x - 1.4, Y0 - 1.6, Z - W + 1, x + 1.4, Y0, Z + W - 1, { col: [0.55, 0.53, 0.5] });
+  for (let x = -half + 20; x < half; x += 40) B.box(M.concrete, x - 1.4, Y0 - 1.6, Z - W + 1, x + 1.4, Y0, Z + W - 1, { col: [0.55, 0.53, 0.5], skip: '' });
   // 高架の上の事故車(当たり判定なし)
   const cols = [[0.7, 0.1, 0.1], [0.15, 0.25, 0.5], [0.85, 0.85, 0.85], [0.13, 0.11, 0.1]];
   for (let x = -half + 10; x < half - 10; x += 14 + rnd() * 20) {

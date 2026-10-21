@@ -87,7 +87,7 @@ class Bld {
     this.ctx.solid(x - r, z - r, x + r, z + r, h, this.b);
   }
   prop(name, x, z, rot = 0, o = {}) { this.ctx.prop(name, x, z, rot, { y: this.y0, ...o }); }
-  light(x, z, r = 6, col = [0.32, 0.34, 0.38]) { pool(this.ctx, x, z, r, col, this.y0 + 0.07); }
+  light(x, z, r = 6, col = [0.32, 0.34, 0.38]) { pool(this.ctx, x, z, r, col, this.y0 + 0.07); (this._lights || (this._lights = [])).push([x, z, r, col]); }
   paint(x, z, sx, sz, col) { this.ctx.B.flat(this.ctx.M.paint, x, this.y0 + 0.065, z, sx, sz, { col }); }
   // 入口の上の光る看板(外側)
   sign(side, at, w, col, y = null) {
@@ -145,7 +145,19 @@ class Bld {
     }
     return h + rise;
   }
+  // 天井(中から見上げたとき。下向きの板なので上からは見えない)と、天井の照明
+  ceiling() {
+    const { ctx, x0, x1, z0, z1, t } = this, CB = ctx.CB, M = ctx.M;
+    const y = this.ceilH || this.h;
+    CB.ceil(M.ceiling, x0 + t * 0.5, y - 0.02, z0 + t * 0.5, x1 - t * 0.5, z1 - t * 0.5, { col: this.ceilCol || [0.78, 0.77, 0.74] });
+    for (const [x, z, r, c] of this._lights || []) {
+      const w = Math.min(2.4, r * 0.35), k = 2.2 + (c[0] - c[2]) * 3;
+      const col = [Math.max(1.2, k + c[0] * 2), Math.max(1.1, k + c[1] * 2), Math.max(1.0, k - 0.3 + c[2] * 2)];
+      CB.ceil(M.glow, x - w / 2, y - 0.05, z - 0.18, x + w / 2, z + 0.18, { col });
+    }
+  }
   finish() {
+    this.ceiling();
     const meshes = this.RB.finish(this.ctx.W.group);
     for (const m of meshes) {
       const isGlow = m.material.isMeshBasicMaterial;
@@ -416,7 +428,8 @@ function gasStation(ctx) {
   const can = { minX: 124, minZ: 124, maxX: 156, maxZ: 144, roofs: [], roof: null, name: 'ガソリンスタンド', small: false };
   ctx.W.addBuildingInfo(can);
   const RB = new Builder(0);
-  RB.box(M.plain, 123, 5.6, 123, 157, 6.6, 145, { col: [0.92, 0.92, 0.9] });
+  RB.box(M.plain, 123, 5.6, 123, 157, 6.6, 145, { col: [0.92, 0.92, 0.9], skip: '' });
+  for (let x = 128; x < 154; x += 6) for (const z of [128, 134, 140]) ctx.CB.ceil(M.glow, x - 1.2, 5.57, z - 0.3, x + 1.2, z + 0.3, { col: [2.6, 2.6, 2.4] });
   RB.box(M.plain, 122.9, 5.9, 122.9, 157.1, 6.4, 145.1, { col: [0.85, 0.15, 0.1], skip: 'tb' });
   RB.box(M.glow, 122.85, 6.45, 122.85, 157.15, 6.55, 145.15, { col: [3, 0.6, 0.3], skip: 'tb' });
   for (const m of RB.finish(ctx.W.group)) { const g = m.material.isMeshBasicMaterial; m.material = g ? m.material.clone() : cutout(m.material.clone()); m.material.transparent = true; m.userData.op = 1; m.userData.noCast = g; can.roofs.push(m); }
