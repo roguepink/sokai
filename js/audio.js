@@ -95,7 +95,7 @@ export const Audio = {
       this.verb.connect(cv).connect(vg).connect(this.master);
       // 音楽
       this.duck = c.createGain(); this.duck.gain.value = 1; this.duck.connect(this.master);
-      this.musicBus = c.createGain(); this.musicBus.gain.value = 0.34; this.musicBus.connect(this.duck);
+      this.musicBus = c.createGain(); this.musicBus.gain.value = 0.42; this.musicBus.connect(this.duck);
       // ノイズ(使い回す)
       this.noise = this._noiseBuf(1.5, (i, n) => Math.random() * 2 - 1);
       this.crackle = this._noiseBuf(0.5, () => (Math.random() < 0.06 ? Math.random() * 2 - 1 : 0) * 1.6);
@@ -273,9 +273,9 @@ const SOUNDS = {
   // --- 銃 ---
   mg(A, t) {
     const p = rnd(0.92, 1.08);
-    A.nz(t, { dur: 0.055, gain: 0.42, type: 'bandpass', f0: 1800 * p, q: 0.8 });
-    A.nz(t, { dur: 0.08, gain: 0.3, type: 'lowpass', f0: 900 * p });
-    A.tn(t, { dur: 0.06, gain: 0.4, f0: 150 * p, f1: 55 });
+    A.nz(t, { dur: 0.055, gain: 0.34, type: 'bandpass', f0: 1800 * p, q: 0.8 });
+    A.nz(t, { dur: 0.08, gain: 0.24, type: 'lowpass', f0: 900 * p });
+    A.tn(t, { dur: 0.06, gain: 0.34, f0: 150 * p, f1: 55 });
   },
   minigun(A, t) {
     const p = rnd(0.94, 1.06);
@@ -323,7 +323,7 @@ const SOUNDS = {
     A.tn(t, { dur: 0.1, gain: 0.25, f0: 140, f1: 60 });
   },
   flame(A, t) {
-    A.nz(t, { dur: 0.15, gain: 0.32, a: 0.025, type: 'lowpass', f0: rnd(600, 900), q: 1.5 });
+    A.nz(t, { dur: 0.15, gain: 0.45, a: 0.025, type: 'lowpass', f0: rnd(600, 900), q: 1.5 });
     A.nz(t, { dur: 0.12, gain: 0.1, a: 0.02, type: 'bandpass', f0: rnd(2500, 3500), q: 1 });
     A.tn(t, { dur: 0.14, gain: 0.08, a: 0.02, f0: 60 });
   },
@@ -389,7 +389,7 @@ const SOUNDS = {
 
   // --- 当たった・倒した ---
   hit(A, t) {
-    A.nz(t, { dur: 0.05, gain: 0.16, type: 'lowpass', f0: rnd(650, 1200), pan: rnd(-0.3, 0.3) });
+    A.nz(t, { dur: 0.05, gain: 0.6, type: 'lowpass', f0: rnd(650, 1200), pan: rnd(-0.3, 0.3) });
   },
   bosshit(A, t) {
     A.tn(t, { dur: 0.08, gain: 0.28, f0: 110, f1: 60 });
@@ -405,7 +405,7 @@ const SOUNDS = {
     const i = Math.min(14, Math.floor(combo / 3));
     const semi = PENTA[i % 5] + 12 * Math.floor(i / 5) - 12;
     const f = note(semi);
-    A.tn(t, { dur: 0.16, gain: 0.07, f0: f });
+    A.tn(t, { dur: 0.16, gain: 0.1, f0: f });
     A.tn(t, { dur: 0.1, gain: 0.03, wave: 'triangle', f0: f * 2 });
     if (combo >= 100) A.tn(t + 0.03, { dur: 0.12, gain: 0.025, f0: f * 3, verb: 0.3 });
   },
@@ -461,7 +461,7 @@ const SOUNDS = {
   horn(A, t) {
     for (const [d, base] of [[0, 98], [1.25, 110]]) {
       [1, 1.5, 2].forEach((m) => {
-        const o = A.tn(t + d, { dur: 0.95, gain: 0.06, a: 0.25, wave: 'sawtooth', f0: base * m, lp: 900, verb: 0.5 });
+        const o = A.tn(t + d, { dur: 0.95, gain: 0.13, a: 0.25, wave: 'sawtooth', f0: base * m, lp: 900, verb: 0.5 });
         o.detune.value = rnd(-8, 8);
       });
     }
@@ -476,11 +476,11 @@ const SOUNDS = {
     const lfo = c.createOscillator(), lg = c.createGain(); lfo.frequency.value = rnd(4, 7); lg.gain.value = f0 * 0.04;
     lfo.connect(lg).connect(o.frequency);
     const g = c.createGain();
-    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(rnd(0.05, 0.085), t + 0.18); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(rnd(0.06, 0.1), t + 0.18); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     const out = A._out(A.sfx, pan);
-    for (const [ff, q, gv] of [[rnd(380, 650), 5, 1], [rnd(900, 1300), 6, 0.5]]) {
+    for (const [ff, q, gv] of [[rnd(380, 650), 2.5, 1], [rnd(900, 1300), 3, 0.5]]) {
       const f = c.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = ff; f.Q.value = q;
-      const fg = c.createGain(); fg.gain.value = gv * 2.2;
+      const fg = c.createGain(); fg.gain.value = gv * 3;
       o.connect(f).connect(fg).connect(g);
     }
     g.connect(out);
@@ -488,7 +488,8 @@ const SOUNDS = {
     o.start(t); lfo.start(t); o.stop(t + dur + 0.05); lfo.stop(t + dur + 0.05);
   },
   attack(A, t) {
-    A.nz(t, { dur: 0.1, gain: 0.18, type: 'lowpass', f0: 320 });
+    A.nz(t, { dur: 0.1, gain: 0.45, type: 'lowpass', f0: 320 });
+    A.tn(t, { dur: 0.08, gain: 0.2, f0: 90, f1: 50 });
   },
 
   // --- 画面・そのほか ---
@@ -510,3 +511,5 @@ const SOUNDS = {
     [[0, 0], [3, 0.12], [7, 0.24]].forEach(([s, d]) => A.tn(t + d, { dur: 0.5, gain: 0.06, wave: 'triangle', f0: note(s - 12), verb: 0.4 }));
   },
 };
+
+Audio.SOUNDS = SOUNDS;   // 確認用(音の大きさを測るテストで使う)

@@ -136,8 +136,9 @@ export const UI = {
         const sz = p >= 10000 ? 1.5 : p >= 2000 ? 1.25 : 1;
         this.pts.spawn(s.x, 2.0, s.z, '+' + fmt(p), 'pts', sz, 0.9, 55);
       } else {
+        if (s.kind === 'multi' && s.count >= 5) return;   // 大きいまとめ倒しは、まんなかの文字で見せる
         const cls = s.kind === 'boss' ? 'pts boss' : 'pts multi';
-        const txt = s.kind === 'multi' ? '+' + fmt(p) : '+' + fmt(p);
+        const txt = '+' + fmt(p);
         this.pts.spawn(s.x, 2.4, s.z, txt, cls, s.kind === 'boss' ? 2 : 1.5, s.kind === 'boss' ? 2.2 : 1.3, 80);
       }
     });
@@ -283,7 +284,7 @@ export const UI = {
       el.pace.style.transform = 'scaleX(1)';
     } else {
       const sb = Score.startBest;
-      el.best.textContent = sb > 0 ? 'ベスト ' + fmt(sb) : 'ベスト ' + fmt(Score.best);
+      el.best.textContent = sb > 0 ? 'ベスト ' + fmt(sb) : 'はじめての記録に挑戦中!';
       el.pace.style.transform = `scaleX(${sb > 0 ? Math.min(1, Score.score / sb).toFixed(3) : 0})`;
     }
     el.paceBox.style.visibility = Score.startBest > 0 ? 'visible' : 'hidden';
