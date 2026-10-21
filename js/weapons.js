@@ -22,6 +22,11 @@ const rnd = Math.random;
 const _mz = new THREE.Vector3();
 const _hits = [], _near = [], _list = [], _cand = new Array(K).fill(null), _cs = new Float64Array(K);
 let _stamp = 1;
+const _sp = {};
+function inView(e) {
+  const p = Engine.project(e.x, 1, e.z, _sp);
+  return !!p && p.x > 10 && p.x < innerWidth - 10 && p.y > 10 && p.y < innerHeight - 10;
+}
 
 export const Weapons = {
   index: 0,
@@ -124,7 +129,8 @@ export const Weapons = {
       }
     }
     let tgt = null;
-    for (let i = 0; i < n; i++) { const e = _cand[i]; if (World.segmentHit(px, pz, e.x, e.z, LOW) >= 0.98) { tgt = e; break; } }
+    // 画面に映っている敵だけ自動で狙う(画面の外で倒しても見えない。押しよせて来るのを画面の中で倒すほうが気持ちいい)
+    for (let i = 0; i < n; i++) { const e = _cand[i]; if ((e.boss || inView(e)) && World.segmentHit(px, pz, e.x, e.z, LOW) >= 0.98) { tgt = e; break; } }
     if (w.cluster) {
       this._aoeT -= dt;
       if (this._aoeT <= 0 || (this._aoeE && !this._aoeE.alive)) { this._aoeT = 0.25; this._aoeE = this._bestCluster(n, px, pz, w); }
@@ -145,7 +151,7 @@ export const Weapons = {
     for (let i = 0; i < n; i++) {
       const e = _cand[i];
       const dd = Math.hypot(e.x - px, e.z - pz);
-      if (dd < 3.5) continue;
+      if (dd < 3.5 || !(e.boss || inView(e))) continue;
       if (World.segmentHit(px, pz, e.x, e.z, LOW) < 0.98) continue;
       const c = Zombies.queryCircle(e.x, e.z, (w.radius || 5) * 0.8, _near).length;
       const sc = c * 2 - dd * 0.1 + (e.boss ? 10 : 0);

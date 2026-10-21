@@ -180,8 +180,8 @@ export const Zombies = {
     let dx = px - e.x, dz = pz - e.z;
     const d = Math.hypot(dx, dz) || 0.001;
     e.dist = d;
-    // 遠すぎるゾンビは消す(出現係が近くに出しなおす)
-    if (d > 125) { this._remove(e); return; }
+    // 遠すぎるゾンビは消す(出現係が近くに出しなおす。道さがしの範囲 72m の少し外)
+    if (d > 80) { this._remove(e); return; }
     if (frozen) { this._separate(e); World.collideCircle(e, e.r); return; }
     e.t += dt;
     if (e.rise > 0) e.rise = Math.max(0, e.rise - dt * 0.7);

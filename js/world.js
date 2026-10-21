@@ -331,8 +331,9 @@ export const World = {
   },
 
   // ゾンビを出す場所: (cx,cz) から minD〜maxD 離れた、壁のない所(主人公と歩いてつながっている所だけ)
-  spawnPoint(cx, cz, minD, maxD, tries = 12) {
-    let want = this._compAt(cx, cz);
+  // refX/refZ を渡すと「その場所(ふつうは主人公)と つながっている所」だけ
+  spawnPoint(cx, cz, minD, maxD, tries = 12, refX = cx, refZ = cz) {
+    let want = this._compAt(refX, refZ);
     if (!want) want = this._mainComp;
     for (let i = 0; i < tries; i++) {
       const a = Math.random() * Math.PI * 2, d = minD + Math.random() * (maxD - minD);
@@ -342,6 +343,12 @@ export const World = {
       return { x, z };
     }
     return null;
+  },
+  // 2 つの場所が 歩いてつながっているか(閉じた部屋・壁の中なら false)
+  connected(x0, z0, x1, z1) {
+    if (!this.comp) return true;
+    const a = this._compAt(x0, z0), b = this._compAt(x1, z1);
+    return a !== 0 && (a === b || b === 0);
   },
   _compAt(x, z) {
     const nv = this.nav; if (!nv || !this.comp) return 0;

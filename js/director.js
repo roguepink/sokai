@@ -1,5 +1,6 @@
 // 出現係(ディレクター): 時間とともにゾンビを増やす・大群イベント・ボスを必ず出す。飽きるまで終わらない。
-// - ふだん: 目標の数(はじめ 50 体 → 最大 約 280 体)まで、画面の外から少しずつ出す
+// - ふだん: 目標の数(はじめ 90 体 → 最大 約 280 体)まで、画面の外から少しずつ出す
+// - 近くの数も見る: 画面のまわりが少ないと、進む先の画面のすぐ外に出す(からっぽの画面にしない)
 // - 大群: 35〜50 秒ごとに、1 つの方向から一気に押しよせる(`horde` イベント)。種類も変わる
 // - 地面から はい出てくるゾンビ(画面の中でも出る。見ていて楽しい)
 // - 建物の中・森からも出る
@@ -31,7 +32,8 @@ export const Director = {
   _bossIdx: 0,
   _nextHorde: 26,
   _hordeIdx: 0,
-  _queue: [],               // 大群の「これから出す」予定 {type, x, z, t}
+  _queue: [],
+  _stat: { want: 0, ok: 0 },   // 確認用: 近くに出したかった数 / 出せた数               // 大群の「これから出す」予定 {type, x, z, t}
 
   reset() {
     this.time = 0; this._acc = 0; this._nextBoss = 40; this._bossIdx = 0;
@@ -41,9 +43,14 @@ export const Director = {
   // 今の時間に、まわりに何体いてほしいか(ゆっくり増えて、ときどき波がある)
   targetCount() {
     const t = this.time;
-    const base = 50 + t * 1.5;
-    const wave = 1 + 0.18 * Math.sin(t / 9);
+    const base = 90 + t * 2;
+    const wave = 1 + 0.15 * Math.sin(t / 9);
     return Math.min(280, base * wave);
+  },
+  // 主人公の近く(だいたい画面のまわり 26m)に いてほしい数。画面がからっぽにならないように
+  nearCount() {
+    const t = this.time;
+    return Math.min(100, 40 + t * 0.4) * (1 + 0.2 * Math.sin(t / 7));
   },
 
   // 時間とともに 種類がまざってくる
@@ -70,6 +77,15 @@ export const Director = {
     this._acc += dt;
     if (this._acc > 0.1) {
       this._acc = 0;
+      const near = countNear(px, pz, 26);
+      // 近くが少ない → 進む先の、画面のすぐ外に出す(からっぽの画面はつまらない)
+      let close = Math.min(8, Math.ceil((this.nearCount() - near) / 4));
+      this._stat.want += Math.max(0, close);
+      if (close > 0 && Zombies.count() >= MAX - 8) this._recycleFar(px, pz, close);
+      while (close-- > 0) {
+        const p = this._closePoint(px, pz, player.vel.x, player.vel.z);
+        if (p && Zombies.spawn(this.pickType(), p.x, p.z)) this._stat.ok++;
+      }
       const want = this.targetCount();
       let n = Math.min(6, Math.ceil((want - Zombies.count()) / 8));
       while (n-- > 0) {
@@ -114,7 +130,12 @@ export const Director = {
       this._queue.splice(i, 1);
       if (Zombies.count() >= MAX - 6) continue;
       let x = q.x, z = q.z;
-      if (World.blockedAt(x, z, 0.8)) { const p = World.spawnPoint(x, z, 0, 5); if (!p) continue; x = p.x; z = p.z; }
+      // 壁の中・閉じた部屋・画面の中には出さない(少しずらす)
+      if (World.blockedAt(x, z, 0.8) || !World.connected(x, z, px, pz) || onScreen(x, z)) {
+        const p = World.spawnPoint(x, z, 0, 6, 8, px, pz);
+        if (!p || onScreen(p.x, p.z)) continue;
+        x = p.x; z = p.z;
+      }
       Zombies.spawn(q.type, x, z);
     }
 
@@ -161,26 +182,65 @@ export const Director = {
     return best;
   },
 
-  // 近くの建物の中(主人公のいない建物)
+  // 近くの建物の中(主人公と歩いてつながっている所だけ。主人公のいる建物なら 画面の外の部屋)
   _buildingPoint(px, pz) {
     const bs = World.buildings;
     if (!bs || !bs.length) return null;
     const inside = World.inside;
     for (let k = 0; k < 6; k++) {
-      const b = bs[(Math.random() * bs.length) | 0];
-      if (b === inside) continue;
+      const b = inside && k < 2 ? inside : bs[(Math.random() * bs.length) | 0];
       const cx = (b.minX + b.maxX) / 2, cz = (b.minZ + b.maxZ) / 2;
       const d = Math.hypot(cx - px, cz - pz);
-      if (d > 70 || d < 12) continue;
+      if (b !== inside && (d > 70 || d < 12)) continue;
       for (let i = 0; i < 6; i++) {
         const x = R(b.minX + 1.2, b.maxX - 1.2), z = R(b.minZ + 1.2, b.maxZ - 1.2);
         if (Math.hypot(x - px, z - pz) < 14) continue;
-        if (!World.blockedAt(x, z, 0.5)) return { x, z };
+        if (World.blockedAt(x, z, 0.5) || !World.connected(x, z, px, pz)) continue;
+        if (b === inside && onScreen(x, z)) continue;
+        return { x, z };
       }
     }
     return null;
   },
+
+  // 進む先の、画面のすぐ外(19〜30m)。止まっているときは まわりのどこか
+  _closePoint(px, pz, vx, vz) {
+    const sp = Math.hypot(vx, vz), ins = World.inside;
+    const base = sp > 1 ? Math.atan2(vz, vx) : Math.random() * Math.PI * 2;
+    for (let i = 0; i < 8; i++) {
+      const a = base + (sp > 1 ? R(-1.3, 1.3) : R(-Math.PI, Math.PI)), d = R(ins ? 14 : 19, ins ? 24 : 30);
+      const x = px + Math.cos(a) * d, z = pz + Math.sin(a) * d;
+      if (World.blockedAt(x, z, 0.8) || !World.connected(x, z, px, pz) || onScreen(x, z)) continue;
+      const b = World.buildingAt(x, z);
+      if (b && b !== ins && Math.random() < 0.6) continue;   // よその建物の中は ときどきだけ
+      return { x, z };
+    }
+    return null;
+  },
+
+  // 数がいっぱいのときは、遠くでうろうろしているゾンビを消して 近くに出しなおす
+  _recycleFar(px, pz, n) {
+    const L = Zombies.list;
+    for (let k = 0; k < n; k++) {
+      let far = null, fd = 45 * 45;
+      for (let i = 0; i < L.length; i++) {
+        const e = L[i];
+        if (e.boss || !e.alive) continue;
+        const d2 = (e.x - px) ** 2 + (e.z - pz) ** 2;
+        if (d2 > fd) { fd = d2; far = e; }
+      }
+      if (!far || onScreen(far.x, far.z)) return;
+      Zombies._remove(far);
+    }
+  },
 };
+
+function countNear(x, z, r) {
+  let n = 0;
+  const L = Zombies.list, r2 = r * r;
+  for (let i = 0; i < L.length; i++) { const e = L[i]; if ((e.x - x) ** 2 + (e.z - z) ** 2 < r2) n++; }
+  return n;
+}
 
 function pickMix(mix) {
   let r = Math.random();
