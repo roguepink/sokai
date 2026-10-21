@@ -75,7 +75,7 @@ export const Audio = {
 
   // 最初のタップで呼ぶ(ブラウザの決まり)
   unlock() {
-    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume().catch(() => {}); return; }
+    if (this.ctx) { if (this.ctx.state !== 'running') this.ctx.resume().catch(() => {}); return; }   // iPhone は 'interrupted' もある
     try {
       const c = this.ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
       // 仕上げのリミッター(音割れ防止)

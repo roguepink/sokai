@@ -164,6 +164,71 @@ class Scenes:
         print("all weapons: max %.0fms" % self.ev("Math.max(...__ft)"))
         print("boot timings:", self.ev("JSON.stringify(window.__boot || null)"))
 
+    # ---- 電波なし(一度開いたあと、オフラインで起動できるか)。--hash sw で使う ----
+    def offline(self):
+        page = self.page
+        page.wait_for_function("navigator.serviceWorker && navigator.serviceWorker.controller !== undefined", timeout=20000)
+        page.wait_for_timeout(7000)          # ページが「読みこんだもの一覧」を送るまで待つ(4 秒後)
+        n = self.ev("caches.keys().then(async ks => { let n = 0; for (const k of ks) n += (await (await caches.open(k)).keys()).length; return [ks, n]; })")
+        print("cached:", n)
+        page.context.set_offline(True)
+        page.reload()
+        page.wait_for_function("window.__stats && window.__stats.state", timeout=30000)
+        page.wait_for_timeout(3000)
+        print("offline boot state:", self.ev("__stats.state"), "zombies:", self.ev("__stats.zombies"))
+        self.shot("offline-title")
+
+    # ---- PC: キーボードとマウス(--pc で使う) ----
+    def keys(self):
+        page, kb = self.page, self.page.keyboard
+        page.wait_for_timeout(1500)
+        page.click("#btnPlay", force=True); page.wait_for_timeout(800)
+        I = "JSON.stringify({move: __game.Input.move, fire: __game.Input.fire, w: __game.Weapons.index, spin: +__game.Weapons.spinReady.toFixed(2)})"
+        kb.down("d"); kb.down("w"); page.wait_for_timeout(300)
+        print("D+W:", self.ev(I))
+        kb.down(" "); page.wait_for_timeout(300)
+        print("+space:", self.ev(I))
+        kb.up(" "); kb.up("d"); kb.up("w"); page.wait_for_timeout(200)
+        print("released:", self.ev(I))
+        kb.press("Shift"); page.wait_for_timeout(200)
+        print("shift (spin used, ready drops):", self.ev(I))
+        kb.press("3"); page.wait_for_timeout(200); print("key 3:", self.ev(I))
+        kb.press("r"); page.wait_for_timeout(200); print("key r:", self.ev(I))
+        kb.press("q"); page.wait_for_timeout(200); print("key q:", self.ev(I))
+        page.mouse.move(self.w * 0.8, self.h * 0.4); page.mouse.down(); page.wait_for_timeout(300)
+        print("mouse down on right side:", self.ev(I))
+        page.mouse.up(); page.wait_for_timeout(200)
+        print("mouse up:", self.ev(I))
+        page.mouse.wheel(0, 120); page.wait_for_timeout(200); print("wheel:", self.ev(I))
+        kb.press("Escape"); page.wait_for_timeout(300); print("esc:", self.ev("__stats.state"))
+        kb.press("Escape"); page.wait_for_timeout(300); print("esc again:", self.ev("__stats.state"))
+        self.shot("pc")
+
+    # ---- 音(聞こえないので 状態だけ見る) ----
+    def audio(self):
+        page = self.page
+        page.wait_for_timeout(3000)
+        A = "JSON.stringify({ctx: __game.Audio.ctx ? __game.Audio.ctx.state : null, muted: __game.Audio.muted, gain: __game.Audio.master ? +__game.Audio.master.gain.value.toFixed(2) : null, state: __stats.state})"
+        print("title, before any tap:", self.ev(A))
+        self.click("#btnPlay"); page.wait_for_timeout(800)
+        print("after tapping あそぶ:", self.ev(A))
+        self.cdp.send("Emulation.setFocusEmulationEnabled", {"enabled": False})
+        self.ev("Object.defineProperty(document, 'hidden', {value: true, configurable: true}); Object.defineProperty(document, 'visibilityState', {value: 'hidden', configurable: true}); document.dispatchEvent(new Event('visibilitychange'))")
+        page.wait_for_timeout(500)
+        print("tab hidden:", self.ev(A))
+        self.ev("Object.defineProperty(document, 'hidden', {value: false, configurable: true}); Object.defineProperty(document, 'visibilityState', {value: 'visible', configurable: true}); document.dispatchEvent(new Event('visibilitychange'))")
+        page.wait_for_timeout(500)
+        print("tab back:", self.ev(A))
+        self.click("#btnResume"); page.wait_for_timeout(500)
+        print("resume tapped:", self.ev(A))
+        self.click("#btnPause"); page.wait_for_timeout(300)
+        self.click("#btnPauseSettings"); page.wait_for_timeout(300)
+        self.click("#settings [data-set=sound] [data-v=off]"); page.wait_for_timeout(400)
+        print("sound off:", self.ev(A))
+        self.shot("settings-off")
+        self.click("#settings [data-set=sound] [data-v=on]"); page.wait_for_timeout(400)
+        print("sound on:", self.ev(A))
+
     # ---- 指で操作 ----
     def touch(self):
         page, cdp, w, h = self.page, self.cdp, self.w, self.h
@@ -245,7 +310,7 @@ class Scenes:
 
     def click(self, sel):
         if self.a.pc:
-            self.page.click(sel)
+            self.page.click(sel, force=True)
         else:
             r = self.ev(f"(() => {{ const r = document.querySelector('{sel}').getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; }})()")
             self.tap(r[0], r[1])

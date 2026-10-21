@@ -195,7 +195,7 @@ function step(dt) {
 
 // 確認用に外から見られる数字
 const stats = window.__stats = { ms: 0, fps: 0, zombies: 0, kills: 0, score: 0, state: '' };
-window.__game = { Game, Engine, Flow, Player, Zombies, Weapons, World, Score, Director, FX, Input, start, pause, resume, finish };
+window.__game = { Game, Engine, Flow, Audio, UI, Player, Zombies, Weapons, World, Score, Director, FX, Input, start, pause, resume, finish };
 
 boot().catch((e) => {
   console.error(e);
