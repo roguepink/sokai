@@ -12,6 +12,8 @@ import { Bosses } from './ui-boss.js';
 import { Minimap } from './ui-minimap.js';
 import { Popups, Banner, Confetti, flash, Avoid } from './ui-fx.js';
 import { Happenings } from './zombie-events.js';
+import { WeaponGrid } from './ui-weapons.js';
+import { Input } from './input.js';
 
 const $ = (id) => document.getElementById(id);
 const fmt = (n) => Math.floor(n).toLocaleString();
@@ -103,6 +105,13 @@ export const UI = {
     this.dmg = new Popups(q('popLayer'), low ? 6 : Engine.quality === 'mid' ? 9 : 12, 'dmg');
     this.pts = new Popups(q('popLayer'), low ? 6 : Engine.quality === 'mid' ? 9 : 11, 'pts');
     this.banner = new Banner(q('banner'));
+    // 大きな文字が出たら、下の 1 行は いったん引っこめる(重ならないように)。出たばかりなら あとで出しなおす
+    this.banner.onPlay = () => {
+      const s = this.el.sub, age = performance.now() - this._subT;
+      if (!s.classList.contains('on') || age > 1300) return;
+      s.classList.remove('on');
+      if (age < 650 && !this._subWait) this._subWait = { html: s.innerHTML, cls: s.className.replace(/\bsub-banner\b|\bon\b/g, '').trim(), prio: this._subPrio, at: performance.now() };
+    };
     this.confetti = new Confetti($('confettiLayer'), low ? 28 : 56);
     Bosses.init();
     Minimap.init(q('minimap'));
@@ -114,6 +123,7 @@ export const UI = {
       this.el.spin.appendChild(ring);
     }
 
+    WeaponGrid.init(root, Input, Audio);
     this._buildWeaponBar();
     this._wireEvents();
     this._wireScreens();
@@ -277,7 +287,7 @@ export const UI = {
     this.el.vignette.classList.remove('boss');
     this.el.boss.classList.add('hidden');
     this.el.bossArrow.classList.add('hidden');
-    this.el.sub.classList.remove('on');
+    this.el.sub.classList.remove('on'); this._subWait = null;
     this.el.hud.classList.remove('fever', 'killcam');
     this.el.ch.classList.add('hidden'); this._chKey = ''; this._fever = -1;
     this._subT = -9999; this._multiT = -9999;
@@ -289,6 +299,12 @@ export const UI = {
   // 下の 1 行(まとめ倒し・小さな区切り)。いつも 1 行だけ。出ている間は、大事なほう(prio)を優先し、
   // すぐ次が来たら 文字だけ入れかえる(動きを最初からやり直さない = ちらつかない)
   _sub(html, cls, prio = 1) {
+    // 大きな文字が出ている間は 順番待ち(重ならないように)。いちばん大事な 1 つだけ覚えておき、大きな文字が消えたら出す
+    if (this.banner.t > 0.05) {
+      const w = this._subWait;
+      if (!w || prio >= w.prio || performance.now() - w.at > 1500) this._subWait = { html, cls, prio, at: performance.now() };
+      return;
+    }
     const s = this.el.sub, now = performance.now(), age = now - this._subT;
     if (age < 700 && prio < this._subPrio) return;
     s.innerHTML = html;
@@ -388,8 +404,15 @@ export const UI = {
   // ---------------- 武器 ----------------
   _buildWeaponBar() {
     const bar = this.el.weaponBar;
-    if (!bar || bar.childElementCount === WEAPONS.length) { this._weapon(false); return; }
+    if (!bar || bar.childElementCount === WEAPONS.length + 1) { this._weapon(false); return; }
     bar.innerHTML = '';
+    // いちばん左: ぜんぶ ならべて えらぶ(31 種類あるので)
+    const all = document.createElement('button');
+    all.type = 'button'; all.className = 'wbtn wall'; all.setAttribute('aria-label', '武器をぜんぶ見る');
+    all.innerHTML = '<span>▦</span><small>全部</small>';
+    all.addEventListener('click', (e) => { e.preventDefault(); Audio.click(); WeaponGrid.show(); });
+    all.addEventListener('pointerdown', (e) => e.stopPropagation());
+    bar.appendChild(all);
     WEAPONS.forEach((w, i) => {
       const b = document.createElement('button');
       b.type = 'button';
@@ -409,10 +432,10 @@ export const UI = {
     this.el.weapon.textContent = name;
     const bar = this.el.weaponBar;
     if (bar) {
-      [...bar.children].forEach((b, i) => b.classList.toggle('on', i === Weapons.index));
-      const cur = bar.children[Weapons.index];
+      [...bar.children].forEach((b, i) => b.classList.toggle('on', i - 1 === Weapons.index));
+      const cur = bar.children[Weapons.index + 1];
       if (cur && bar.scrollWidth > bar.clientWidth) {
-        const left = cur.offsetLeft - bar.clientWidth / 2 + cur.offsetWidth / 2;
+        const left = cur.offsetLeft - bar.clientWidth / 2 + cur.offsetWidth / 2 - 24;
         try { bar.scrollTo({ left, behavior: changed ? 'smooth' : 'auto' }); } catch (e) { bar.scrollLeft = left; }
       }
     }
@@ -463,14 +486,28 @@ export const UI = {
     // 数字をよける場所: 主人公のまわり・上の点数の帯・右下のボタン
     const hp = Engine.viewMode === 'fps' ? null : Engine.project(Player.pos.x, 1.0, Player.pos.z, _pt2);
     Avoid.hx = hp ? hp.x : -999; Avoid.hy = hp ? hp.y : -999;
+    const close = Engine.viewMode !== 'top';
+    if (close !== this._close) { this._close = close; el.hud.classList.toggle('close', close); this._avoidT = 0; }
     if ((this._avoidT = (this._avoidT || 0) - dt) <= 0) {        // 大きさを測るのは ときどき(重くしない)
       this._avoidT = 0.5;
       Avoid.top = (Bosses.list.length ? el.boss.getBoundingClientRect().bottom : el.scoreBox.getBoundingClientRect().bottom) + 4;
+      // 肩越し・一人称: 大きな文字は 点数(ボスの体力)のすぐ下へ(照準のまわりを あける)
+      const lc = Math.round(Avoid.top + 2) + 'px';
+      if (lc !== this._laneC) { this._laneC = lc; el.hud.style.setProperty('--laneC', lc); }
+      // 大きな文字の場所(ボスの矢印が よける)
+      this._banRect = this.banner.t > 0 ? this.banner.main.getBoundingClientRect() : null;
+      this._chRect = el.ch.classList.contains('hidden') ? null : el.ch.getBoundingClientRect();
     }
     this.dmg.update(gdt); this.pts.update(gdt);
     if (!this.paused) this._updateZone(dt);
     this._dmgFrame = 0;
     this.banner.update(dt);
+    // 順番待ちの 下の 1 行(古すぎるものは 出さない)
+    const sw = this._subWait;
+    if (sw && this.banner.t <= 0.05 && !this.paused) {
+      this._subWait = null;
+      if (performance.now() - sw.at < 3500) this._sub(sw.html, sw.cls, sw.prio);
+    }
     if (!this.paused) Minimap.update(dt);
   },
 
@@ -539,17 +576,28 @@ export const UI = {
     if (onScreen) { el.bossArrow.classList.add('hidden'); return; }
     el.bossArrow.classList.remove('hidden');
     const dx = e.x - Player.pos.x, dz = e.z - Player.pos.z, l = Math.hypot(dx, dz) || 1;
-    const ux = dx / l, uy = dz / l;                      // カメラは北が上なので、そのまま画面の向き
-    const TOP = innerHeight > innerWidth ? 200 : 120;      // 上は点数・ボスの体力の下まで
+    // 画面の向き: 見下ろしは 北が上。肩越し・一人称は 見ている向きが上(うしろなら下)
+    let ux = dx / l, uy = dz / l;
+    if (Engine.viewMode !== 'top') {
+      const y = Engine.lookYaw, fx = Math.sin(y), fz = -Math.cos(y);
+      const r = ux * -fz + uy * fx, f = ux * fx + uy * fz;      // 右向き(cos, sin) = (-fz, fx)
+      const m = Math.hypot(r, f) || 1; ux = r / m; uy = -f / m;
+    }
+    const TOP = Math.max(innerHeight > innerWidth ? 200 : 120, Avoid.top + 26);      // 上は点数・ボスの体力の下まで
     const hw = W / 2 - M, hh = uy < 0 ? H / 2 - TOP : H / 2 - M - 26;   // 下は 無双ゲージの上まで
     const t = Math.min(hw / Math.abs(ux || 1e-6), hh / Math.abs(uy || 1e-6));
     let x = W / 2 + ux * t, y = H / 2 + uy * t;
     // 左上のミニマップ・右上の武器の列・右下のボタンにかぶらないように
     if (x < 130 && y < 160) { if (uy < -0.5) x = 130; else y = 160; }
+    const cr = this._chRect;                              // 左上のチャレンジの札
+    if (cr && x < cr.right + 30 && y < cr.bottom + 30) { if (uy < -0.5) x = cr.right + 30; else y = cr.bottom + 30; }
     if (x > W - 330 && y < 70) y = 70;
-    const BW = W > H ? 290 : 250, BH = W > H ? 230 : 330;   // 右下のボタン(撃つ・回転斬り・武器)の場所
+    const BW = W > H ? 360 : 250, BH = W > H ? 230 : 330;   // 右下のボタン(撃つ・回転斬り・ダッシュ・武器)の場所
     if (x > W - BW && y > H - BH) { if (ux > 0.5 && uy < 0.5) y = H - BH; else x = W - BW; }
     if (W > H && x > W - 200 && y > 50 && y < H - BH) x = W - 200;   // 右の コンボ・武器の名前 にかぶらない
+    // まんなかの大きな文字に かぶらない(横へ よける)
+    const br = this.banner.t > 0 ? this._banRect : null;
+    if (br && y > br.top - 30 && y < br.bottom + 30 && x > br.left - 30 && x < br.right + 30) x = x < (br.left + br.right) / 2 ? br.left - 30 : br.right + 30;
     el.bossArrow.style.transform = `translate3d(${x.toFixed(0)}px,${y.toFixed(0)}px,0) translate(-50%,-50%)`;
     el.bossArrow.firstChild.style.transform = `rotate(${Math.atan2(ux, -uy).toFixed(3)}rad)`;
     el.bossDist.textContent = Math.round(l) + 'm';

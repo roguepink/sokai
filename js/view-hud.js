@@ -115,6 +115,17 @@ export const ViewHud = {
       this._hintT = 4.5;
     }
     h.className = 'view-hint ' + kind;
+    h.style.top = '';
+    this._placeHint();
+  },
+  // 左上のチャレンジの札が出ていたら、その下へ(重ならないように。札は あとから出ることもある)
+  _placeHint() {
+    const h = this.hint, ch = document.getElementById('hudChallenge');
+    if (this._hintKind !== 'slam' || innerWidth < innerHeight) return;
+    h.style.top = '';
+    if (!ch || ch.classList.contains('hidden')) return;
+    const r = ch.getBoundingClientRect(), top = h.getBoundingClientRect().top;
+    if (r.height && top < r.bottom + 8) h.style.top = Math.round(Math.min(r.bottom + 8, innerHeight - h.offsetHeight - 40)) + 'px';
   },
   hideHint() { this.hint.classList.add('hidden'); this._hintKind = ''; this._hintT = 0; },
 
@@ -198,6 +209,7 @@ export const ViewHud = {
     // 表示のタイマー
     if (this._toastT > 0 && (this._toastT -= dt) <= 0) this.toast.classList.add('hidden');
     if (this._hintT > 0) {
+      if (((this._hintT * 4) | 0) !== (((this._hintT - dt) * 4) | 0)) this._placeHint();
       this._hintT -= dt;
       const looked = this._hintKind === 'look' && Input.lookT !== this._hintLook0 && this._hintT < 5.8;
       if (this._hintT <= 0 || looked || !playing || (this._hintKind === 'look' && !close)) this.hideHint();

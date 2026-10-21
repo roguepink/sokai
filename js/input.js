@@ -20,6 +20,8 @@ export const Input = {
   viewHold: false,          // 視点ボタンの長押し(視点の設定を開く)
   dash: false,              // ダッシュ(押した瞬間だけ)。すばやく 2 回 = ジャンプ叩きつけ
   slam: false,              // ジャンプ叩きつけ(PC の G キー)
+  weaponGrid: false,        // 武器を ぜんぶ ならべる画面(PC の T キー)
+  digitPress: false,        // 数字キーを押した(同じ数字を もう一度で 11〜・21〜。main が見る)
   auto: HASH.has('auto'),   // 自動操作
   enabled: false,           // プレイ中だけ true
   touchUsed: false,
@@ -161,7 +163,8 @@ export const Input = {
       if (k === 'g') this.slam = true;
       if (k === 'q') this.weaponDelta = -1;
       if (k === 'r' || k === 'tab') { this.weaponDelta = 1; e.preventDefault(); }
-      if (/^[0-9]$/.test(k)) this.weaponSelect = k === '0' ? 9 : +k - 1;
+      if (k === 't') this.weaponGrid = true;
+      if (/^[0-9]$/.test(k)) { this.weaponSelect = k === '0' ? 9 : +k - 1; this.digitPress = true; }
       if (k === ' ') e.preventDefault();
     });
     addEventListener('keyup', (e) => this._keys.delete(e.key.toLowerCase()));
@@ -194,6 +197,7 @@ export const Input = {
   consumeViewHold() { const v = this.viewHold; this.viewHold = false; return v; },
   consumeDash() { const v = this.dash; this.dash = false; return v; },
   consumeSlam() { const v = this.slam; this.slam = false; return v; },
+  consumeWeaponGrid() { const v = this.weaponGrid; this.weaponGrid = false; return v; },
   consumeSpin() { const s = this.spin; this.spin = false; return s; },
   consumeWeaponDelta() { const d = this.weaponDelta; this.weaponDelta = 0; return d; },
   consumeWeaponSelect() { const s = this.weaponSelect; this.weaponSelect = -1; return s; },

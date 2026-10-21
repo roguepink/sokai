@@ -18,6 +18,8 @@ import { Flow } from './zombie-flow.js';
 import { Look } from './view-look.js';
 import { ViewHud } from './view-hud.js';
 import { ViewCam } from './view-camera.js';
+import { WeaponGrid } from './ui-weapons.js';
+import { WEAPONS } from './weapons.js';
 
 export const Game = {
   state: 'title',           // 'title'(見本プレイ) | 'play' | 'paused' | 'result'
@@ -64,6 +66,7 @@ async function boot() {
   addEventListener('keydown', (e) => {
     if (e.key === 'Escape' || e.key === 'p') {
       if (ViewHud.open) { ViewHud.closePanel(); return; }
+      if (WeaponGrid.open) { WeaponGrid.close(); return; }
       Game.state === 'play' ? pause() : Game.state === 'paused' && resume();
     }
   });
@@ -124,7 +127,7 @@ function start(ev) {
 
 function pause() {
   if (Game.state !== 'play') return;
-  ViewHud.closePanel();
+  ViewHud.closePanel(); WeaponGrid.close();
   Game.state = 'paused';
   Score.save();
   $('pauseMenu').classList.remove('hidden');
@@ -172,9 +175,11 @@ function loop(now) {
   requestAnimationFrame(loop);
   try {
     const real = Math.min((now - last) / 1000, CONFIG.MAX_FRAME); last = now;
-    const running = (Game.state === 'play' && !ViewHud.open) || Game.state === 'title';
+    const menu = ViewHud.open || WeaponGrid.open;      // 視点の設定・武器の一覧を開いている間は 止める
+    const running = (Game.state === 'play' && !menu) || Game.state === 'title';
     Input.update(real);
-    if (Game.state === 'play' && !ViewHud.open) handleView(real);
+    if (Game.state === 'play') handleWeaponKeys();
+    if (Game.state === 'play' && !menu) handleView(real);
     if (running) {
       Engine.stepTime(real);
       acc += real * Engine.timeScale;
@@ -185,7 +190,7 @@ function loop(now) {
     if ((streetT -= real) <= 0) { streetT = 0.3; Engine.street = streetCheck(Player.pos.x, Player.pos.z); }
     Engine.updateCamera(real, Player.pos, !!World.inside, Game.state === 'title');
     if (Game.state !== 'title') UI.update(real);
-    ViewHud.update(real, Game.state === 'play');
+    ViewHud.update(real, Game.state === 'play' && !WeaponGrid.open);
     Engine.render(real);
     if (Game.state === 'play' && (saveT += real) > 5) { saveT = 0; Score.save(); }
     // 1 フレームの計算にかかった時間(ミリ秒。確認用。16 をこえるとカクつく)
@@ -207,6 +212,16 @@ function streetCheck(px, pz) {
     hit = 1; break;
   }
   return hit;
+}
+
+// PC: T = 武器の一覧 / 同じ数字を もう一度 = 11〜・21〜(31 種類あるので)
+function handleWeaponKeys() {
+  if (Input.consumeWeaponGrid()) WeaponGrid.toggle();
+  if (Input.digitPress) {
+    Input.digitPress = false;
+    const d = Input.weaponSelect, cur = Weapons.index;
+    if (d >= 0 && cur % 10 === d) Input.weaponSelect = cur + 10 < WEAPONS.length ? cur + 10 : d;
+  }
 }
 
 // 視点の切りかえ(見下ろし → 肩越し → 一人称 → 見下ろし)と、指・マウスで向きを変える(view-look.js)
@@ -236,7 +251,7 @@ function step(dt) {
 
 // 確認用に外から見られる数字
 const stats = window.__stats = { ms: 0, fps: 0, zombies: 0, kills: 0, score: 0, state: '' };
-window.__game = { Game, Engine, Look, ViewHud, ViewCam, Flow, Audio, UI, Player, Zombies, Weapons, World, Score, Director, FX, Input, start, pause, resume, finish };
+window.__game = { Game, Engine, Look, ViewHud, ViewCam, Flow, Audio, UI, Player, Zombies, Weapons, World, Score, Director, FX, Input, WeaponGrid, start, pause, resume, finish };
 
 boot().catch((e) => {
   console.error(e);
