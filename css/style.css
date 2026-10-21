@@ -198,9 +198,10 @@ button.big:active { transform: translateY(4px); box-shadow: 0 2px 0 #8a2a00; }
 @keyframes zoneIn { 0% { opacity: 0; transform: translateX(-12px); } 10%, 80% { opacity: 1; transform: none; } 100% { opacity: 0; } }
 
 /* 縦向きのときの ひとこと */
-.rot-hint { display: none; position: absolute; left: 50%; top: 64%; transform: translateX(-50%); white-space: nowrap; font-size: 15px; color: var(--gold);
+.rot-hint { display: none; position: absolute; left: 50%; top: 60%; transform: translateX(-50%); white-space: nowrap; font-size: 15px; color: var(--gold);
   padding: 6px 14px; border-radius: 999px; background: rgba(0,0,0,.55); opacity: 0; }
-.rot-hint.on { animation: zoneIn 5s ease-out both; }
+.rot-hint.on { animation: rotIn 5s ease-out both; }
+@keyframes rotIn { 0% { opacity: 0; } 8%, 85% { opacity: 1; } 100% { opacity: 0; } }
 
 /* 飛び出す数字 */
 .pop { position: absolute; left: 0; top: 0; will-change: transform, opacity; white-space: nowrap; font-weight: 900; }
