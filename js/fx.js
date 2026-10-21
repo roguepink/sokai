@@ -46,8 +46,17 @@ function upload(geo, names, n) {
     a.needsUpdate = true;
   }
 }
+// テスト係A: 目の前の光で画面が白く飛ばないための上限(視点ごとに FX.update が入れる)
+const U_GLOW = { uCover: { value: 2 }, uNear: { value: 0 }, uHot: { value: 64 } };
+const U_SOLID = { uCover: { value: 3 }, uNear: { value: 0 }, uHot: { value: 64 } };
+const U_BEAM = { uBeamMax: { value: 1 }, uBeamNear: { value: 1 } };
+const U_RING = { uRingNear: { value: 1 } };
+// 視点ごとの値 [光る粒の広がり, ふつうの粒の広がり, 近すぎて消す距離, 線の太さ, 近くの粒の明るさの上限, 近くの線の こさ, 近くの輪・弧の こさ]
+const VIEW_CAP = { top: [0.9, 1.6, 0, 0.25, 64, 1, 1], tps: [0.45, 0.6, 1.2, 0.06, 1.6, 0.5, 0.5], fps: [0.32, 0.5, 1.6, 0.045, 1.1, 0.35, 0.3] };
 function fxMesh(geo, vs, fs, blending, order, side = THREE.FrontSide) {
-  const mat = new THREE.ShaderMaterial({ vertexShader: vs, fragmentShader: fs, transparent: true, depthWrite: false, blending, side });
+  const uniforms = vs === SH.PARTICLE_VS ? (blending === THREE.AdditiveBlending ? U_GLOW : U_SOLID) : vs === SH.BEAM_VS ? U_BEAM
+    : fs === SH.RING_FS || vs === SH.SLASH_VS ? U_RING : {};
+  const mat = new THREE.ShaderMaterial({ uniforms, vertexShader: vs, fragmentShader: fs, transparent: true, depthWrite: false, blending, side });
   const m = new THREE.Mesh(geo, mat);
   m.frustumCulled = false;
   m.renderOrder = order;
@@ -440,7 +449,9 @@ export const FX = {
     const pal = KIND[kind] || KIND.fire;
     const y = 0.8;
     // 爆発が重なるほど、1 つ 1 つの光を弱くする(画面が真っ白にならないように)
-    const b = 1 / (1 + this._boom * 0.12);
+    // 肩越し・一人称でカメラの近くなら さらに弱く(目の前で 画面がまっ白にならないように)
+    const cn = this.nearDim(x, y, z, R);
+    const b = cn / (1 + this._boom * 0.12);
     this._boom += R;
     // 一瞬の白い光
     g.emit(x, y + 0.3, z, 0, 0, 0, 0.12, R * 0.35, R * 0.55, 0xffffff, 0.8 * b, pal.c0, 0.45 * b, 1, 0, 0, 0, 0, 0);
@@ -451,7 +462,7 @@ export const FX = {
       const a = rnd() * TAU, u = rnd(), sp = R * (1.0 + rnd() * 1.6);
       s.emit(x + Math.cos(a) * u * R * 0.3, y + rnd() * R * 0.3, z + Math.sin(a) * u * R * 0.3,
         Math.cos(a) * sp, R * (0.5 + rnd() * 1.3), Math.sin(a) * sp, 0.4 + rnd() * 0.45, R * (0.13 + rnd() * 0.08), R * (0.3 + rnd() * 0.14),
-        pal.fire, 2.6, pal.c2, 0.5, 1.4, -2, 4.5, 0, 0, 0);
+        pal.fire, 1 + 1.6 * cn, pal.c2, 0.5, 0.7 + 0.7 * cn, -2, 4.5, 0, 0, 0);
     }
     const nc = this.q(3 + R * 0.6);
     for (let i = 0; i < nc; i++) {
@@ -463,7 +474,7 @@ export const FX = {
     for (let i = 0; i < ns; i++) {
       const a = rnd() * TAU, sp = R * (3 + rnd() * 5);
       g.emit(x, y + 0.3, z, Math.cos(a) * sp, 2 + rnd() * R * 2.4, Math.sin(a) * sp, 0.4 + rnd() * 0.6, 0.07, 0.03,
-        pal.spark, 8, pal.c1, 3, 1, 16, 1.4, 0.05, 1, 1);
+        pal.spark, 8 * cn, pal.c1, 3 * cn, 1, 16, 1.4, 0.05, 1, 1);
     }
     // 煙の柱
     if (pal.smoke) {
@@ -471,7 +482,7 @@ export const FX = {
       for (let i = 0; i < nm; i++) {
         const a = rnd() * TAU, u = rnd() * R * 0.5;
         s.emit(x + Math.cos(a) * u, y + rnd() * 1.5, z + Math.sin(a) * u, Math.cos(a) * R * 0.5, 1.5 + rnd() * 3.5, Math.sin(a) * R * 0.5,
-          1.6 + rnd() * 1.6, R * 0.25, R * (0.5 + rnd() * 0.3), pal.smoke, 1, 0x4a4a4a, 1, 0.75, -0.6, 1.4, 0, 0, 0);
+          1.6 + rnd() * 1.6, R * 0.25, R * (0.5 + rnd() * 0.3), pal.smoke, 1, 0x4a4a4a, 1, 0.45 + 0.3 * cn, -0.6, 1.4, 0, 0, 0);
       }
       // 地面を走る土ぼこり
       const nd = this.q(8 + R * 1.5);
@@ -497,6 +508,15 @@ export const FX = {
     // 光
     this.flash(x, 3.5, z, pal.light, 5 * R * b, R * 4.5, 0.3);
     Engine.shake(Math.min(1.25, 0.25 + R / 8));
+  },
+
+  // 肩越し・一人称で、カメラの近く(R は その演出の大きさ)なら 1 より小さい数 → 光の強さに かける。見下ろしは いつも 1
+  nearDim(x, y, z, R = 3) {
+    const vm = Engine.viewMode;
+    if (vm === 'top' || !Engine.camera) return 1;
+    const c = Engine.camera.position, d = Math.sqrt((x - c.x) ** 2 + (y - c.y) ** 2 + (z - c.z) ** 2);
+    const far = (vm === 'fps' ? 2.2 : 1.6) * R + 4;
+    return d >= far ? 1 : Math.max(0.15, d / far);
   },
 
   // 弾の光の線。曳光弾のように 光のすじが 飛んでいく(life は消えるまでの長さの目安)
@@ -529,6 +549,7 @@ export const FX = {
   },
   // 光の玉(このフレームだけ)。弾・ロケットの火・ブラックホールなど、動くものの光
   glow(x, y, z, size, color, k = 3, shape = 0) {
+    if (this.muzzleScale < 1 && this._camNear(x, y, z, 3)) size *= this.muzzleScale + 0.15;   // 一人称: 銃口の光の玉は小さく
     this.glowPool.emit(x, y, z, 0, 0, 0, -1, size, size, color, k, color, k, 1, 0, 0, 0, shape, 0);
   },
   // 光る粒 1 つ(細かい指定)
@@ -536,8 +557,13 @@ export const FX = {
     this.glowPool.emit(x, y, z, vx, vy, vz, life, size, size * 0.4, color, k, color2, k2, 1, grav, drag, stretch, stretch > 0 ? 1 : 0, floor);
   },
   // 炎の粒(白黄 → 橙 → 赤 と変わり、ふくらむ)
-  flame(x, y, z, vx, vy, vz, size = 0.4, life = 0.5, hot = 0xffb050, cool = 0xc02a06, k = 2.4) {
-    this.solidPool.emit(x, y, z, vx, vy, vz, life, size * 0.45, size * 2.0, hot, k, cool, k * 0.3, 1.3, -3, 1.6, 0, 0, 0);
+  flame(x, y, z, vx, vy, vz, size = 0.4, life = 0.5, hot = 0xffb050, cool = 0xc02a06, k = 2.4, alpha = 1.3) {
+    this.solidPool.emit(x, y, z, vx, vy, vz, life, size * 0.45, size * 2.0, hot, k, cool, k * 0.3, alpha, -3, 1.6, 0, 0, 0);
+  },
+  // カメラから d m 以内か
+  _camNear(x, y, z, d) {
+    const c = Engine.camera && Engine.camera.position;
+    return !!c && (x - c.x) ** 2 + (y - c.y) ** 2 + (z - c.z) ** 2 < d * d;
   },
   // 光る火の粉(炎の中の明るい所)
   ember(x, y, z, vx, vy, vz, size = 0.2, life = 0.4, color = 0xffc070, k = 2) {
@@ -648,6 +674,11 @@ export const FX = {
   },
   _setLight(i, x, y, z, color, intensity, distance, dur) {
     const l = this.lights[i], lt = this._lt[i];
+    // 肩越し・一人称: カメラのすぐ近くの光は弱く(地面と手元が真っ白にならないように)
+    if (Engine.viewMode !== 'top' && Engine.camera && i !== 0) {
+      const c = Engine.camera.position, d = Math.sqrt((x - c.x) ** 2 + (y - c.y) ** 2 + (z - c.z) ** 2);
+      intensity *= Math.min(1, 0.25 + d / Math.max(8, distance));
+    }
     l.position.set(x, y, z); l.color.setHex(color); l.distance = distance;
     lt.t = dur; lt.dur = dur; lt.i0 = intensity;
     l.intensity = intensity;
@@ -663,6 +694,10 @@ export const FX = {
 
   // 毎ステップ(1/60 秒): 動かして、描く入れ物に書く
   update(dt) {
+    const cap = VIEW_CAP[Engine.viewMode] || VIEW_CAP.top;
+    U_GLOW.uCover.value = cap[0]; U_SOLID.uCover.value = cap[1];
+    U_GLOW.uNear.value = U_SOLID.uNear.value = cap[2]; U_BEAM.uBeamMax.value = cap[3];
+    U_GLOW.uHot.value = U_SOLID.uHot.value = cap[4]; U_BEAM.uBeamNear.value = cap[5]; U_RING.uRingNear.value = cap[6];
     this._bloodBudget = Math.round(70 * this.quality) + 10;
     this._boom *= Math.exp(-dt * 4);
     this.solidPool.update(dt);

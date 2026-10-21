@@ -119,7 +119,7 @@ export const VM = {
     const sp = this.swordPivot = new THREE.Group();
     root.add(sp);
     const sword = this.sword = new THREE.Group();
-    const bladeM = new THREE.MeshStandardMaterial({ color: 0x1a2a3a, emissive: 0x4ab0ff, emissiveIntensity: 2.6, roughness: 0.3, metalness: 0.6 });
+    const bladeM = new THREE.MeshStandardMaterial({ color: 0x1a2a3a, emissive: 0x4ab0ff, emissiveIntensity: 1.6, roughness: 0.3, metalness: 0.6 });   // 目の前なので 光りすぎないように
     const blade = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.012, 1.0), bladeM);
     blade.position.z = -0.6;
     const guard = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.03, 0.035), armor);
@@ -274,9 +274,19 @@ export const VM = {
     this._t += dt;
     const root = this.root;
     cam.matrixWorld.decompose(root.position, root.quaternion, _s);
-    // 太陽はいつも同じ向きから
-    this.sun.position.set(root.position.x + 30, root.position.y + 60, root.position.z + 20);
+    // 太陽(夜は月): 世界の光と同じ向き・色(時間で変わる)。手元が真っ黒にならないよう 明るさには下限
+    const ES = Engine.sun, EH = Engine.hemi;
+    if (ES) {
+      _s.copy(ES.position).sub(ES.target.position);
+      if (_s.lengthSq() < 1e-6) _s.set(30, 60, 20);
+      _s.normalize();
+      this.sun.position.copy(root.position).addScaledVector(_s, 60);
+      this.sun.color.copy(ES.color);
+      this.sun.intensity = Math.max(0.7, ES.intensity * 0.9);
+      _s.set(1, 1, 1);
+    } else this.sun.position.set(root.position.x + 30, root.position.y + 60, root.position.z + 20);
     this.sun.target.position.copy(root.position);
+    if (EH) { this.hemi.color.copy(EH.color); this.hemi.groundColor.copy(EH.groundColor); this.hemi.intensity = Math.max(0.9, EH.intensity * 1.4); }
 
     // 歩くゆれ
     const sp = Math.hypot(Player.vel.x, Player.vel.z);

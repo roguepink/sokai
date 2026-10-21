@@ -23,6 +23,8 @@ import { Events } from './events.js';
 const CELL = 8;           // ぶつかり判定の区画の大きさ(m)
 const NAV = 1;            // 道さがし地図の1マス(m)
 const CHUNK = 100;        // 見た目をまとめる区画(m)
+// 肩越し・一人称で 描く距離(m)。木は霧で かすむ 140m まで、草・小物は もっと近くだけ
+const CLOSE_VIS = { pine: 140, broad: 140, birch: 140, dead: 120, bush: 85, grass: 70, rock: 100, log: 90, grave: 100, cross: 100, hay: 110, corn: 110 };
 const OCC = 2;            // 「もう何か置いた」地図の1マス(m)
 const MAP_PX = 1024;       // ミニマップの大きさ
 
@@ -466,14 +468,18 @@ export const World = {
         if (!m.geometry.boundingSphere) m.geometry.computeBoundingSphere();
         const bs = m.isInstancedMesh ? (m.boundingSphere || (m.computeBoundingSphere(), m.boundingSphere)) : m.geometry.boundingSphere;
         if (!bs || bs.radius > 900) continue;
-        this._cullList.push({ m, x: bs.center.x, z: bs.center.z, y: bs.center.y, r: bs.radius, hide: false, vis: (m.material && m.material.userData && m.material.userData.vis) || 1e9 });
+        const vis = (m.material && m.material.userData && m.material.userData.vis) || 1e9;
+        // テスト係A: 肩越し・一人称では 遠くの木・草・小物の区画(霧で半分かすむ所)は描かない(描く回数を へらす)
+        const nm = m.name || '', kind = nm.startsWith('inst:') ? nm.slice(5) : '';
+        const cv = !kind ? vis : CLOSE_VIS[kind] || Math.min(vis, 150);
+        this._cullList.push({ m, x: bs.center.x, z: bs.center.z, y: bs.center.y, r: bs.radius, hide: false, vis, cvis: Math.min(vis, cv) });
       }
     }
-    const L = this._cullList;
+    const L = this._cullList, close = Engine.viewMode !== 'top';
     for (let i = 0; i < L.length; i++) {
       const o = L[i], dx = o.x - cam.x, dz = o.z - cam.z, dy = o.y - cam.y;
-      const d = Math.sqrt(dx * dx + dz * dz + dy * dy) - o.r;
-      const hide = d > (o.vis < far ? o.vis : far);
+      const d = Math.sqrt(dx * dx + dz * dz + dy * dy) - o.r, v = close ? o.cvis : o.vis;
+      const hide = d > (v < far ? v : far);
       if (hide !== o.hide) { o.hide = hide; o.m.userData.culled = hide; o.m.visible = !hide && !o.m.userData.off; }
     }
   },
@@ -521,6 +527,12 @@ export const World = {
   get weather() { return Sky.weather; },
   get night() { return Sky.night; },          // 0 = 昼 … 1 = 夜
   get wet() { return Sky.wet; },
+  // 太陽・月の向き(地面 → 光。長さ 1)。空の絵と同じ。engine.js が影の向きに使う
+  get sunDir() { return Sky.U ? Sky.U.uSunDir.value : null; },
+  get moonDir() { return Sky.U ? Sky.U.uMoonDir.value : null; },
+  // 肩越し・一人称の 霧と描く距離に かける数(1 = そのまま)。スマホの 'mid' は 0.85(Sky.init で決める)
+  get viewDistMul() { return Sky.viewDistMul; },
+  set viewDistMul(v) { Sky.viewDistMul = Math.max(0.4, Math.min(1.5, +v || 1)); },
   setTime(t) { Sky.setTime(t); Sky.apply(0); },
   setWeather(w, instant = false) { Sky.setWeather(w, instant); },
   set timeSpeed(v) { Sky.speed = v; },

@@ -218,7 +218,7 @@ export function installProjectiles(B) {
             o.position.y = 0.55; o.rotation.set(Math.PI * (Math.random() < 0.5 ? 1 : 0), o.rotation.y, R(-0.2, 0.2));
             FX.explosion(x, z, 7, 'fire');
             const k = this._Z.damageCircle(x, z, 7.5, 1500, { force: 34, cause: 'car', falloff: true });
-            if (typeof World.damage === 'function') try { World.damage(x, z, 7, 500, { cause: 'car' }); } catch (e) {}
+            if (typeof World.damage === 'function') try { World.damage(x, z, 7, 500, { cause: 'explosion' }); } catch (e) {}
             Engine.shake(1.2); Engine.hitStop(0.05);
             Gore.splat(x, z, 4.5, 0, 0, 1, 0x1a1410, 0.75);
             Events.emit('explosion', { x, z, radius: 7.5, source: 'car', kills: k });

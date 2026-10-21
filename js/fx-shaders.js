@@ -17,21 +17,36 @@ export const PARTICLE_VS = /* glsl */`
   varying vec2 vUv;
   varying vec4 vCol;
   varying float vShape;
+  // テスト係A: 目の前の大きな粒で画面が真っ白にならないように。
+  // uCover = 1 粒が画面の高さの半分の何割まで広がってよいか(こえた分は うすくする)/ uNear = これより近い粒は消していく(m)
+  uniform float uCover;
+  uniform float uNear;
+  uniform float uHot;       // カメラのすぐ近くの粒の明るさの上限(遠くなるほど ゆるめる)
   void main() {
     vUv = position.xy; vCol = iCol; vShape = iMisc.y;
     vec4 mv = viewMatrix * vec4(iPos.xyz, 1.0);
     float s = iPos.w;
     vec2 c = position.xy;
     vec2 off = c * s;
+    float L = 0.0;
     if (iVel.w > 0.0) {
       vec2 v2 = (viewMatrix * vec4(iVel.xyz, 0.0)).xy;
       float vl = length(v2);
       if (vl > 1e-3) {
         vec2 d = v2 / vl, n = vec2(-d.y, d.x);
-        float L = vl * iVel.w;
+        L = vl * iVel.w;
         off = n * c.x * s + d * (c.y * (s + L * 0.5) - L * 0.5);
       }
-    } else if (iMisc.x != 0.0) {
+    }
+    // 画面に占める大きさ(すじは 長さも入れた 面積で考える)
+    float depth = max(0.05, -mv.z);
+    float cover = sqrt(s * (s + L * 0.5)) * projectionMatrix[1][1] / depth;
+    if (cover > uCover) { float q = uCover / cover; vCol.a *= q * sqrt(q); }
+    if (uNear > 0.0) vCol.a *= smoothstep(uNear * 0.35, uNear, depth);
+    float hot = mix(uHot, 64.0, smoothstep(1.5, 12.0, depth));
+    float mx = max(vCol.r, max(vCol.g, vCol.b));
+    if (mx > hot) vCol.rgb *= hot / mx;
+    if (iVel.w <= 0.0 && iMisc.x != 0.0) {
       float cs = cos(iMisc.x), sn = sin(iMisc.x);
       off = vec2(c.x * cs - c.y * sn, c.x * sn + c.y * cs) * s;
     }
@@ -91,6 +106,8 @@ export const BEAM_VS = /* glsl */`
   varying vec2 vUv;
   varying vec4 vCol;
   varying float vLen;
+  uniform float uBeamMax;
+  uniform float uBeamNear;  // カメラの近くの線の こさ(0..1)   // テスト係A: 線の太さの上限(画面の高さの半分に対する割合)。目の前の稲妻で画面がうまらないように
   void main() {
     vec4 a = viewMatrix * vec4(iA.xyz, 1.0);
     vec4 b = viewMatrix * vec4(iB.xyz, 1.0);
@@ -98,14 +115,16 @@ export const BEAM_VS = /* glsl */`
     float l = length(d);
     d = l > 1e-5 ? d / l : vec2(1.0, 0.0);
     vec2 n = vec2(d.y, -d.x);
-    float w = iA.w;
     float t = position.y * 0.5 + 0.5;
     vec4 p = mix(a, b, t);
+    float w = min(iA.w, uBeamMax * max(0.05, -p.z) / projectionMatrix[1][1]);
+    float nearA = mix(uBeamNear, 1.0, smoothstep(1.0, 9.0, -p.z));
     p.xy += n * position.x * w + d * position.y * w;
     vUv = vec2(position.x, t * l + position.y * w);
     vLen = l / max(w, 1e-4);
     vUv.y /= max(w, 1e-4);
     vCol = iCol;
+    vCol.a *= nearA;
     gl_Position = projectionMatrix * p;
   }
 `;
@@ -136,6 +155,7 @@ export const GROUND_VS = /* glsl */`
   varying vec4 vCol;
   varying vec4 vMisc;
   varying float vR;
+  varying float vDepth;
   void main() {
     float th = iMisc.x;
     float outer = iP.w + th * 2.5;
@@ -144,7 +164,9 @@ export const GROUND_VS = /* glsl */`
     vec2 rc = vec2(c.x * cs - c.y * sn, c.x * sn + c.y * cs);
     vec3 wp = vec3(iP.x + rc.x * outer, iP.y, iP.z + rc.y * outer);
     vUv = c * outer; vR = iP.w; vCol = iCol; vMisc = iMisc;
-    gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
+    vec4 mvp = viewMatrix * vec4(wp, 1.0);
+    vDepth = -mvp.z;
+    gl_Position = projectionMatrix * mvp;
   }
 `;
 // 光る輪(足し算)
@@ -153,12 +175,15 @@ export const RING_FS = /* glsl */`
   varying vec4 vCol;
   varying vec4 vMisc;
   varying float vR;
+  varying float vDepth;
+  uniform float uRingNear;  // カメラの近く(足もと)の輪の こさ
   void main() {
     float d = length(vUv);
     float th = max(vMisc.x, 1e-3);
     float k = (d - vR) / th;
     float a = exp(-k * k * 2.0);
     if (vMisc.y > 0.5) a += smoothstep(vR, 0.0, d) * 0.25;      // 中も うっすら光る
+    a *= mix(uRingNear, 1.0, smoothstep(1.5, 10.0, vDepth));
     if (a < 0.01) discard;
     gl_FragColor = vec4(vCol.rgb, a * vCol.a);
     ${OUT}
@@ -206,6 +231,7 @@ export const SLASH_VS = /* glsl */`
   varying float vV;
   varying vec4 vCol;
   varying vec2 vHT;
+  uniform float uRingNear;
   void main() {
     float u = position.x, v = position.y;
     float ang = iC.w + (u - 0.5) * iS.x;
@@ -216,7 +242,9 @@ export const SLASH_VS = /* glsl */`
     vV = v;
     vCol = iCol;
     vHT = vec2(iS.w, iT.z);
-    gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
+    vec4 mvp = viewMatrix * vec4(wp, 1.0);
+    vCol.rgb *= mix(uRingNear, 1.0, smoothstep(1.5, 9.0, -mvp.z));   // 目の前の弧は 弱く
+    gl_Position = projectionMatrix * mvp;
   }
 `;
 export const SLASH_FS = /* glsl */`

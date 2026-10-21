@@ -14,14 +14,15 @@ const START_T = 0.22;                    // はじまりは夕方
 const WEATHERS = ['clear', 'rain', 'storm', 'fog', 'snow', 'ash'];
 const W_TEXT = { clear: '空が晴れた', rain: '雨が降ってきた', storm: '雷雨だ!', fog: '霧が出てきた', snow: '雪が降ってきた', ash: '灰が降ってきた…' };
 
+// 夜の明るさ: スマホの画面で 見下ろしでも敵が見えるよう 少し明るめ(テスト係A2)
 // 時間ごとの色(t, 空の上, 地平線, 霧, 空の光(上), 空の光(下), 空の光の強さ, 太陽の色, 太陽の強さ, 窓, 街灯, 光だまり, 星)
 const KEYS = [
   [0.00, 0x3f6ea8, 0xb9c4cc, 0x8e959c, 0xd4dcee, 0x5b5248, 1.55, 0xfff1de, 2.9, 0.15, 0.55, 0.12, 0],
   [0.16, 0x4a6aa0, 0xd6b89a, 0x8c8682, 0xd0cce0, 0x584a40, 1.45, 0xffe2bc, 2.7, 0.3, 0.6, 0.2, 0],
   [0.24, 0x2a2550, 0xe89a5c, 0x464256, 0x9aa4d2, 0x3d3631, 1.15, 0xffd2ae, 2.25, 1.0, 1.0, 1.0, 0.1],
   [0.30, 0x101030, 0x8a4a58, 0x2c2a40, 0x7c86ba, 0x2a2630, 0.98, 0xc8a0a8, 1.45, 1.35, 1.2, 1.3, 0.5],
-  [0.36, 0x05070f, 0x1c2440, 0x182030, 0x6a7cae, 0x201e26, 0.86, 0x9db0ff, 1.05, 1.6, 1.4, 1.7, 1],
-  [0.64, 0x05070f, 0x1c2440, 0x182030, 0x6a7cae, 0x201e26, 0.86, 0x9db0ff, 1.05, 1.6, 1.4, 1.7, 1],
+  [0.36, 0x05070f, 0x1c2440, 0x182030, 0x6a7cae, 0x201e26, 1.0, 0x9db0ff, 1.2, 1.6, 1.4, 1.7, 1],
+  [0.64, 0x05070f, 0x1c2440, 0x182030, 0x6a7cae, 0x201e26, 1.0, 0x9db0ff, 1.2, 1.6, 1.4, 1.7, 1],
   [0.70, 0x111a3a, 0x4a4a6c, 0x2a3044, 0x8890b8, 0x2a2830, 0.96, 0xb0b8e8, 1.25, 1.4, 1.2, 1.3, 0.6],
   [0.76, 0x2a3c70, 0xf2a27a, 0x6a5c6c, 0xb0aacc, 0x3e3634, 1.2, 0xffc8a0, 2.1, 0.9, 0.9, 0.8, 0.1],
   [0.84, 0x5078b0, 0xe0c8a8, 0x8a8c90, 0xc8d0e4, 0x564c44, 1.4, 0xfff0dc, 2.6, 0.3, 0.6, 0.2, 0],
@@ -226,7 +227,10 @@ export const Sky = {
   _wTimer: 70, _phase: '', _time: 0, _ltTimer: 5, _ltSeq: [], _view: 'top',
   M: null, W: null, cur: {},
 
+  viewDistMul: 1,   // 肩越し・一人称の 霧の距離に かける数(World.viewDistMul)
   init(W, M) {
+    // スマホの 'mid': 目の高さの霧と描く距離を 少し近く(230m → 約195m。描く回数が へる)
+    try { if (navigator.maxTouchPoints > 1 && Engine.quality === 'mid') this.viewDistMul = 0.85; } catch (e) { /* なし */ }
     this.W = W; this.M = M;
     const q = Engine.quality, sc = Engine.scene;
     // 空のドーム
@@ -424,7 +428,7 @@ export const Sky = {
     for (const w of this.wetMats) { w.m.roughness = w.r + (w.wr - w.r) * wet; w.m.color.copy(w.c).multiplyScalar(1 + (w.dk - 1) * wet); w.m.metalness = w.me + 0.12 * wet; }
     // 霧の距離(視点と天気で変える)
     const v = this._view, q = Engine.quality;
-    const far0 = v === 'top' ? 140 : q === 'high' ? 290 : q === 'mid' ? 230 : 175;
+    const far0 = v === 'top' ? 140 : (q === 'high' ? 290 : q === 'mid' ? 230 : 175) * this.viewDistMul;
     const near0 = v === 'top' ? 40 : 45;
     const fm = Math.max(0.28, 1 - wx.rain * 0.2 - wx.storm * 0.32 - wx.fog * 0.62 - wx.snow * 0.3 - wx.ash * 0.4) * (1 - nightK * 0.12);
     this.fogMul = fm;

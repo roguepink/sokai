@@ -295,7 +295,7 @@ export const Happenings = {
         FX.explosion(b.x, b.z, r, 'fire');
         const k = Zombies.damageCircle(b.x, b.z, r, 1400, { force: 34, cause: 'airstrike', falloff: true });
         if (this._strike) this._strike.kills += k;
-        if (typeof World.damage === 'function') try { World.damage(b.x, b.z, r, 400, { cause: 'airstrike' }); } catch (e) {}
+        if (typeof World.damage === 'function') try { World.damage(b.x, b.z, r, 400, { cause: 'explosion' }); } catch (e) {}
         Events.emit('explosion', { x: b.x, z: b.z, radius: r, source: 'airstrike', kills: k });
         Engine.shake(0.7);
       }
@@ -498,10 +498,11 @@ const POWERS = [
 
 function megaBlast(px, pz) {
   const r = 17;
-  FX.explosion(px, pz, 9, 'fire');
+  if (Engine.viewMode === 'top') FX.explosion(px, pz, 9, 'fire');   // 肩越し・一人称は カメラの所なので まわりの 6 つだけ
   for (let i = 0; i < 6; i++) { const a = i / 6 * TAU; FX.explosion(px + Math.cos(a) * 8, pz + Math.sin(a) * 8, 6, 'fire'); }
   if (FX.ring) FX.ring(px, pz, 1, r, 0.6, 0xffd060, 1.2, 5, 1);
   const k = Zombies.damageCircle(px, pz, r, 3000, { force: 46, cause: 'explosion', falloff: false });
+  if (typeof World.damage === 'function') World.damage(px, pz, r, 600, { cause: 'explosion' });   // 車・ドラム缶も まきこむ
   Gore.splat(px, pz, 5, 0, 0, 1, 0x2a1810, 0.6);
   Engine.shake(1.6); Engine.hitStop(0.06); Engine.slowMo(0.7, 0.35);
   Events.emit('explosion', { x: px, z: pz, radius: r, source: 'supply', kills: k });
