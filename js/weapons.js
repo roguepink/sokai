@@ -736,9 +736,11 @@ export const Weapons = {
     const px = player.pos.x, pz = player.pos.z;
     const kills = area(px, pz, SPIN_R, SPIN_DMG, 46, 'spin', false, true);
     const R = SPIN_R;
-    const sk = Engine.viewMode === 'fps' ? 0.45 : 1;   // 一人称: カメラをかこむ光の輪は うすく
-    FX.slash(px, 1.1, pz, 0, Math.PI * 2.05, R * 0.42, R * 0.62, 0x48b8ff, 0.3, 1, 0, 1.0 * sk, 1.1, 0.35);
-    FX.slash(px, 1.3, pz, Math.PI, Math.PI * 2.05, R * 0.78, R * 1.0, 0x9ad8ff, 0.4, 1, 0.05, 0.9 * sk, 1.1, 0.6);
+    // 一人称: カメラをかこむ光の輪は 空に大きな弧(ドーム)に見えるので出さない(手元の VM.spin と地面の輪だけ)
+    if (Engine.viewMode !== 'fps') {
+      FX.slash(px, 1.1, pz, 0, Math.PI * 2.05, R * 0.42, R * 0.62, 0x48b8ff, 0.3, 1, 0, 1.0, 1.1, 0.35);
+      FX.slash(px, 1.3, pz, Math.PI, Math.PI * 2.05, R * 0.78, R * 1.0, 0x9ad8ff, 0.4, 1, 0.05, 0.9, 1.1, 0.6);
+    }
     FX.ring(px, pz, 1, R * 1.2, 0.5, 0x7ac8ff, 0.6, 1.6, 1, 0);
     FX.ring(px, pz, 0.5, R * 0.9, 0.3, 0xffffff, 0.25, 2, 1, 0);
     const g = FX.q(50);
