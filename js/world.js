@@ -527,6 +527,12 @@ export const World = {
   get weather() { return Sky.weather; },
   get night() { return Sky.night; },          // 0 = 昼 … 1 = 夜
   get wet() { return Sky.wet; },
+  // 太陽・月の向き(地面 → 光。長さ 1)。空の絵と同じ。engine.js が影の向きに使う
+  get sunDir() { return Sky.U ? Sky.U.uSunDir.value : null; },
+  get moonDir() { return Sky.U ? Sky.U.uMoonDir.value : null; },
+  // 肩越し・一人称の 霧と描く距離に かける数(1 = そのまま)。スマホの 'mid' は 0.85(Sky.init で決める)
+  get viewDistMul() { return Sky.viewDistMul; },
+  set viewDistMul(v) { Sky.viewDistMul = Math.max(0.4, Math.min(1.5, +v || 1)); },
   setTime(t) { Sky.setTime(t); Sky.apply(0); },
   setWeather(w, instant = false) { Sky.setWeather(w, instant); },
   set timeSpeed(v) { Sky.speed = v; },

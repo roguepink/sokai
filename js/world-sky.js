@@ -226,7 +226,10 @@ export const Sky = {
   _wTimer: 70, _phase: '', _time: 0, _ltTimer: 5, _ltSeq: [], _view: 'top',
   M: null, W: null, cur: {},
 
+  viewDistMul: 1,   // 肩越し・一人称の 霧の距離に かける数(World.viewDistMul)
   init(W, M) {
+    // スマホの 'mid': 目の高さの霧と描く距離を 少し近く(230m → 約195m。描く回数が へる)
+    try { if (navigator.maxTouchPoints > 1 && Engine.quality === 'mid') this.viewDistMul = 0.85; } catch (e) { /* なし */ }
     this.W = W; this.M = M;
     const q = Engine.quality, sc = Engine.scene;
     // 空のドーム
@@ -424,7 +427,7 @@ export const Sky = {
     for (const w of this.wetMats) { w.m.roughness = w.r + (w.wr - w.r) * wet; w.m.color.copy(w.c).multiplyScalar(1 + (w.dk - 1) * wet); w.m.metalness = w.me + 0.12 * wet; }
     // 霧の距離(視点と天気で変える)
     const v = this._view, q = Engine.quality;
-    const far0 = v === 'top' ? 140 : q === 'high' ? 290 : q === 'mid' ? 230 : 175;
+    const far0 = v === 'top' ? 140 : (q === 'high' ? 290 : q === 'mid' ? 230 : 175) * this.viewDistMul;
     const near0 = v === 'top' ? 40 : 45;
     const fm = Math.max(0.28, 1 - wx.rain * 0.2 - wx.storm * 0.32 - wx.fog * 0.62 - wx.snow * 0.3 - wx.ash * 0.4) * (1 - nightK * 0.12);
     this.fogMul = fm;

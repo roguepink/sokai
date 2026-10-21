@@ -274,9 +274,19 @@ export const VM = {
     this._t += dt;
     const root = this.root;
     cam.matrixWorld.decompose(root.position, root.quaternion, _s);
-    // 太陽はいつも同じ向きから
-    this.sun.position.set(root.position.x + 30, root.position.y + 60, root.position.z + 20);
+    // 太陽(夜は月): 世界の光と同じ向き・色(時間で変わる)。手元が真っ黒にならないよう 明るさには下限
+    const ES = Engine.sun, EH = Engine.hemi;
+    if (ES) {
+      _s.copy(ES.position).sub(ES.target.position);
+      if (_s.lengthSq() < 1e-6) _s.set(30, 60, 20);
+      _s.normalize();
+      this.sun.position.copy(root.position).addScaledVector(_s, 60);
+      this.sun.color.copy(ES.color);
+      this.sun.intensity = Math.max(0.7, ES.intensity * 0.9);
+      _s.set(1, 1, 1);
+    } else this.sun.position.set(root.position.x + 30, root.position.y + 60, root.position.z + 20);
     this.sun.target.position.copy(root.position);
+    if (EH) { this.hemi.color.copy(EH.color); this.hemi.groundColor.copy(EH.groundColor); this.hemi.intensity = Math.max(0.9, EH.intensity * 1.4); }
 
     // 歩くゆれ
     const sp = Math.hypot(Player.vel.x, Player.vel.z);
