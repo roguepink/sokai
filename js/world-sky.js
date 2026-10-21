@@ -280,20 +280,20 @@ export const Sky = {
     for (const k of ['office', 'apt', 'ribbon', 'shop']) if (M[k]) this.base[k] = M[k].emissiveIntensity;
     this.wetMats = ['asphalt', 'sidewalk', 'pave', 'floorC', 'ground', 'roof', 'car', 'concrete'].filter((k) => M[k]).map((k) => ({ m: M[k], r: M[k].roughness, c: M[k].color.clone(), dk: k === 'ground' ? 0.85 : k === 'car' ? 0.95 : 0.72, wr: k === 'ground' ? 0.7 : k === 'car' ? 0.2 : 0.32, me: M[k].metalness }));
     Events.on('viewChange', (e) => this.setView(e.mode));
-    Events.on('start', () => { this.setTime(START_T); this.setWeather('clear', true); this._wTimer = 70; });
+    Events.on('start', () => { this.setTime(START_T); this.setWeather('clear', true, true); this._wTimer = 70; });
     this.setTime(START_T); this._phase = 'dusk';
     this.apply(0);
   },
 
   setTime(t) { this.t = ((t % 1) + 1) % 1; this._phase = this.phaseAt(this.t); },
   phaseAt(t) { let p = PHASES[PHASES.length - 1][1]; for (const [a, name] of PHASES) if (t >= a) p = name; return p; },
-  setWeather(w, instant = false) {
+  setWeather(w, instant = false, silent = false) {
     if (!WEATHERS.includes(w)) return;
     const changed = w !== this.weather;
     this.weather = w;
     if (instant) for (const k in this.wx) this.wx[k] = k === w ? 1 : 0;
     if (instant) this.wet = w === 'rain' || w === 'storm' ? 1 : 0;
-    if (changed) Events.emit('worldChange', { timeOfDay: this.t, weather: w, text: W_TEXT[w], phase: this._phase, kind: 'weather' });
+    if (changed && !silent) Events.emit('worldChange', { timeOfDay: this.t, weather: w, text: W_TEXT[w], phase: this._phase, kind: 'weather' });
     this._ltTimer = 2 + Math.random() * 3;
   },
   setView(mode) { this._view = mode; },
