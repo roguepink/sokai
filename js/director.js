@@ -45,12 +45,18 @@ export const Director = {
     const t = this.time;
     const base = 90 + t * 2;
     const wave = 1 + 0.15 * Math.sin(t / 9);
-    return Math.min(280, base * wave);
+    return Math.min(280, base * wave) * this.perfScale();
+  },
+  // スマホが重いときは数を減らす(解像度を下げても追いつかないとき)
+  perfScale() {
+    const E = Engine;
+    if (E._noBloom || (E._dprScale || 1) <= 0.6) return E.fps < 40 ? 0.55 : 0.75;
+    return 1;
   },
   // 主人公の近く(だいたい画面のまわり 26m)に いてほしい数。画面がからっぽにならないように
   nearCount() {
     const t = this.time;
-    return Math.min(100, 40 + t * 0.4) * (1 + 0.2 * Math.sin(t / 7));
+    return Math.min(100, 40 + t * 0.4) * (1 + 0.2 * Math.sin(t / 7)) * this.perfScale();
   },
 
   // 時間とともに 種類がまざってくる

@@ -17,6 +17,9 @@
 - 確認: `source ~/.local/venvs/ryokoshi/bin/activate && python3 tools/playtest.py --secs 20 --shots 3`
   → `_check/pt-*.png` を **必ず目で見る**。fps・ゾンビ数・エラーが出る。`--before "JS"` / `--eval "JS"` で状態を作れる
   (`window.__game` に各係が入っている)。音は出ない(--mute-audio)。**Mac の画面をつけない・音を出さない**(ノブさんのルール)
+- ほかの確認道具: `tools/playtest_cpu.py --cpu 4`(CPU を遅くしてスマホに近づける)/ `tools/playtest_mobile.py`(タッチ・画面の流れ・オフラインなどの場面別)。
+  `__stats.ms` = 1フレームの計算時間。`--before` の JS は最後に `; 1` をつける(ゾンビなどの物を返すと止まる)
+- js ファイルを足したら `sw.js` の FILES に足して VERSION を上げる
 - アドレスの印: `#play`(すぐ始まる)/ `#auto`(自動で動いて撃つ)/ `q=low|mid|high`(画質)。例 `#play&auto&q=low`
 
 ## 座標・単位

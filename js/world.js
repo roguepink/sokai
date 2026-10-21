@@ -422,7 +422,7 @@ export const World = {
       }
     }
     CUT.pos.value.set(px, 1.0, pz);
-    CUT.r.value = b ? 0.24 : 0.2;
+    CUT.r.value = b ? 0.3 : 0.27;
     const M = this.M;
     if (M) {
       M.water.map.offset.x = (this._time * 0.012) % 1; M.water.map.offset.y = (this._time * 0.007) % 1;
