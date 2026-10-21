@@ -24,29 +24,58 @@
 <body>
 <div id="app"></div>
 
-<div id="loading" class="overlay">読みこみ中…</div>
+<div id="loading" class="overlay"><div class="spinner"></div>読みこみ中…</div>
 
 <div id="title" class="overlay hidden">
+  <button id="btnSettings" class="corner-btn" type="button">⚙ 設定</button>
   <h1 class="logo"><span>爽快</span>ゾンビ無双</h1>
   <p class="lead">最初から最強。絶対に死なない。<br>押しよせるゾンビの大群を、なぎ倒せ!</p>
+  <div id="titleBest" class="title-best hidden"></div>
   <button id="btnPlay" class="big" type="button">あそぶ</button>
-  <p class="howto">左で移動 ・ 右のボタンを押している間 撃ちつづける ・ 近くの敵は自動で斬る</p>
+  <ul class="howto">
+    <li><b>🕹️</b>左で 移動</li>
+    <li><b>🔥</b>右を 押すと 撃つ</li>
+    <li><b>🗡️</b>近くは 自動で 斬る</li>
+    <li><b>🌀</b>回転斬りで 一掃</li>
+  </ul>
+</div>
+
+<div id="settings" class="overlay hidden">
+  <h2>設定</h2>
+  <div class="set-row"><span>音</span><div class="seg" data-set="sound"><button type="button" data-v="on">オン</button><button type="button" data-v="off">オフ</button></div></div>
+  <div class="set-row"><span>音楽</span><div class="seg" data-set="music"><button type="button" data-v="on">オン</button><button type="button" data-v="off">オフ</button></div></div>
+  <div class="set-row"><span>ぶるぶる</span><div class="seg" data-set="vibrate"><button type="button" data-v="on">オン</button><button type="button" data-v="off">オフ</button></div></div>
+  <div class="set-row"><span>画質</span><div class="seg" data-set="quality"><button type="button" data-v="low">低</button><button type="button" data-v="mid">中</button><button type="button" data-v="high">高</button></div></div>
+  <p class="set-note">動きが重いときは 画質を「低」に。変えると 読みこみ直します</p>
+  <button id="btnSetBack" class="big" type="button">もどる</button>
 </div>
 
 <div id="pauseMenu" class="overlay hidden">
   <h2>一時停止</h2>
+  <p id="pauseScore" class="pause-score"></p>
   <button id="btnResume" class="big" type="button">つづける</button>
-  <button id="btnQuit" type="button">おわる</button>
+  <div class="row">
+    <button id="btnPauseSettings" type="button">⚙ 設定</button>
+    <button id="btnQuit" type="button">おわる</button>
+  </div>
 </div>
 
 <div id="result" class="overlay hidden">
-  <h2>けっか</h2>
+  <h2 class="res-title">けっか</h2>
   <p id="resultNew" class="newrec hidden">🏆 最高記録 更新!</p>
-  <p class="res">スコア <b id="resultScore">0</b></p>
-  <p class="res">倒したゾンビ <b id="resultKills">0</b> 体</p>
-  <p class="res small">ベスト <b id="resultBest">0</b></p>
-  <button id="btnAgain" class="big" type="button">もういっかい</button>
-  <button id="btnTitle" type="button">タイトルへ</button>
+  <p class="res-score">スコア <b id="resultScore">0</b></p>
+  <p id="resultHint" class="res-hint"></p>
+  <div class="res-grid">
+    <div><small>倒したゾンビ</small><b id="resultKills">0</b></div>
+    <div><small>最大コンボ</small><b id="resultCombo">0</b></div>
+    <div><small>ボス撃破</small><b id="resultBoss">0</b></div>
+    <div><small>プレイ時間</small><b id="resultTime">0:00</b></div>
+  </div>
+  <p class="res-best">ベスト <b id="resultBest">0</b></p>
+  <div class="row">
+    <button id="btnAgain" class="big" type="button">もういっかい</button>
+    <button id="btnTitle" type="button">タイトルへ</button>
+  </div>
 </div>
 
 <script type="importmap">

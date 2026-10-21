@@ -1,5 +1,12 @@
-/* 見た目(画面係が作りこむ) */
-:root { color-scheme: dark; --accent: #ff5a1f; --gold: #ffd23f; --ink: #120808; }
+/* 見た目(画面係)。動きは transform と opacity だけ(スマホで軽い)。
+   スマホ横(844x390)が基本。縦長・PC も崩れないように。 */
+:root {
+  color-scheme: dark;
+  --accent: #ff5a1f; --gold: #ffd23f; --ink: #120808; --red: #ff2a3a; --cyan: #5fe0ff;
+  --sat: env(safe-area-inset-top, 0px); --sar: env(safe-area-inset-right, 0px);
+  --sab: env(safe-area-inset-bottom, 0px); --sal: env(safe-area-inset-left, 0px);
+  --stroke: 0 2px 0 #000, 2px 0 0 #000, -2px 0 0 #000, 0 -2px 0 #000, 0 3px 6px rgba(0,0,0,.6);
+}
 * { box-sizing: border-box; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 html, body { margin: 0; height: 100%; overflow: hidden; background: var(--ink); color: #fff; overscroll-behavior: none;
   font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Meiryo", "Noto Sans JP", system-ui, sans-serif; }
@@ -7,51 +14,252 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--ink); 
 canvas#game { position: absolute; inset: 0; display: block; touch-action: none; }
 .hidden { display: none !important; }
 
-/* ---- 重ねる画面(タイトル・一時停止・結果) ---- */
+/* ================= 重ねる画面(タイトル・設定・一時停止・結果) ================= */
 .overlay { position: fixed; inset: 0; z-index: 20; display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 12px; text-align: center; padding: env(safe-area-inset-top) 24px env(safe-area-inset-bottom);
-  background: radial-gradient(ellipse at center, rgba(20, 6, 6, .35), rgba(10, 2, 2, .85)); }
-#loading { font-size: 18px; background: var(--ink); }
-#title { background: linear-gradient(180deg, rgba(10,2,2,.55), rgba(10,2,2,.15) 45%, rgba(10,2,2,.7)); }
-.logo { margin: 0; font-size: clamp(34px, 9vw, 76px); font-weight: 900; letter-spacing: .04em; line-height: 1.1;
-  text-shadow: 0 4px 0 #000, 0 0 24px rgba(255, 90, 31, .7); }
-.logo span { display: block; font-size: .45em; color: var(--gold); letter-spacing: .3em; }
-.lead { margin: 0; font-size: clamp(14px, 3.6vw, 20px); line-height: 1.6; font-weight: 700; text-shadow: 0 2px 4px #000; }
-.howto { margin: 0; font-size: 12px; opacity: .8; text-shadow: 0 1px 3px #000; }
-h2 { margin: 0 0 6px; font-size: 32px; font-weight: 900; }
-.res { margin: 0; font-size: 20px; } .res b { font-size: 34px; color: var(--gold); }
-.res.small b { font-size: 22px; }
-.newrec { margin: 0; font-size: 26px; font-weight: 900; color: var(--gold); animation: pulse .6s infinite alternate; }
-@keyframes pulse { to { transform: scale(1.08); } }
-button { font: inherit; font-weight: 800; font-size: 17px; padding: 10px 28px; border: 2px solid rgba(255,255,255,.4); border-radius: 999px;
-  background: rgba(0,0,0,.45); color: #fff; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
-button.big { font-size: 24px; padding: 14px 52px; border: 0; color: #1a0500;
-  background: linear-gradient(180deg, #ffd23f, #ff7a1f); box-shadow: 0 6px 0 #8a2a00, 0 0 30px rgba(255, 120, 31, .6); }
+  gap: 10px; text-align: center; padding: calc(var(--sat) + 10px) calc(var(--sar) + 20px) calc(var(--sab) + 10px) calc(var(--sal) + 20px);
+  background: radial-gradient(ellipse at center, rgba(20, 6, 6, .45), rgba(10, 2, 2, .88)); overflow-y: auto; }
+.overlay:not(.hidden) { animation: ovIn .25s ease-out; }
+@keyframes ovIn { from { opacity: 0; } }
+#loading { font-size: 18px; background: var(--ink); gap: 16px; }
+.spinner { width: 44px; height: 44px; border-radius: 50%; border: 5px solid rgba(255,255,255,.15); border-top-color: var(--accent); animation: spin 0.9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* --- タイトル --- */
+#title { background: linear-gradient(180deg, rgba(10,2,2,.65), rgba(10,2,2,.15) 40%, rgba(10,2,2,.15) 60%, rgba(10,2,2,.8)); gap: 8px; }
+.logo { margin: 0; font-size: min(10vw, 14vh, 78px); font-weight: 900; letter-spacing: .04em; line-height: 1.05;
+  color: #fff; text-shadow: 0 4px 0 #6a0d00, 0 7px 0 #000, 0 0 30px rgba(255, 90, 31, .85);
+  animation: logoIn .7s cubic-bezier(.2,1.6,.4,1) both, logoGlow 2.4s ease-in-out .7s infinite alternate; }
+.logo span { display: block; font-size: .42em; color: var(--gold); letter-spacing: .5em; margin-right: -.5em; text-shadow: 0 3px 0 #000, 0 0 18px rgba(255,210,63,.7); }
+@keyframes logoIn { from { transform: scale(2.2) rotate(-4deg); opacity: 0; } }
+@keyframes logoGlow { to { transform: scale(1.035); } }
+.lead { margin: 0; font-size: clamp(13px, min(3.6vw, 4.4vh), 20px); line-height: 1.5; font-weight: 800; text-shadow: var(--stroke); }
+.title-best { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 14px; font-size: 14px; font-weight: 800; text-shadow: var(--stroke); }
+.title-best b { color: var(--gold); font-size: 18px; }
+.howto { list-style: none; margin: 2px 0 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 8px; }
+.howto li { font-size: 12px; font-weight: 800; padding: 4px 10px 4px 6px; border-radius: 999px; background: rgba(0,0,0,.5); border: 1px solid rgba(255,255,255,.2); }
+.howto b { margin-right: 4px; }
+.corner-btn { position: absolute; top: calc(var(--sat) + 10px); right: calc(var(--sar) + 12px); font-size: 15px; padding: 8px 16px; }
+
+/* --- 共通 --- */
+h2 { margin: 0 0 2px; font-size: 32px; font-weight: 900; text-shadow: var(--stroke); }
+.row { display: flex; gap: 12px; align-items: center; justify-content: center; flex-wrap: wrap; }
+button { font: inherit; font-weight: 800; font-size: 17px; padding: 10px 26px; border: 2px solid rgba(255,255,255,.4); border-radius: 999px;
+  background: rgba(0,0,0,.5); color: #fff; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+button:active { transform: scale(.95); }
+button.big { font-size: 24px; padding: 13px 50px; border: 0; color: #1a0500; text-shadow: none;
+  background: linear-gradient(180deg, #ffe066, #ff7a1f); box-shadow: 0 6px 0 #8a2a00, 0 0 30px rgba(255, 120, 31, .6); }
 button.big:active { transform: translateY(4px); box-shadow: 0 2px 0 #8a2a00; }
+#btnPlay { font-size: 28px; padding: 14px 64px; animation: breathe 1.6s ease-in-out infinite; }
+@keyframes breathe { 50% { transform: scale(1.06); box-shadow: 0 6px 0 #8a2a00, 0 0 46px rgba(255, 160, 31, .9); } }
+#btnPlay:active { animation: none; }
 
-/* ---- 点数など(HUD) ---- */
-#hud { position: fixed; inset: 0; z-index: 10; pointer-events: none; text-shadow: 0 2px 0 #000, 0 0 8px rgba(0,0,0,.6); }
-.hud-score { position: absolute; top: calc(env(safe-area-inset-top) + 8px); left: 50%; transform: translateX(-50%); text-align: center; }
-.hud-score b { display: block; font-size: 30px; font-weight: 900; letter-spacing: .02em; }
-.hud-score small { font-size: 12px; opacity: .8; }
-.hud-combo { position: absolute; top: calc(env(safe-area-inset-top) + 70px); left: 50%; transform: translateX(-50%); font-size: 22px; font-weight: 900; color: var(--gold); }
-.hud-weapon { position: absolute; bottom: calc(env(safe-area-inset-bottom) + 190px); right: calc(env(safe-area-inset-right) + 20px); font-size: 16px; font-weight: 800; }
-.hud-pause { position: absolute; top: calc(env(safe-area-inset-top) + 8px); right: calc(env(safe-area-inset-right) + 12px); pointer-events: auto;
-  width: 44px; height: 44px; padding: 0; font-size: 18px; }
+/* --- 設定 --- */
+#settings { gap: 6px; }
+.set-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: min(420px, 100%);
+  padding: 4px 6px 4px 16px; border-radius: 14px; background: rgba(0,0,0,.45); }
+.set-row > span { font-size: 18px; font-weight: 800; }
+.seg { display: flex; gap: 4px; }
+.seg button { font-size: 15px; padding: 7px 16px; border-width: 1px; }
+.seg button[aria-pressed="true"] { background: var(--gold); color: #1a0500; border-color: var(--gold); }
+.set-note { margin: 0; font-size: 12px; opacity: .75; }
 
-/* ---- 操作(スティックとボタン) ---- */
+/* --- 一時停止 --- */
+.pause-score { margin: 0 0 4px; font-size: 18px; font-weight: 800; }
+.pause-score b { color: var(--gold); font-size: 24px; }
+
+/* --- 結果 --- */
+#result { gap: 6px; }
+.res-title { font-size: 26px; letter-spacing: .3em; margin-right: -.3em; opacity: .9; }
+.res-score { margin: 0; font-size: 18px; font-weight: 800; }
+.res-score b { display: inline-block; font-size: min(52px, 12vh); color: var(--gold); text-shadow: 0 4px 0 #000, 0 0 24px rgba(255,210,63,.6); font-variant-numeric: tabular-nums; vertical-align: middle; }
+.res-hint { margin: 0; font-size: 14px; font-weight: 800; color: #ffb38a; min-height: 0; }
+.res-hint:empty { display: none; }
+.res-grid { display: grid; grid-template-columns: repeat(4, auto); gap: 6px; }
+.res-grid div { display: flex; flex-direction: column; padding: 6px 14px; border-radius: 12px; background: rgba(0,0,0,.45); border: 1px solid rgba(255,255,255,.12); }
+.res-grid small { font-size: 11px; opacity: .8; font-weight: 700; }
+.res-grid b { font-size: 22px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.res-best { margin: 0; font-size: 15px; font-weight: 800; opacity: .9; } .res-best b { color: var(--gold); font-size: 20px; }
+.newrec { margin: 0; font-size: 26px; font-weight: 900; color: var(--gold); text-shadow: 0 3px 0 #000, 0 0 20px rgba(255,210,63,.9); animation: pulse .5s infinite alternate; }
+@keyframes pulse { to { transform: scale(1.1); } }
+#result.rec { background: radial-gradient(ellipse at center, rgba(90, 60, 0, .55), rgba(10, 2, 2, .9)); }
+
+/* ================= 点数など(HUD) ================= */
+#hud { position: fixed; inset: 0; z-index: 10; pointer-events: none; font-weight: 900; text-shadow: var(--stroke); }
+.pop-layer { position: absolute; inset: 0; overflow: hidden; contain: strict; }
+
+/* 左上: ミニマップ・倒した数・時間 */
+.hud-tl { position: absolute; top: calc(var(--sat) + 8px); left: calc(var(--sal) + 10px); display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.minimap { width: 88px; height: 88px; border-radius: 50%; display: block; box-shadow: 0 2px 10px rgba(0,0,0,.6); }
+.hud-stats { display: flex; flex-direction: column; align-items: center; line-height: 1.1; }
+.hud-stats .kills { font-size: 17px; } .hud-stats .kills i { font-style: normal; font-size: 13px; margin-right: 3px; opacity: .85; }
+.hud-stats .time { font-size: 12px; opacity: .8; font-variant-numeric: tabular-nums; }
+
+/* 上のまんなか: 点数 */
+.hud-score { position: absolute; top: calc(var(--sat) + 4px); left: 50%; transform: translateX(-50%); text-align: center; min-width: 180px; }
+.hud-score b { display: block; font-size: 34px; letter-spacing: .02em; line-height: 1.1; font-variant-numeric: tabular-nums; transform-origin: 50% 60%; }
+.hud-score small { display: block; font-size: 12px; opacity: .85; font-weight: 800; }
+.pace { width: 120px; height: 4px; margin: 3px auto 0; border-radius: 3px; background: rgba(0,0,0,.45); overflow: hidden; }
+.pace i { display: block; height: 100%; background: linear-gradient(90deg, #ff7a1f, var(--gold)); transform-origin: 0 50%; transform: scaleX(0); }
+.hud-score.record b { color: var(--gold); text-shadow: var(--stroke), 0 0 18px rgba(255,210,63,.9); }
+.hud-score.record small { color: var(--gold); opacity: 1; animation: pulse .45s infinite alternate; }
+.hud-score.record .pace i { background: linear-gradient(90deg, #fff6b0, var(--gold), #ff9a1f); }
+
+/* ボスの体力 */
+.hud-boss { position: absolute; top: calc(var(--sat) + 70px); left: 50%; width: min(46vw, 420px); transform: translateX(-50%); animation: bossIn .5s cubic-bezier(.2,1.5,.4,1); }
+@keyframes bossIn { from { transform: translateX(-50%) scaleX(.2); opacity: 0; } }
+.boss-name { display: flex; align-items: baseline; gap: 6px; font-size: 14px; margin-bottom: 2px; }
+.boss-name span { font-size: 11px; color: #fff; background: var(--red); padding: 0 6px; border-radius: 4px; text-shadow: none; letter-spacing: .1em; }
+.boss-bar { position: relative; height: 12px; border-radius: 6px; background: rgba(0,0,0,.6); border: 2px solid rgba(255,255,255,.7); overflow: hidden; box-shadow: 0 0 12px rgba(255,40,40,.6); }
+.boss-bar i { position: absolute; inset: 0; transform-origin: 0 50%; }
+.boss-lag { background: #fff; opacity: .85; }
+.boss-fill { background: linear-gradient(180deg, #ff6a5a, #c40018); }
+
+/* 右: コンボ */
+.hud-combo { position: absolute; top: calc(var(--sat) + 62px); right: calc(var(--sar) + 14px); text-align: right; opacity: 0; transform: translateX(30px); transition: opacity .2s, transform .2s; }
+.hud-combo.on { opacity: 1; transform: none; }
+.hud-combo.end { opacity: 0; transform: translateY(-14px) scale(.9); transition: opacity .6s, transform .6s; }
+.hud-combo b { display: block; font-size: 42px; line-height: 1; font-style: italic; transform-origin: 100% 70%; font-variant-numeric: tabular-nums; }
+.combo-label { font-size: 13px; letter-spacing: .08em; display: flex; gap: 6px; justify-content: flex-end; align-items: baseline; }
+.combo-label em { font-size: 18px; font-style: normal; color: var(--gold); }
+.combo-bar { width: 96px; height: 5px; margin: 3px 0 0 auto; border-radius: 3px; background: rgba(0,0,0,.5); overflow: hidden; }
+.combo-bar i { display: block; height: 100%; background: currentColor; transform-origin: 100% 50%; }
+.hud-combo.hurry .combo-bar i { animation: blink .18s infinite alternate; }
+@keyframes blink { to { opacity: .3; } }
+.hud-combo.t0 { color: #fff; }
+.hud-combo.t1 { color: #ffe066; }
+.hud-combo.t2 { color: #ffa53a; } .hud-combo.t2 b { font-size: 48px; }
+.hud-combo.t3 { color: #ff5a3a; } .hud-combo.t3 b { font-size: 54px; text-shadow: var(--stroke), 0 0 16px rgba(255,90,58,.8); }
+.hud-combo.t4 { color: #ff3bd0; } .hud-combo.t4 b { font-size: 58px; text-shadow: var(--stroke), 0 0 20px rgba(255,59,208,.9); }
+.hud-combo.t5 b { font-size: 62px; animation: rainbow 1s linear infinite; text-shadow: var(--stroke), 0 0 24px rgba(255,255,255,.8); }
+.hud-combo.t5 { color: #fff; }
+@keyframes rainbow { 0% { color: #ff3b6b; } 25% { color: #ffd23f; } 50% { color: #5fff8a; } 75% { color: #5fe0ff; } 100% { color: #ff3b6b; } }
+
+/* 武器の列(上の右。さわって選べる) */
+.weapon-bar { position: absolute; top: calc(var(--sat) + 8px); right: calc(var(--sar) + 62px); max-width: calc(50vw - 170px); display: flex; gap: 4px;
+  overflow-x: auto; scrollbar-width: none; pointer-events: auto; touch-action: pan-x; padding: 2px; border-radius: 12px; }
+.weapon-bar::-webkit-scrollbar { display: none; }
+.wbtn { position: relative; flex: 0 0 auto; width: 40px; height: 40px; padding: 0; border-radius: 10px; font-size: 21px; line-height: 1;
+  background: rgba(0,0,0,.5); border: 2px solid rgba(255,255,255,.25); opacity: .75; }
+.wbtn span { display: block; }
+.wbtn sub { position: absolute; right: 2px; bottom: 0; font-size: 9px; opacity: .7; text-shadow: none; }
+.wbtn.on { opacity: 1; border-color: var(--gold); background: rgba(255,170,40,.35); box-shadow: 0 0 10px rgba(255,210,63,.7); }
+.weapon-name { position: absolute; bottom: calc(var(--sab) + 208px); right: calc(var(--sar) + 24px); font-size: 15px; opacity: .85; white-space: nowrap; }
+.weapon-name.wpop { animation: wpop .9s ease-out; }
+@keyframes wpop { 0% { transform: scale(1.8); color: var(--gold); opacity: 1; } 30% { transform: scale(1); color: var(--gold); } 100% { opacity: .85; } }
+
+/* 一時停止ボタン */
+.hud-pause { position: absolute; top: calc(var(--sat) + 8px); right: calc(var(--sar) + 12px); pointer-events: auto;
+  width: 44px; height: 44px; padding: 0; font-size: 18px; text-shadow: none; }
+
+/* まんなかの大きな文字 */
+.banner { position: absolute; left: 50%; top: 38%; transform: translate(-50%, -50%); text-align: center; white-space: nowrap; opacity: 0; }
+.banner b { display: block; font-size: min(46px, 11vh, 9vw); font-style: italic; letter-spacing: .02em; }
+.banner small { display: block; font-size: 16px; margin-top: 2px; }
+.banner.on { animation: bannerIn var(--dur, 1.6s) cubic-bezier(.2,1.4,.4,1) both; }
+@keyframes bannerIn {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(2.6) rotate(-6deg); }
+  8% { opacity: 1; transform: translate(-50%, -50%) scale(.92) rotate(0); }
+  13% { transform: translate(-50%, -50%) scale(1.06); }
+  18%, 80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -70%) scale(1.05); }
+}
+.banner.gold b, .banner.kills b { color: var(--gold); }
+.banner.combo b { color: #ffa53a; }
+.banner.massacre b { color: #ff3b3b; text-shadow: var(--stroke), 0 0 24px rgba(255,0,0,.9); font-size: min(56px, 13vh, 10vw); }
+.banner.start b { color: #fff; } .banner.start small { color: var(--gold); }
+.banner.horde b { color: #ff8a2a; }
+.banner.boss b { color: #ff2a3a; font-size: min(58px, 14vh, 10vw); text-shadow: var(--stroke), 0 0 30px rgba(255,0,0,.9); }
+.banner.boss small { font-size: 22px; }
+.banner.boss.on b { animation: shakeX .12s 6 linear; }
+@keyframes shakeX { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+.banner.bossdown b { color: var(--gold); font-size: min(60px, 14vh, 10vw); text-shadow: var(--stroke), 0 0 30px rgba(255,210,63,.9); }
+.banner.bossdown small { font-size: 24px; color: #fff; }
+.banner.record b { color: var(--gold); font-size: min(56px, 13vh, 10vw); text-shadow: var(--stroke), 0 0 30px rgba(255,210,63,1); }
+.banner.record small { font-size: 18px; letter-spacing: .3em; color: #fff; }
+
+/* 少し小さい文字(まとめて倒した など) */
+.sub-banner { position: absolute; left: 50%; top: 50%; transform: translate(-50%, 0); font-size: 18px; white-space: nowrap; opacity: 0; margin-top: 44px; }
+.sub-banner b { color: #ff9a3a; font-size: 24px; } .sub-banner em { font-style: normal; color: var(--gold); }
+.sub-banner.big { font-size: 22px; } .sub-banner.big b { font-size: 32px; color: #ff5a3a; }
+.sub-banner.on { animation: subIn 1.2s ease-out both; }
+@keyframes subIn { 0% { opacity: 0; transform: translate(-50%, 10px) scale(1.5); } 12% { opacity: 1; transform: translate(-50%, 0) scale(1); } 75% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -16px); } }
+
+/* 飛び出す数字 */
+.pop { position: absolute; left: 0; top: 0; will-change: transform, opacity; white-space: nowrap; font-weight: 900; }
+.pop.dmg { font-size: 15px; color: #fff; }
+.pop.dmg.crit { font-size: 20px; color: #ffe14a; }
+.pop.dmg.boss { color: #ffb08a; }
+.pop.pts { font-size: 17px; color: var(--gold); }
+.pop.pts.multi { color: #ff9a3a; }
+.pop.pts.boss { color: var(--gold); text-shadow: var(--stroke), 0 0 14px rgba(255,210,63,.9); }
+
+/* ボスがいる間、画面のふちが赤く脈打つ */
+.vignette { position: absolute; inset: 0; opacity: 0; background: radial-gradient(ellipse at center, transparent 55%, rgba(255,0,0,.45) 100%); transition: opacity .6s; }
+.vignette.boss { animation: vpulse 1.1s ease-in-out infinite; }
+@keyframes vpulse { 0%, 100% { opacity: .35; } 50% { opacity: .85; } }
+
+/* 画面の外のボスへの矢印 */
+.boss-arrow { position: absolute; left: 0; top: 0; display: flex; flex-direction: column; align-items: center; line-height: 1; color: #ff4a4a; }
+.boss-arrow i { font-style: normal; font-size: 22px; display: block; }
+.boss-arrow span { font-size: 11px; background: var(--red); color: #fff; padding: 1px 5px; border-radius: 4px; text-shadow: none; animation: pulse .4s infinite alternate; }
+.boss-arrow small { font-size: 11px; color: #fff; }
+
+/* 画面全体のフラッシュ・紙ふぶき(結果画面の上にも出る) */
+#fxLayer { position: fixed; inset: 0; z-index: 30; pointer-events: none; overflow: hidden; }
+.flash { position: absolute; inset: 0; opacity: 0; }
+.confetti { position: absolute; left: 0; top: 0; width: 8px; height: 14px; opacity: 0; border-radius: 2px; will-change: transform; }
+
+/* ================= 操作(スティックとボタン。input.js が作る) ================= */
 #controls { position: fixed; inset: 0; z-index: 12; pointer-events: none; }
 .stick-zone { position: absolute; left: 0; top: 0; bottom: 0; width: 55%; pointer-events: auto; touch-action: none; }
 .stick-base, .stick-knob { position: absolute; left: 0; top: 0; border-radius: 50%; pointer-events: none; opacity: 0; transition: opacity .15s; }
 .stick-base { width: 140px; height: 140px; border: 3px solid rgba(255,255,255,.35); background: rgba(0,0,0,.2); }
 .stick-knob { width: 64px; height: 64px; background: rgba(255,255,255,.55); }
 #controls.sticking .stick-base, #controls.sticking .stick-knob { opacity: 1; }
-#controls .btn { position: absolute; pointer-events: auto; touch-action: none; border-radius: 50%; padding: 0; display: flex; align-items: center; justify-content: center; line-height: 1.1; }
+#controls .btn { position: absolute; pointer-events: auto; touch-action: none; border-radius: 50%; padding: 0; display: flex; align-items: center; justify-content: center; line-height: 1.1; font-weight: 900; text-shadow: 0 2px 0 rgba(0,0,0,.5); }
 #controls .btn.down { transform: scale(.92); filter: brightness(1.4); }
-.btn-fire { right: calc(env(safe-area-inset-right) + 28px); bottom: calc(env(safe-area-inset-bottom) + 28px); width: 120px; height: 120px; font-size: 22px;
+.btn-fire { right: calc(var(--sar) + 28px); bottom: calc(var(--sab) + 28px); width: 120px; height: 120px; font-size: 22px;
   background: radial-gradient(circle at 40% 35%, #ff8a4a, #c41f00); border: 3px solid rgba(255,255,255,.6); box-shadow: 0 0 24px rgba(255, 80, 20, .5); }
-.btn-spin { right: calc(env(safe-area-inset-right) + 160px); bottom: calc(env(safe-area-inset-bottom) + 24px); width: 84px; height: 84px; font-size: 15px;
-  background: radial-gradient(circle at 40% 35%, #7fd8ff, #0a64b4); border: 3px solid rgba(255,255,255,.6); }
-.btn-prev, .btn-next { bottom: calc(env(safe-area-inset-bottom) + 150px); width: 52px; height: 52px; font-size: 18px; background: rgba(0,0,0,.45); border: 2px solid rgba(255,255,255,.45); }
-.btn-prev { right: calc(env(safe-area-inset-right) + 150px); }
-.btn-next { right: calc(env(safe-area-inset-right) + 28px); }
+.btn-spin { right: calc(var(--sar) + 160px); bottom: calc(var(--sab) + 24px); width: 84px; height: 84px; font-size: 15px;
+  background: radial-gradient(circle at 40% 35%, #7fd8ff, #0a64b4); border: 3px solid rgba(255,255,255,.6); --p: 1; }
+.btn-spin:not(.ready) { filter: saturate(.45) brightness(.8); }
+.btn-spin.ready { box-shadow: 0 0 20px rgba(95,224,255,.75); }
+.btn-spin.flashready { animation: readyPop .4s ease-out; }
+@keyframes readyPop { 0% { transform: scale(1.25); } }
+.spin-ring { position: absolute; inset: -9px; border-radius: 50%; pointer-events: none;
+  background: conic-gradient(#8ff0ff calc(var(--p) * 360deg), rgba(255,255,255,.12) 0);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 6px), #000 calc(100% - 5px));
+          mask: radial-gradient(farthest-side, transparent calc(100% - 6px), #000 calc(100% - 5px)); }
+.btn-spin.ready .spin-ring { background: #8ff0ff; animation: ringGlow .8s ease-in-out infinite alternate; }
+@keyframes ringGlow { to { opacity: .45; } }
+.btn-prev, .btn-next { bottom: calc(var(--sab) + 150px); width: 52px; height: 52px; font-size: 18px; background: rgba(0,0,0,.45); border: 2px solid rgba(255,255,255,.45); }
+.btn-prev { right: calc(var(--sar) + 150px); }
+.btn-next { right: calc(var(--sar) + 28px); }
+
+/* ================= 画面の大きさごとの調整 ================= */
+/* 背の低い横画面(スマホ横) */
+@media (max-height: 430px) {
+  .hud-score b { font-size: 30px; }
+  .minimap { width: 80px; height: 80px; }
+  .hud-boss { top: calc(var(--sat) + 58px); }
+  .banner { top: 38%; }
+}
+/* 縦長の画面 */
+@media (orientation: portrait) {
+  .weapon-bar { top: calc(var(--sat) + 104px); left: 50%; right: auto; transform: translateX(-50%); max-width: calc(100vw - 24px); }
+  .hud-score { top: calc(var(--sat) + 10px); }
+  .hud-boss { top: calc(var(--sat) + 156px); width: 80vw; }
+  .hud-combo { top: calc(var(--sat) + 200px); }
+  .res-grid { grid-template-columns: repeat(2, auto); }
+  .banner { top: 36%; }
+  .logo { font-size: min(14vw, 78px); }
+}
+/* PC の広い画面 */
+@media (min-width: 1100px) and (min-height: 600px) {
+  .hud-score b { font-size: 42px; }
+  .minimap { width: 120px; height: 120px; }
+  .hud-combo b { font-size: 52px; }
+  .wbtn { width: 46px; height: 46px; font-size: 24px; }
+  .banner b { font-size: 64px; }
+}
+#hud.paused .banner, #hud.paused .sub-banner, #hud.paused .pop-layer, #hud.paused .boss-arrow { visibility: hidden; }
