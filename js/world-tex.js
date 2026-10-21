@@ -440,6 +440,7 @@ export function makeMaterials(renderer, quality) {
     rock: std({ roughness: 1, flatShading: true }, [4, 4], { cast: true }),
     car: std({ roughness: 0.45, metalness: 0.3 }, [4, 4], { cast: true, cut: true }),
     ceiling: std({ map: plasterTex(), roughness: 0.95 }, [4, 4]),
+    glass: cutout(std({ color: 0x9fc0d4, roughness: 0.06, metalness: 0.6, transparent: true, opacity: 0.32, depthWrite: false }, [1, 1])),
   };
   // 遠くでは描かない距離(m)。小さい物・床・シールは近くだけ(描く回数を へらす)
   const VIS = { decal: 95, paint: 120, pool: 110, glow: 230, plain: 165, plainNoCut: 140, car: 175, tile: 85, lino: 85, woodFloor: 85, ceiling: 80, flame: 160, rock: 150, wood: 170, floorC: 150, plaster: 120 };

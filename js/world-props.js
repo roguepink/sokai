@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { makeGeo, col3 } from './world-build.js';
 import { seeded } from './util.js';
+import { Brk, KINDS } from './world-break.js';
 
 export const PROPS = {};
 const _m = new THREE.Matrix4(), _r = new THREE.Matrix4(), _s = new THREE.Matrix4();
@@ -331,20 +332,56 @@ export function placeTree(ctx, kind, x, z, s = 1, rot = 0, tint = null) {
   ctx.occupy(x - 1, z - 1, x + 1, z + 1);
 }
 
-// 小道具を置く。o: { y, s(大きさ), col(色), solid(false で当たらない) }
+// 小道具を置く。o: { y, s(大きさ), col(色), solid(false で当たらない), static(こわれない), stack(積んだ数) }
+// こわせる種類(world-break.js の KINDS)で 地面に近い物は、こわせる物として登録する(見た目は InstancedMesh)
 export function placeProp(ctx, name, x, z, rot = 0, o = {}) {
   const P = PROPS[name];
   if (!P) return;
   const s = o.s || 1, y = o.y || 0;
-  _m.makeRotationY(rot); _s.makeScale(s, s, s); _m.multiply(_s); _m.setPosition(x, y, z);
-  for (const part of P.parts) ctx.B.geom(part.mat, part.geo, _m, { col: part.tint ? o.col : null, bx: x, bz: z });
-  if (o.solid !== false) {
-    const c = Math.abs(Math.cos(rot)), sn = Math.abs(Math.sin(rot));
-    const hw = P.w * s / 2, hd = P.d * s / 2;
-    let ex = c * hw + sn * hd, ez = sn * hw + c * hd;
-    if (sn > 0.2 && c > 0.2) { ex *= 0.88; ez *= 0.88; }   // ななめの物は 少し小さめに
-    ctx.solid(x - ex, z - ez, x + ex, z + ez, P.h * s);
+  const brk = KINDS[name] && !o.static && y <= 0.5 && ctx.brk !== false;
+  const c = Math.abs(Math.cos(rot)), sn = Math.abs(Math.sin(rot));
+  const hw = P.w * s / 2, hd = P.d * s / 2;
+  let ex = c * hw + sn * hd, ez = sn * hw + c * hd;
+  if (sn > 0.2 && c > 0.2) { ex *= 0.88; ez *= 0.88; }   // ななめの物は 少し小さめに
+  if (!brk) {
+    _m.makeRotationY(rot); _s.makeScale(s, s, s); _m.multiply(_s); _m.setPosition(x, y, z);
+    for (let k = 0; k < (o.stack || 1); k++) {
+      if (k) _m.elements[13] = y + k * P.h * s;
+      for (const part of P.parts) ctx.B.geom(part.mat, part.geo, _m, { col: part.tint ? o.col : null, bx: x, bz: z });
+    }
+  }
+  let box = null;
+  if (o.solid !== false) box = ctx.solid(x - ex, z - ez, x + ex, z + ez, P.h * s * (o.stack || 1));
+  if (brk) {
+    const col = o.col || null;
+    const wreck = !!(col && col[0] < 0.16 && col[1] < 0.14 && col[2] < 0.13);
+    Brk.add(name, P.parts, x, y, z, rot, s, col, box, { ex, ez, h: P.h, wreck, stack: o.stack || 1, stackH: P.h });
   }
   if (o.occupy !== false) ctx.occupy(x - P.w * s / 2, z - P.w * s / 2, x + P.w * s / 2, z + P.w * s / 2);
+}
+
+// ガラス(店先など)。中心 (x,z)、向き rot(0 = 板が x 方向)、幅 w・高さ h・下の高さ y0
+let _glassGeo = null;
+export function placeGlass(ctx, x, z, rot, w, h, y0 = 0.2) {
+  if (!_glassGeo) _glassGeo = makeGeo((b) => b.box(null, -0.5, 0, -0.03, 0.5, 1, 0.03, { col: [1, 1, 1], skip: '' }));
+  const c = Math.abs(Math.cos(rot)), sn = Math.abs(Math.sin(rot));
+  Brk.add('glass', [{ geo: _glassGeo, mat: ctx.M.glass }], x, y0, z, rot, 1, null, null, { ex: c * w / 2 + sn * 0.15, ez: sn * w / 2 + c * 0.15, h, sx: w, sy: h });
+}
+
+// 柵(こわせる。3m ずつ)。col: 色
+let _fenceGeo = null;
+export function placeFence(ctx, xa, za, xb, zb, col = [0.9, 0.88, 0.82], h = 1.1) {
+  if (!_fenceGeo) _fenceGeo = makeGeo((b) => {
+    for (const x of [-1.5, 0, 1.5]) b.box(null, x - 0.06, 0, -0.06, x + 0.06, 1.1, 0.06, { col: [1, 1, 1] });
+    for (const y of [0.4, 0.85]) b.box(null, -1.5, y, -0.03, 1.5, y + 0.1, 0.03, { col: [1, 1, 1], skip: '' });
+  });
+  const L = Math.hypot(xb - xa, zb - za), n = Math.max(1, Math.round(L / 3)), seg = L / n;
+  const rot = -Math.atan2(zb - za, xb - xa), dx = (xb - xa) / L, dz = (zb - za) / L;
+  for (let i = 0; i < n; i++) {
+    const cx = xa + dx * seg * (i + 0.5), cz = za + dz * seg * (i + 0.5);
+    const ex = Math.abs(dx) * seg / 2 + Math.abs(dz) * 0.1, ez = Math.abs(dz) * seg / 2 + Math.abs(dx) * 0.1;
+    const box = ctx.solid(cx - ex, cz - ez, cx + ex, cz + ez, h);
+    Brk.add('fence', [{ geo: _fenceGeo, mat: ctx.M.plain, tint: true }], cx, 0, cz, rot, 1, col, box, { ex, ez, h, sx: seg / 3, sy: h / 1.1 });
+  }
 }
 export { col3 };

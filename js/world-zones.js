@@ -1,6 +1,6 @@
 // マップ係: 住宅街(西)と 工場地帯(東)。
 import * as THREE from 'three';
-import { placeTree } from './world-props.js';
+import { placeTree, placeFence } from './world-props.js';
 import { house } from './world-interiors.js';
 import { decal, pool, lamp, tower } from './world-town.js';
 
@@ -77,20 +77,8 @@ export function genSuburb(ctx) {
   }
 }
 
-// 白い木の柵(x 方向 or z 方向)
-export function fence(ctx, xa, za, xb, zb, col = [0.9, 0.88, 0.82]) {
-  const { B, M } = ctx;
-  const alongX = Math.abs(xb - xa) > Math.abs(zb - za);
-  const L = alongX ? xb - xa : zb - za;
-  for (let s = 0; s <= L; s += 1.5) {
-    const x = alongX ? xa + s : xa, z = alongX ? za : za + s;
-    B.box(M.plain, x - 0.06, 0, z - 0.06, x + 0.06, 1.1, z + 0.06, { col });
-  }
-  for (const y of [0.4, 0.85]) {
-    if (alongX) B.box(M.plain, xa, y, za - 0.03, xb, y + 0.1, za + 0.03, { col }); else B.box(M.plain, xa - 0.03, y, za, xa + 0.03, y + 0.1, zb, { col });
-  }
-  if (alongX) ctx.solid(xa, za - 0.1, xb, za + 0.1, 1.1); else ctx.solid(xa - 0.1, za, xa + 0.1, zb, 1.1);
-}
+// 白い木の柵(こわせる。world-props.js の placeFence)
+export function fence(ctx, xa, za, xb, zb, col = [0.9, 0.88, 0.82]) { placeFence(ctx, xa, za, xb, zb, col); }
 
 // ---------------- 工場地帯 ----------------
 export function genIndustrial(ctx) {

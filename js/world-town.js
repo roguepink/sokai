@@ -2,7 +2,7 @@
 // 中に入れる大きな建物(モール・病院 …)は world-interiors.js。ここでは その区画をあけておく。
 import * as THREE from 'three';
 import { cutout } from './world-tex.js';
-import { placeTree } from './world-props.js';
+import { placeTree, placeGlass } from './world-props.js';
 import { Builder } from './world-build.js';
 
 const LINES = [-178, -112, -40, 40, 112, 178];      // 道路の中心線(x 一定の南北の道 / z 一定の東西の道)
@@ -224,7 +224,9 @@ export function tower(ctx, x0, z0, x1, z1, H, o = {}) {
   const style = o.style || [M.office, M.apt, M.ribbon][Math.floor(rnd() * 3)];
   const tint = TINTS[Math.floor(rnd() * TINTS.length)];
   const Y = o.y ?? PAD_H, G = 4.5;
-  B.box(M.shop, x0, Y, z0, x1, G, z1, { skip: 'bt', uo: Math.floor(rnd() * 4) * 0.5, s: [12, G - Y] });
+  const uo = Math.floor(rnd() * 4) * 0.5;
+  B.box(M.shop, x0, Y, z0, x1, G, z1, { skip: 'bt', uo, s: [12, G - Y] });
+  if (o.glass !== false) shopGlass(ctx, x0, z0, x1, z1, Y, G, uo);
   B.box(style, x0, G, z0, x1, H, z1, { top: M.roof, uo: Math.floor(rnd() * 4) * 0.25, vo: Math.floor(rnd() * 4) * 0.25, col: tint });
   B.box(M.plain, x0 - 0.3, G - 0.1, z0 - 0.3, x1 + 0.3, G + 0.35, z1 + 0.3, { col: [0.45 * tint[0], 0.44 * tint[1], 0.42 * tint[2]], skip: '' });
   // 屋上のふち
@@ -263,6 +265,23 @@ export function tower(ctx, x0, z0, x1, z1, H, o = {}) {
   ctx.solid(x0, z0, x1, z1, topH);
   ctx.occupy(x0, z0, x1, z1);
   ctx.mapRect(x0, z0, x1, z1, '#1d1d22');
+}
+
+// 店先のガラス(こわせる)。店の模様(12m に 2 軒)の窓の位置に合わせて置く
+function shopGlass(ctx, x0, z0, x1, z1, Y, G, uo) {
+  const y0 = Y + 0.0208 * (G - Y), hh = 0.73 * (G - Y);
+  const faces = [
+    [x1 - x0, (a) => [x0 + a, z1 + 0.05, 0]], [x1 - x0, (a) => [x1 - a, z0 - 0.05, 0]],
+    [z1 - z0, (a) => [x1 + 0.05, z1 - a, Math.PI / 2]], [z1 - z0, (a) => [x0 - 0.05, z0 + a, Math.PI / 2]],
+  ];
+  for (const [L, at] of faces) {
+    for (let n = Math.floor(uo); n <= Math.ceil(uo + L / 12); n++) for (const sh of [0, 0.5]) {
+      const a = (n + sh + 0.0195 - uo) * 12, b = (n + sh + 0.4805 - uo) * 12;
+      if (a < 0.2 || b > L - 0.2) continue;
+      const [x, z, rot] = at((a + b) / 2);
+      placeGlass(ctx, x, z, rot, b - a - 0.08, hh, y0);
+    }
+  }
 }
 
 // 中央広場: まわりを土のうで囲んだ 軍の検問所(4 方向は大きく あいている)

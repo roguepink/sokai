@@ -14,6 +14,7 @@ import { genTown, TOWN } from './world-town.js';
 import { genBuildings } from './world-interiors.js';
 import { genNature, LAKES } from './world-nature.js';
 import { Sky } from './world-sky.js';
+import { Brk } from './world-break.js';
 import { Events } from './events.js';
 
 const CELL = 8;           // ぶつかり判定の区画の大きさ(m)
@@ -83,6 +84,7 @@ export const World = {
       zoneAt: (x, z) => self.zoneAt(x, z),
     };
     this._ctx = ctx;
+    Brk.init(this);
     defineProps(ctx);
     Sky.init(this, M);
     if (q !== 'low') this._embers(q === 'high' ? 420 : 260);
@@ -98,6 +100,7 @@ export const World = {
     B.finish(this.group);
     I.finish(this.group);
     CB.finish(this.group, { cast: false, recv: false });
+    Brk.finish(this.group);
     // 建物の印をミニマップの上に
     for (const b of this.buildings) {
       if (b.small) continue;
@@ -423,6 +426,7 @@ export const World = {
       this._emberU.uScale.value = (Engine.renderer ? Engine.renderer.domElement.height : 400) * 0.12;
     }
     Sky.update(dt, px, pz);
+    Brk.update(dt, px, pz);
     if ((this._cullT -= dt) <= 0) { this._cullT = 0.15; this._cull(); }
   },
 
@@ -448,6 +452,40 @@ export const World = {
       const hide = d > (o.vis < far ? o.vis : far);
       if (hide !== o.hide) { o.hide = hide; o.m.userData.culled = hide; o.m.visible = !hide && !o.m.userData.off; }
     }
+  },
+
+  // ---------- こわせる物(武器係が 弾・爆発のたびに呼ぶ) ----------
+  // 円(x,z,半径 r)にふれた 車・ドラム缶・ガラス・柵 … に amount のダメージ。opts.cause: 'explosion' などは よく効く。こわれた数を返す
+  damage(x, z, r, amount, opts = {}) { return Brk.damage(x, z, r, amount, opts); },
+  // 弾の通り道(線)で いちばん手前の こわせる物に当てる。当たった所の割合 0..1(なければ 1)。車など低い物にも当たる
+  hitLine(x0, z0, x1, z1, amount, opts = {}) { return Brk.hitLine(x0, z0, x1, z1, amount, opts); },
+  // その場所で爆発を起こす(ゾンビ・物にダメージ。イベント propExplode)
+  explode(x, z, radius = 6, amount = 400, kind = 'world') { Brk.explode(x, z, radius, amount, kind); },
+  get props() { return Brk.list; },
+
+  // 壁(箱)を消す(こわれた物)。道さがし地図も その場所だけ直す
+  _removeBox(box) {
+    if (!box || box.dead) return;
+    const { minX, minZ, maxX, maxZ } = box;
+    box.dead = true; box.minX = box.maxX = box.minZ = box.maxZ = 1e7;
+    const nv = this.nav; if (!nv) return;
+    const w = nv.w, hf = this.half;
+    const x0 = Math.max(0, Math.floor((minX - 0.35 + hf) / NAV)), x1 = Math.min(w - 1, Math.floor((maxX + 0.35 + hf) / NAV));
+    const z0 = Math.max(0, Math.floor((minZ - 0.35 + hf) / NAV)), z1 = Math.min(w - 1, Math.floor((maxZ + 0.35 + hf) / NAV));
+    for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) nv.blocked[z * w + x] = 0;
+    // まだ残っている壁を もう一度 書く
+    const c0 = this._cell(minX - 1, minZ - 1), c1 = this._cell(maxX + 1, maxZ + 1);
+    for (let gz = c0.z; gz <= c1.z; gz++) for (let gx = c0.x; gx <= c1.x; gx++) {
+      const cell = this.grid[gz * this.gw + gx];
+      for (let k = 0; k < cell.length; k++) {
+        const b = this.boxes[cell[k]];
+        if (b.dead) continue;
+        const a0 = Math.max(x0, Math.floor((b.minX - 0.35 + hf) / NAV)), a1 = Math.min(x1, Math.floor((b.maxX + 0.35 + hf) / NAV));
+        const b0 = Math.max(z0, Math.floor((b.minZ - 0.35 + hf) / NAV)), b1 = Math.min(z1, Math.floor((b.maxZ + 0.35 + hf) / NAV));
+        for (let z = b0; z <= b1; z++) for (let x = a0; x <= a1; x++) nv.blocked[z * w + x] = 1;
+      }
+    }
+    if (this.comp) { const id = this._compAt((minX + maxX) / 2 + 1.5, (minZ + maxZ) / 2) || this._mainComp; for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) if (!nv.blocked[z * w + x] && !this.comp[z * w + x]) this.comp[z * w + x] = id; }
   },
 
   // ---------- 時間と天気(ほかの係も読める) ----------

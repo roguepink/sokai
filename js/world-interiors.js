@@ -481,7 +481,7 @@ function warehouse(ctx) {
     if (Math.abs(z + 102) < 3.5 || Math.abs(x - 230) < 6 && z > -80 || Math.abs(x - 275) < 6 && z > -80) continue;
     if (!ctx.isFree(x, z, 1)) continue;
     const n = 1 + Math.floor(rnd() * 3);
-    for (let i = 0; i < n; i++) B.prop('crate', x, z, rnd() * 0.3, { y: i * 1.2, col: [0.85, 0.7, 0.5], solid: i === 0 });
+    B.prop('crate', x, z, rnd() * 0.3, { stack: n, col: [0.85, 0.7, 0.5] });
   }
   for (let k = 0; k < 10; k++) { const x = 212 + rnd() * 80, z = -84 + rnd() * 10; if (ctx.isFree(x, z, 0.8)) B.prop('pallet', x, z, rnd() * 3, { col: [0.8, 0.65, 0.45] }); }
   B.prop('forklift', 245, -104, 0.5); B.prop('forklift', 285, -98, 2.2);
