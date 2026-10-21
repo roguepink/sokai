@@ -119,7 +119,7 @@ export const Weapons = {
       let sc = -dd + 3 * (dx * ax + dz * az) / dd;
       if (ml > 0.2) sc += 6 * (dx * mx + dz * mz) / dd;
       if (e === this.target) sc += 4;
-      if (e.boss) sc += dd < 26 ? 30 : 6;
+      if (e.boss) sc += dd < Math.min(26, w.range) ? 30 : 6;   // ボスは とどく距離なら いちばん先に
       if (dd < 4.5) sc += 5;
       if (e === this._aoeE) sc += 14;
       if (n < K || sc > _cs[n - 1]) {
@@ -130,7 +130,7 @@ export const Weapons = {
     }
     let tgt = null;
     // 画面に映っている敵だけ自動で狙う(画面の外で倒しても見えない。押しよせて来るのを画面の中で倒すほうが気持ちいい)
-    for (let i = 0; i < n; i++) { const e = _cand[i]; if ((e.boss || inView(e)) && World.segmentHit(px, pz, e.x, e.z, LOW) >= 0.98) { tgt = e; break; } }
+    for (let i = 0; i < n; i++) { const e = _cand[i]; if ((inView(e) || (e.boss && (e.x - px) ** 2 + (e.z - pz) ** 2 < w.range * w.range)) && World.segmentHit(px, pz, e.x, e.z, LOW) >= 0.98) { tgt = e; break; } }
     if (w.cluster) {
       this._aoeT -= dt;
       if (this._aoeT <= 0 || (this._aoeE && !this._aoeE.alive)) { this._aoeT = 0.25; this._aoeE = this._bestCluster(n, px, pz, w); }
