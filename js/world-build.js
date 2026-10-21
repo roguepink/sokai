@@ -178,7 +178,7 @@ export class Instancer {
   constructor(chunk = 80, half = 400) { this.chunk = chunk; this.half = half; this.kinds = new Map(); this.thin = 1; }
 
   define(name, geo, mat, { cast = true, recv = true, decor = false } = {}) {
-    this.kinds.set(name, { geo, mat, cast, recv, decor, chunks: new Map(), n: 0 });
+    this.kinds.set(name, { name, geo, mat, cast, recv, decor, chunks: new Map(), n: 0 });
   }
 
   // 置く: 位置・Y 回転・大きさ(数 or [x,y,z])・色。o.rx/o.rz で傾き
@@ -203,6 +203,7 @@ export class Instancer {
       for (const c of k.chunks.values()) {
         const n = c.m.length / 16;
         const mesh = new THREE.InstancedMesh(k.geo, k.mat, n);
+        mesh.name = 'inst:' + k.name;
         mesh.instanceMatrix.array.set(c.m);
         if (c.hasCol) mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(c.c), 3);
         mesh.castShadow = k.cast; mesh.receiveShadow = k.recv;

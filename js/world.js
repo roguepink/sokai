@@ -462,7 +462,7 @@ export const World = {
     if (!this._cullList) {
       this._cullList = [];
       for (const m of ch) {
-        if (!m.isMesh || m.frustumCulled === false || !m.geometry) continue;
+        if (!m.isMesh || m.frustumCulled === false || !m.geometry || m.matrixAutoUpdate !== false) continue;   // 動く物は のぞく
         if (!m.geometry.boundingSphere) m.geometry.computeBoundingSphere();
         const bs = m.isInstancedMesh ? (m.boundingSphere || (m.computeBoundingSphere(), m.boundingSphere)) : m.geometry.boundingSphere;
         if (!bs || bs.radius > 900) continue;
@@ -486,6 +486,9 @@ export const World = {
   // その場所で爆発を起こす(ゾンビ・物にダメージ。イベント propExplode)
   explode(x, z, radius = 6, amount = 400, kind = 'world') { Brk.explode(x, z, radius, amount, kind); },
   get props() { return Brk.list; },
+  get life() { return Life; },
+  lightningTarget(px, pz) { return Brk.lightningTarget(px, pz); },
+  lightningHit(x, z) { Brk.lightningHit(x, z); },
 
   // 壁(箱)を消す(こわれた物)。道さがし地図も その場所だけ直す
   _removeBox(box) {

@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { Engine } from './engine.js';
 import { Events } from './events.js';
 
-const CHUNK = 200, CELL = 8;
+const CHUNK = 400, CELL = 8;   // 区画 400m(境目は x,z = ±200。町の中は 1 つにまとまる)
 const BURNT = [0.07, 0.06, 0.055];
 // 種類ごとの決まり: hp 体力 / ex 爆発(r 半径, d ダメージ)/ end 'burn' 黒こげの残骸 | 'hide' 消える / fx 破片の種類
 export const KINDS = {
@@ -96,6 +96,7 @@ export const Brk = {
       let n = 0; for (const r of g.recs) n += r.stack;
       g.meshes = g.parts.map((p) => {
         const mesh = new THREE.InstancedMesh(p.geo, p.mat, n);
+        mesh.name = 'brk:' + g.recs[0].kind;
         mesh.castShadow = !!p.mat.userData.cast && !p.mat.transparent; mesh.receiveShadow = !p.mat.transparent;
         if (p.mat.transparent) mesh.renderOrder = 2;
         mesh.matrixAutoUpdate = false; mesh.updateMatrix();
@@ -262,6 +263,28 @@ export const Brk = {
     Events.emit('propExplode', { x, z, radius: R, kind });
     // となりへ燃え移る(少しおくれて。つぎつぎに爆発する)
     this._queue.push({ t: 0.12 + Math.random() * 0.18 + (R >= 12 ? 0.25 : 0), x, z, r: R * (R >= 12 ? 1.25 : 0.95), d: dmg * (R >= 12 ? 1 : 0.7) });
+  },
+
+  // 雷: 主人公の近くのゾンビ(いなければ近くの地面)に落ちる
+  lightningTarget(px, pz) {
+    const L = Zombies && Zombies.list;
+    if (L && L.length) {
+      for (let i = 0; i < 12; i++) { const e = L[Math.floor(Math.random() * L.length)]; if (e.alive && !e.boss && (e.x - px) ** 2 + (e.z - pz) ** 2 < 32 * 32 && (e.x - px) ** 2 + (e.z - pz) ** 2 > 5 * 5) return { x: e.x, z: e.z }; }
+    }
+    const a = Math.random() * Math.PI * 2, d = 10 + Math.random() * 15;
+    return { x: px + Math.cos(a) * d, z: pz + Math.sin(a) * d };
+  },
+  lightningHit(x, z) {
+    if (FX) {
+      if (FX.bolt) FX.bolt(x + (Math.random() - 0.5) * 6, 60, z + (Math.random() - 0.5) * 6, x, 0.2, z, 0xbfd8ff, 0.5, 0.3, 2.5, 10);
+      FX.explosion(x, z, 3.5, 'plasma');
+      if (FX.ring) FX.ring(x, z, 0.5, 9, 0.5, 0xbfd8ff, 0.6, 4);
+      if (FX.decal) FX.decal(x, z, 3.5, 'scorch', 30);
+      if (FX.flash) FX.flash(x, 3, z, 0xbfd8ff, 500, 30, 0.3);
+    }
+    if (Zombies) Zombies.damageCircle(x, z, 5, 900, { force: 16, cause: 'lightning', falloff: true });
+    this.damage(x, z, 3, 300, { cause: 'lightning' });
+    Engine.shake(0.8);
   },
 
   addFire(x, y, z, size, life, rec = null) {

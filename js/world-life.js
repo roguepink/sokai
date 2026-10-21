@@ -12,7 +12,7 @@ const DOWN = new THREE.Vector3(0, -1, 0);
 let FX = null;
 
 // 光の筋(先が細い円すい。先から遠いほど うすい)
-const BEAM_VS = `varying float vT; varying vec3 vN; varying vec3 vV; void main(){ vT = -position.y; vec4 w = modelMatrix * vec4(position, 1.0); vN = normalize(mat3(modelMatrix) * normal); vV = normalize(cameraPosition - w.xyz); gl_Position = projectionMatrix * viewMatrix * w; }`;
+const BEAM_VS = `varying float vT; varying vec3 vN; varying vec3 vV; void main(){ vT = -position.y; vec4 w = modelMatrix * vec4(position, 1.0); vN = normalize(transpose(inverse(mat3(modelMatrix))) * normal); vV = normalize(cameraPosition - w.xyz); gl_Position = projectionMatrix * viewMatrix * w; }`;
 const BEAM_FS = `uniform vec3 uCol; uniform float uI; varying float vT; varying vec3 vN; varying vec3 vV; void main(){ float edge = pow(abs(dot(normalize(vN), normalize(vV))), 1.5); float a = (1.0 - vT) * (1.0 - vT) * edge * uI; gl_FragColor = vec4(uCol * a, a); }`;
 
 export const Life = {
@@ -26,6 +26,7 @@ export const Life = {
     this.beamGeo = new THREE.ConeGeometry(1, 1, 16, 1, true).translate(0, -0.5, 0);   // 先が (0,0,0)、底が y = -1
     this.spotMat = new THREE.MeshBasicMaterial({ map: M._glowTex, color: new THREE.Color(1, 0.95, 0.75), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -8 });
     this.spotGeo = new THREE.PlaneGeometry(2, 2).rotateX(-Math.PI / 2);
+    this.spin = W.spinners;
     for (const s of W.spinners) this._setup(s, g, M);
     this._heli(g, M);
     this._crows(g, M);
@@ -60,7 +61,7 @@ export const Life = {
     const t = this._t, cam = Engine.camera.position, night = this.W.night || 0, wx = this.W._sky ? this.W._sky.wx : null;
     const murk = wx ? Math.min(1, wx.fog + wx.storm * 0.6 + wx.rain * 0.3 + wx.snow * 0.3) : 0;
     const lightI = Math.min(1, 0.12 + night * 0.9 + murk * 0.4);
-    this.beamU.uI.value = 0.22 * lightI;
+    this.beamU.uI.value = 0.8 * lightI;
     this.spotMat.opacity = 0.6 * lightI;
     for (const s of this.spin) {
       const dx = s.x - cam.x, dz = s.z - cam.z, far = dx * dx + dz * dz > 420 * 420;
@@ -123,7 +124,7 @@ export const Life = {
       case 'beacon': s.obj.visible = Math.sin(t * 3.3) > 0.2; break;
       case 'search': {
         s.a += dt * s.sp;
-        const tx = s.x + Math.cos(s.a) * 22 + Math.sin(s.a * 2.3) * 8, tz = s.z + Math.sin(s.a) * 22 + 14 * Math.sign(-s.z - 540);
+        const tx = s.x + Math.cos(s.a) * 20 + Math.sin(s.a * 2.3) * 8, tz = s.z + Math.sin(s.a) * 20;
         const dx = tx - s.x, dy = -s.y, dz = tz - s.z, L = Math.hypot(dx, dy, dz);
         this.aim(s.beam, s.x, s.y, s.z, dx, dy, dz, L, 3.2);
         s.spot.position.set(tx, 0.08, tz); s.spot.scale.setScalar(4.5);
@@ -254,7 +255,7 @@ export const Life = {
         b.y = Math.max(0, Math.sin(b.ph * 7) * 0.08) + 0.1;
       }
       _e.set(C.state === 'sit' ? Math.sin(b.ph * 5) * 0.3 : -0.2, b.r, 0); _q.setFromEuler(_e);
-      _m.compose(_p.set(b.x, b.y, b.z), _q, _s.set(1.2, 1 + flap * 0.9, 1.2));
+      _m.compose(_p.set(b.x, b.y, b.z), _q, _s.set(2, 2 * (1 + flap * 0.9), 2));
       C.m.setMatrixAt(i, _m);
     }
     C.m.instanceMatrix.needsUpdate = true;
