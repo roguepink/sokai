@@ -64,6 +64,19 @@ export function cone(x, z, dirX, dirZ, range, cosMin, out) {
   return out;
 }
 
+// テスト係A: こわせる物(車・ガラス・ドラム缶 …)への 弾の当たり。
+// 弾は LOW より低い物(車など)を segmentHit では こえてしまうので、通り道で いちばん手前の物に ダメージを入れる。
+// 当たった所の割合 0..1(なければ 1)。弾は止めない(後ろのゾンビにも当たる)
+export function propLine(x0, z0, x1, z1, amount, cause) {
+  return World.hitLine ? World.hitLine(x0, z0, x1, z1, amount, { cause }) : 1;
+}
+// 線の上の物 ぜんぶ(レールガンなど つらぬく光): step m ごとに 小さな円で ダメージ
+export function propRay(x0, z0, x1, z1, amount, cause, step = 3, r = 1.1) {
+  if (!World.damage) return;
+  const L = Math.hypot(x1 - x0, z1 - z0), n = Math.max(1, Math.ceil(L / step));
+  for (let i = 1; i <= n; i++) { const t = i / n; World.damage(x0 + (x1 - x0) * t, z0 + (z1 - z0) * t, r, amount, { cause }); }
+}
+
 // 爆発(見た目 + ダメージ + 知らせ)
 export function explode(x, z, radius, dmg, force, kind = 'fire', weapon = '') {
   FX.explosion(x, z, radius, kind);

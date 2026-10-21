@@ -566,6 +566,7 @@ export const Zombies = {
     Engine.shake(0.45);
     Events.emit('explosion', { x, z, radius: R, source: 'bloater' });
     this.damageCircle(x, z, R, 120, { force: 18, cause: 'bloater', falloff: true });
+    if (World.damage) World.damage(x, z, R * 0.8, 120, { cause: 'explosion' });   // 近くの車・ドラム缶に 火がうつる
   },
 };
 
