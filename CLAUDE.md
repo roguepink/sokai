@@ -92,6 +92,10 @@ PC: WASD/矢印=移動、スペース/クリック=撃つ、Shift/E=回転斬り
 | `zombieAttack` | {x,z} ゾンビが主人公をなぐった(主人公は無傷。見た目と音だけ) | キャラ |
 | `score` | {points,x,z,combo,mult} | 点数 |
 | `newRecord` | {best} | 点数 |
+| `multiKill` | {count,points,x,z} | 点数 |
+| `milestone` | {kind:'kills'|'combo'|'score',value,text,bonus} | 点数 |
+| `comboEnd` | {combo} | 点数 |
+| `bossDown` | {name,x,z,e}(ボス1体につき1回だけ。UI の Bosses が出す) | 画面 |
 | `start` `pause` `resume` `finish` `reset` | | main |
 
 ## 順番(main.js の step、1/60 秒ごと)
