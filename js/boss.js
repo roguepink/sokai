@@ -149,7 +149,7 @@ export const Bosses = {
     const f = e.flash, fr = e.frozen > 0 ? 1 : 0, burn = e.burn > 0 ? 0.6 + 0.4 * sin(e.t * 20) : 0, sh = e.shock > 0 ? Math.random() : 0;
     for (const mt of m.mats) {
       const b = mt.userData.baseE;
-      mt.emissive.setRGB(b.r + f * 0.9 + burn * 0.7 + sh * 0.2 + fr * 0.15, b.g + f * 0.85 + burn * 0.25 + sh * 0.45 + fr * 0.3, b.b + f * 0.8 + sh * 0.8 + fr * 0.5);
+      mt.emissive.setRGB(b.r + f * 0.45 + burn * 0.5 + sh * 0.2 + fr * 0.1, b.g + f * 0.4 + burn * 0.15 + sh * 0.45 + fr * 0.2, b.b + f * 0.35 + sh * 0.8 + fr * 0.35);
       if (mt.userData.baseC) mt.color.copy(mt.userData.baseC).lerp(_ice, fr * 0.6);
     }
   },
@@ -526,6 +526,7 @@ const BUILDERS = {
   // ---------------- 異形アボミネーション(高さ 約 2.8m、腕 6 本、頭 3 つ) ----------------
   abomination(m) {
     const flesh = newMat(m, { map: skinTex('#a07a70', { boils: 30, wounds: 22, stitches: 3 }), color: 0xffffff, roughness: 0.55 });
+    flesh.map.repeat.set(2.5, 2);
     const skin = newMat(m, { map: skinTex('#8a8a78', { wounds: 8 }), color: 0xffffff });
     const bone = newMat(m, { color: BONE, roughness: 0.5 });
     const glow = newMat(m, { color: 0x302010, emissive: 0xffd040, emissiveIntensity: 1.5 });
@@ -573,7 +574,8 @@ const BUILDERS = {
 
   // ---------------- 大這い屍クローラー(長さ 約 6m) ----------------
   crawlerKing(m) {
-    const skin = newMat(m, { map: skinTex('#b0a898', { wounds: 16, stitches: 2 }), color: 0xffffff, roughness: 0.6 });
+    const skin = newMat(m, { map: skinTex('#8e8676', { wounds: 16, stitches: 2 }), color: 0xffffff, roughness: 0.6 });
+    skin.map.repeat.set(2, 2);
     const bone = newMat(m, { color: BONE, roughness: 0.45 });
     const mouth = newMat(m, { color: 0x200404, roughness: 0.4 });
     const eye = newMat(m, { color: 0x302010, emissive: 0xff3a10, emissiveIntensity: 2 });

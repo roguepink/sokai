@@ -138,7 +138,7 @@ export const Zombies = {
 
   // 状態(当たった光・凍る・燃える・しびれ)
   _status(e, dt) {
-    e.flash = Math.max(0, e.flash - dt * 7);
+    e.flash = Math.max(0, e.flash - dt * 9);
     e.flinch = Math.max(0, e.flinch - dt * 5);
     const B = e._B;
     let glow = 0;
@@ -323,7 +323,7 @@ export const Zombies = {
   damage(e, amount, opts = _noOpts) {
     if (!e.alive) return false;
     e.hp -= amount;
-    e.flash = 1;
+    e.flash = e.flash > 0.5 ? 0.75 : 1;
     const cause = opts.cause;
     if (cause !== 'fire') { e.flinch = Math.min(1, e.flinch + 0.5 + amount * 0.02); e.flinchSide = Math.random() - 0.5; }
     const sc = e.def.scale;

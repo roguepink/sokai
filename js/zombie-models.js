@@ -516,7 +516,7 @@ diffuseColor.rgb *= texelColor.rgb * tint;
 diffuseColor.rgb = mix( diffuseColor.rgb, diffuseColor.rgb * vec3(0.09, 0.07, 0.06), vFx.z );
 diffuseColor.rgb = mix( diffuseColor.rgb, vec3(0.45, 0.7, 0.95), vFx.y * 0.75 );`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
-totalEmissiveRadiance += vec3(1.0, 0.93, 0.85) * vFx.x * 0.9;
+totalEmissiveRadiance += vec3(1.0, 0.9, 0.8) * vFx.x * 0.45;
 totalEmissiveRadiance += vec3(0.12, 0.3, 0.55) * vFx.y * 0.18;
 { // 燃える: 暗いところ(焦げ・傷)が おき火のように光る / しびれ: 青白く光る
   float lum = dot(texelColor.rgb, vec3(0.3, 0.59, 0.11));
