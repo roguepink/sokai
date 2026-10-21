@@ -594,7 +594,7 @@ function dress(B, def) {
   B.eye[0] = ec[0] * ev; B.eye[1] = ec[1] * ev; B.eye[2] = ec[2] * ev;
   // 肌
   _c.setHex(pick(o.skins || SKINS));
-  const v = 0.88 + Math.random() * 0.24;
+  const v = (def.gold ? 1 : 1.25) * (0.88 + Math.random() * 0.24);   // 目の高さで顔が暗くなりすぎないよう 少し明るく
   B.skin[0] = _c.r * v; B.skin[1] = _c.g * v; B.skin[2] = _c.b * v;
   // マス
   const torso = Array.isArray(o.torso) ? pick(o.torso) : o.torso;
