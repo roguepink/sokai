@@ -11,13 +11,13 @@ const DARKTOP = [0.12, 0.11, 0.1];
 const LOW = 3.2;              // 壁の「いつも見える」高さ
 const _m = new THREE.Matrix4();
 
-class Bld {
+export class Bld {
   constructor(ctx, o) {
     this.ctx = ctx;
     const { M } = ctx;
     Object.assign(this, { h: 6, y0: 0, t: 0.5, wall: M.plaster, wallCol: [1, 1, 1], skin: M.ribbon, skinCol: [1, 1, 1], floor: M.tile, floorCol: [1, 1, 1], roofCol: [0.8, 0.8, 0.8], small: false }, o);
     this.RB = new Builder(0);
-    this.b = ctx.W.addBuildingInfo({ minX: this.x0, minZ: this.z0, maxX: this.x1, maxZ: this.z1, roof: null, roofs: [], name: this.name, small: this.small, zone: ctx.zoneAt((this.x0 + this.x1) / 2, (this.z0 + this.z1) / 2) });
+    this.b = ctx.W.addBuildingInfo({ minX: this.x0, minZ: this.z0, maxX: this.x1, maxZ: this.z1, h: this.h, roof: null, roofs: [], name: this.name, small: this.small, zone: ctx.zoneAt((this.x0 + this.x1) / 2, (this.z0 + this.z1) / 2) });
     // 床
     ctx.B.box(this.floor, this.x0, 0, this.z0, this.x1, this.y0 + 0.05, this.z1, { skip: 'bnsew', col: this.floorCol });
     ctx.occupy(this.x0 - 2, this.z0 - 2, this.x1 + 2, this.z1 + 2);
@@ -425,7 +425,7 @@ function gasStation(ctx) {
   const { M, B: CB, rnd } = ctx;
   const y0 = 0.15;
   // 屋根(キャノピー): 下に入ると消える
-  const can = { minX: 124, minZ: 124, maxX: 156, maxZ: 144, roofs: [], roof: null, name: 'ガソリンスタンド', small: false };
+  const can = { minX: 124, minZ: 124, maxX: 156, maxZ: 144, h: 5.6, roofs: [], roof: null, name: 'ガソリンスタンド', small: false };
   ctx.W.addBuildingInfo(can);
   const RB = new Builder(0);
   RB.box(M.plain, 123, 5.6, 123, 157, 6.6, 145, { col: [0.92, 0.92, 0.9], skip: '' });

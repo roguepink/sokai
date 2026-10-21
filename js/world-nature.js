@@ -4,6 +4,7 @@ import { placeTree } from './world-props.js';
 import { cabin } from './world-interiors.js';
 import { decal, pool, lamp, tower, TOWN } from './world-town.js';
 import { genSuburb, genIndustrial } from './world-zones.js';
+import { genOuter } from './world-outer.js';
 
 // 湖・池(水面。中は歩けない)
 export const LAKES = [
@@ -35,6 +36,7 @@ export function genNature(ctx) {
   lakes(ctx);
   paths(ctx);
   clearings(ctx);
+  genOuter(ctx);
   cabin(ctx, 112, -306);
   forest(ctx);
   outside(ctx);
@@ -157,6 +159,7 @@ function forest(ctx) {
     let p;
     if (edge < 14) p = 0.95;                       // 端は こい林
     else if (zn === 'forest') p = 0.4;
+    else if (zn === 'farm' || zn === 'fun' || zn === 'cemetery') p = 0.03;
     else if (zn === 'park') p = 0.12;
     else if (zn === 'suburb') p = 0.06;
     else if (zn === 'industrial') p = 0.02;
@@ -183,15 +186,16 @@ function forest(ctx) {
 // マップの外: 地面と こい森(見えるだけ。外へは出られない)
 function outside(ctx) {
   const { B, M, rnd, half } = ctx;
-  const W = 70, E = half + W;
+  const W = 70, W2 = 260, E = half + W2, SEA = 520;
   const col = [0.4, 0.38, 0.26];
-  for (let s = -E; s < E; s += 40) {
-    const L = Math.min(40, E - s);
-    for (const [cx, cz, sx, sz] of [[s + L / 2, -half - W / 2, L, W], [s + L / 2, half + W / 2, L, W]]) B.flat(M.ground, cx, -0.01, cz, sx, sz, { col });
-    if (s >= -half && s < half) for (const [cx, cz, sx, sz] of [[-half - W / 2, s + L / 2, W, L], [half + W / 2, s + L / 2, W, L]]) B.flat(M.ground, cx, -0.01, cz, sx, sz, { col });
+  // 地面(遠くまで。霧の中に消える)。東は海
+  for (let s = -E; s < E; s += 80) {
+    const L = Math.min(80, E - s);
+    if (s < SEA) for (const [cx, cz, sx, sz] of [[s + Math.min(L, SEA - s) / 2, -half - W2 / 2, Math.min(L, SEA - s), W2], [s + Math.min(L, SEA - s) / 2, half + W2 / 2, Math.min(L, SEA - s), W2]]) B.flat(M.ground, cx, -0.01, cz, sx, sz, { col });
+    if (s >= -half && s < half) B.flat(M.ground, -half - W2 / 2, -0.01, s + L / 2, W2, L, { col });
   }
   const G = 6.5;
-  for (let z = -E; z < E; z += G) for (const [xa, xb] of (Math.abs(z + G / 2) < half - G ? [[-E, -half], [half, E]] : [[-E, E]])) for (let x = xa; x < xb; x += G) {
+  for (let z = -half - W; z < half + W; z += G) for (const [xa, xb] of (Math.abs(z + G / 2) < half - G ? [[-half - W, -half]] : [[-half - W, SEA - 4]])) for (let x = xa; x < xb; x += G) {
     const px = x + rnd() * G, pz = z + rnd() * G;
     if (Math.abs(px) < half + 1 && Math.abs(pz) < half + 1) continue;
     const r = rnd(), s = 1.2 + rnd() * 0.7;

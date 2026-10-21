@@ -447,6 +447,7 @@ export function makeMaterials(renderer, quality) {
   for (const k in VIS) if (M[k]) M[k].userData.vis = VIS[k];
   M.glow.userData.s = [1, 1]; M.pool.userData.s = [1, 1]; M.water.userData.s = [12, 12]; M.flame.userData.s = [1, 1];
   M.water.map.repeat.set(1, 1);
+  M.sea = M.water.clone(); M.sea.color = new THREE.Color(0x6f8ea0); M.sea.opacity = 1; M.sea.transparent = false; M.sea.userData.s = [20, 20];
   M._glowTex = glowT;
   return M;
 }

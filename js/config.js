@@ -6,7 +6,7 @@ export const CONFIG = {
   BEST_KEY: 'sokai-best',   // 最高記録(localStorage)
   SETTINGS_KEY: 'sokai-settings',
 
-  WORLD_SIZE: 800,          // マップの一辺(メートル)。中心が (0,0)
+  WORLD_SIZE: 1200,          // マップの一辺(メートル)。中心が (0,0)
 
   PLAYER: {
     SPEED: 9.5,             // 走る速さ (m/s)

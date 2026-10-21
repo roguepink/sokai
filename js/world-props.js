@@ -358,6 +358,8 @@ export function placeProp(ctx, name, x, z, rot = 0, o = {}) {
     Brk.add(name, P.parts, x, y, z, rot, s, col, box, { ex, ez, h: P.h, wreck, stack: o.stack || 1, stackH: P.h });
   }
   if (o.occupy !== false) ctx.occupy(x - P.w * s / 2, z - P.w * s / 2, x + P.w * s / 2, z + P.w * s / 2);
+  // こわれた信号機の一部は 火花を散らす
+  if (name === 'tlight' && ctx.rnd() < 0.2) ctx.W.sparkPoints.push({ x: x + Math.cos(rot) * 4.2, y: (o.y || 0) + 4.6, z: z - Math.sin(rot) * 4.2, t: Math.random() * 3 });
 }
 
 // ガラス(店先など)。中心 (x,z)、向き rot(0 = 板が x 方向)、幅 w・高さ h・下の高さ y0

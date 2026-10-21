@@ -15,13 +15,16 @@ import { genBuildings } from './world-interiors.js';
 import { genNature, LAKES } from './world-nature.js';
 import { Sky } from './world-sky.js';
 import { Brk } from './world-break.js';
+import { Life } from './world-life.js';
+import { defineProps2 } from './world-props2.js';
+import { outerZone, OUTER_NAMES, OUTER_GROUND, OUTER_MAP, OUT } from './world-outer.js';
 import { Events } from './events.js';
 
 const CELL = 8;           // ぶつかり判定の区画の大きさ(m)
 const NAV = 1;            // 道さがし地図の1マス(m)
 const CHUNK = 100;        // 見た目をまとめる区画(m)
 const OCC = 2;            // 「もう何か置いた」地図の1マス(m)
-const MAP_PX = 512;       // ミニマップの大きさ
+const MAP_PX = 1024;       // ミニマップの大きさ
 
 export const World = {
   group: new THREE.Group(),
@@ -52,7 +55,7 @@ export const World = {
     const S = CONFIG.WORLD_SIZE, h = this.half;
     const q = Engine.quality;
     const M = this.M = makeMaterials(Engine.renderer, q);
-    const B = new Builder(CHUNK, h), I = new Instancer(CHUNK, h), CB = new Builder(CHUNK * 2, h);
+    const B = new Builder(CHUNK, h), I = new Instancer(CHUNK, h), CB = new Builder(CHUNK * 2, h), SB = new Builder(400, h);
     I.thin = q === 'low' ? 0.45 : q === 'mid' ? 0.8 : 1;
     // ミニマップ
     const mc = document.createElement('canvas'); mc.width = mc.height = MAP_PX;
@@ -62,7 +65,7 @@ export const World = {
     const occ = new Uint8Array((S / OCC) * (S / OCC)), ow = S / OCC;
     const self = this;
     const ctx = {
-      W: this, B, I, M, CB, q, half: h, rnd: seeded(12345),
+      W: this, B, I, M, CB, SB, q, half: h, rnd: seeded(12345),
       // 壁(見た目は別に作る)
       solid(x0, z0, x1, z1, hh = 3, building = null) { return self.addBox(Math.min(x0, x1), Math.min(z0, z1), Math.max(x0, x1), Math.max(z0, z1), { h: hh, mesh: false, building }); },
       mapRect(x0, z0, x1, z1, color) { mx.fillStyle = color; mx.fillRect((x0 + h) * k, (z0 + h) * k, Math.max(1, (x1 - x0) * k), Math.max(1, (z1 - z0) * k)); },
@@ -86,6 +89,7 @@ export const World = {
     this._ctx = ctx;
     Brk.init(this);
     defineProps(ctx);
+    defineProps2(ctx);
     Sky.init(this, M);
     if (q !== 'low') this._embers(q === 'high' ? 420 : 260);
     this._ground(ctx, mx, k);
@@ -100,7 +104,10 @@ export const World = {
     B.finish(this.group);
     I.finish(this.group);
     CB.finish(this.group, { cast: false, recv: false });
+    SB.finish(this.group, { cast: false });
     Brk.finish(this.group);
+    this._sky = Sky;
+    Life.init(this);
     // 建物の印をミニマップの上に
     for (const b of this.buildings) {
       if (b.small) continue;
@@ -155,8 +162,9 @@ export const World = {
     for (let i = 0; i < noise.length; i++) noise[i] = nz();
     const colAt = (x, z) => {
       const zn = this.zoneAt(x, z);
-      const ix = Math.min(100, Math.max(0, Math.round((x + h) / G))), iz = Math.min(100, Math.max(0, Math.round((z + h) / G)));
+      const ix = Math.round((x + h) / G) % 101, iz = Math.round((z + h) / G) % 101;
       const n = 0.82 + noise[iz * 101 + ix] * 0.36;
+      if (OUTER_GROUND[zn]) { const c = OUTER_GROUND[zn]; return [c[0] * n, c[1] * n, c[2] * n]; }
       if (zn === 'forest') return [0.47 * n, 0.45 * n, 0.3 * n];
       if (zn === 'industrial') return [0.5 * n, 0.5 * n, 0.5 * n];
       if (zn === 'park' || zn === 'suburb') return [0.36 * n, 0.5 * n, 0.27 * n];
@@ -165,7 +173,9 @@ export const World = {
     const T = TOWN.ext;
     for (let z = -h; z < h; z += G) for (let x = -h; x < h; x += G) {
       if (x >= T[0] && x + G <= T[2] && z >= T[1] && z + G <= T[3]) continue;   // 町の中は道路が敷いてある
-      if (x >= T[2] && z >= -208 && z + G <= 208) continue;                       // 工場地帯はコンクリート(world-zones.js)
+      if (x >= T[2] && x + G <= 400 && z >= -208 && z + G <= 208) continue;      // 工場地帯はコンクリート(world-zones.js)
+      if (x >= OUT.SEA - 0.01 || (z >= OUT.river.z0 && z + G <= OUT.river.z1 && x < OUT.SEA)) continue;   // 海・川
+      if (x >= OUT.harbor[0] - 4 && z >= OUT.harbor[1] && z + G <= OUT.harbor[3]) continue;                // 港はコンクリート
       const b = B.bucket(M.ground, x + G / 2, z + G / 2), s = M.ground.userData.s;
       const c0 = colAt(x, z + G), c1 = colAt(x + G, z + G), c2 = colAt(x + G, z), c3 = colAt(x, z);
       const base = b.v;
@@ -180,7 +190,7 @@ export const World = {
     const S = CONFIG.WORLD_SIZE;
     for (let z = -h; z < h; z += 4) for (let x = -h; x < h; x += 4) {
       const zn = this.zoneAt(x + 2, z + 2);
-      mx.fillStyle = zn === 'forest' ? '#26361f' : zn === 'industrial' ? '#55524c' : zn === 'park' || zn === 'suburb' ? '#3f5a2c' : zn === 'lake' ? '#2d5a70' : '#3a3a3e';
+      mx.fillStyle = OUTER_MAP[zn] ? OUTER_MAP[zn] : zn === 'forest' ? '#26361f' : zn === 'industrial' ? '#55524c' : zn === 'park' || zn === 'suburb' ? '#3f5a2c' : zn === 'lake' ? '#2d5a70' : '#3a3a3e';
       mx.fillRect((x + h) * k, (z + h) * k, 4 * k + 0.5, 4 * k + 0.5);
     }
     void S;
@@ -188,10 +198,11 @@ export const World = {
 
   // 場所の種類: 'town' 町 / 'industrial' 工場地帯 / 'suburb' 住宅地 / 'park' 公園 / 'forest' 森 / 'lake' 湖
   zoneAt(x, z) {
+    if (Math.abs(x) > 400 || Math.abs(z) > 400 || (z < OUT.river.z1 && z > OUT.river.z0)) { const o = outerZone(x, z); if (o) return o; }
     for (const L of LAKES) { const dx = (x - L.x) / L.rx, dz = (z - L.z) / L.rz; if (dx * dx + dz * dz < 1) return 'lake'; }
     const T = TOWN.ext;
     if (x >= T[0] && x <= T[2] && z >= T[1] && z <= T[3]) return 'town';
-    if (x > T[2] && z > -215 && z < 215) return 'industrial';
+    if (x > T[2] && x <= 404 && z > -215 && z < 215) return 'industrial';
     if (x < T[0] && z > -150 && z < 290) return 'suburb';
     if (z > T[3] && Math.abs(x) <= T[2] && z < 372) return 'park';
     return 'forest';
@@ -200,7 +211,8 @@ export const World = {
   zoneName(x, z) {
     const b = this.buildingAt(x, z);
     if (b && b.name) return b.name;
-    return { town: 'ダウンタウン', industrial: '工場地帯', suburb: '住宅街', park: '公園', forest: '森', lake: '湖' }[this.zoneAt(x, z)] || '';
+    const zn = this.zoneAt(x, z);
+    return OUTER_NAMES[zn] || { town: 'ダウンタウン', industrial: '工場地帯', suburb: '住宅街', park: '公園', forest: '森', lake: '湖' }[zn] || '';
   },
   // 上から見た地図(北が上、マップ全体)。UI のミニマップ用。1px = WORLD_SIZE/512 m
   minimapImage() { return this._map; },
@@ -209,6 +221,17 @@ export const World = {
   addBuildingInfo(b) { this.buildings.push(b); return b; },
   // 主人公が test(x,z) の所にいる間、材質(mats)を うすくする(高架の下など)
   faders: [],
+  // 動く景色(観覧車・サーチライト …)。world-life.js が動かす
+  spinners: [],
+  addSpinner(s) { this.spinners.push(s); return s; },
+  // ずっと燃えている火(墜落機など)
+  addFire(x, y, z, size = 1, life = 9e9) { Brk.addFire(x, y, z, size, life); },
+  // その場所に ただよう霧(墓地など)
+  mists: [],
+  addMist(x, z, r) { this.mists.push({ x, z, r }); },
+  localMist(px, pz) { let m = 0; for (const o of this.mists) { const d = Math.hypot(px - o.x, pz - o.z); if (d < o.r) m = Math.max(m, 0.6 * Math.min(1, (o.r - d) / 40)); } return m * (0.4 + 0.6 * (this.night || 0)); },
+  // 電線の火花が出る所
+  sparkPoints: [],
   addFader(mats, test, minOp = 0.15) { this.faders.push({ mats, test, minOp, op: 1 }); },
 
   // 壁(ぶつかる箱)を登録する。mesh: false なら見た目は作らない(見た目は別に作るとき)
@@ -427,6 +450,7 @@ export const World = {
     }
     Sky.update(dt, px, pz);
     Brk.update(dt, px, pz);
+    Life.update(dt, px, pz);
     if ((this._cullT -= dt) <= 0) { this._cullT = 0.15; this._cull(); }
   },
 

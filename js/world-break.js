@@ -18,6 +18,7 @@ export const KINDS = {
   truck: { hp: 460, ex: { r: 8, d: 480 }, end: 'burn', fx: 'metal' },
   tanker: { hp: 300, ex: { r: 14, d: 900 }, end: 'burn', fx: 'metal', big: true },
   jeep: { hp: 220, ex: { r: 6.5, d: 380 }, end: 'burn', fx: 'metal' },
+  tractor: { hp: 260, ex: { r: 6, d: 360 }, end: 'burn', fx: 'metal' },
   forklift: { hp: 180, ex: { r: 4.5, d: 250 }, end: 'burn', fx: 'metal' },
   tank: { hp: 1400, ex: { r: 10, d: 700 }, end: 'burn', fx: 'metal', big: true },
   heli: { hp: 600, ex: { r: 11, d: 650 }, end: 'burn', fx: 'metal', big: true },
@@ -105,7 +106,7 @@ export const Brk = {
       let i = 0;
       for (const r of g.recs) {
         r.i0 = i;
-        if (r.state === 1) this._burnLook(r, false);
+        if (r.state === 1) { this._burnLook(r, false); if (Math.random() < 0.3) this.fires.push({ x: r.x, y: r.y + r.h * r.s * 0.6, z: r.z, size: 0.8, t: 3, life: 9e9 }); }
         for (let k = 0; k < r.stack; k++, i++) {
           this._matrix(r, k, _m);
           g.meshes.forEach((mesh, pi) => {
@@ -195,6 +196,7 @@ export const Brk = {
     let mul = 1;
     if (cause === 'explosion' || cause === 'lightning') mul = rec.def.big ? 1.6 : 2.2;
     else if (cause === 'fire' && rec.def.ex) mul = 2.5;
+    else if (cause === 'slam' || cause === 'dash') mul = rec.def.big ? 0.8 : 1.5;
     rec.hp -= amount * mul;
     // 当たった手ごたえ(火花・ガラスのひび)
     if (FX && rec.def.fx === 'metal' && Math.random() < 0.35) FX.burst({ x: hx, y: 0.6 + Math.random() * rec.h * 0.6, z: hz, count: 3, color: 0xffd080, speed: 5, up: 3, life: 0.25, size: 0.06, grav: 14 });

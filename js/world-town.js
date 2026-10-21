@@ -420,24 +420,24 @@ function streetStuff(ctx, R) {
 // 高架道路(高さ 9m)。柱は道のまん中。上には事故車。下を通ると透けて見える
 function overpass(ctx) {
   const { M, rnd, half } = ctx;
-  const Z = TOWN.overZ, W = 7.5, Y0 = 9, Y1 = 10.2;
+  const Z = TOWN.overZ, W = 7.5, Y0 = 9, Y1 = 10.2, XE = 500;   // 東は港の手前で とぎれている(こわれた高架)
   const deckTop = M.asphalt;
   const conc = [0.62, 0.6, 0.57];
   // 橋げたの上の部分は 別のまとまり(DB)に作る。下を歩くと うすくなる(World.addFader)
   const B0 = ctx.B, DB = new Builder(80, half);
   ctx.B = DB;
   const B = DB;
-  for (let x = -half; x < half; x += 40) {
-    const xb = Math.min(half, x + 40);
-    B.box(M.concrete, x, Y0, Z - W, xb, Y1, Z + W, { top: deckTop, col: conc, skip: (x > -half ? 'w' : '') + (xb < half ? 'e' : '') });
+  for (let x = -half; x < XE; x += 40) {
+    const xb = Math.min(XE, x + 40);
+    B.box(M.concrete, x, Y0, Z - W, xb, Y1, Z + W, { top: deckTop, col: conc, skip: (x > -half ? 'w' : '') + (xb < XE ? 'e' : '') });
     B.box(M.concrete, x, Y0 - 0.6, Z - W + 1, xb, Y0, Z + W - 1, { col: [0.5, 0.48, 0.46], skip: 't' + (x > -half ? 'w' : '') + (xb < half ? 'e' : '') });
-    for (const s of [-1, 1]) B.box(M.concrete, x, Y1, s > 0 ? Z + W - 0.4 : Z - W, xb, Y1 + 1.0, s > 0 ? Z + W : Z - W + 0.4, { col: conc, skip: (x > -half ? 'w' : '') + (xb < half ? 'e' : '') });
+    for (const s of [-1, 1]) B.box(M.concrete, x, Y1, s > 0 ? Z + W - 0.4 : Z - W, xb, Y1 + 1.0, s > 0 ? Z + W : Z - W + 0.4, { col: conc, skip: (x > -half ? 'w' : '') + (xb < XE ? 'e' : '') });
     for (let k = 0; k < 40; k += 7) B.flat(M.paint, x + k + 2, Y1 + 0.01, Z, 3.5, 0.15, { col: [0.9, 0.9, 0.88] });
   }
-  for (let x = -half + 20; x < half; x += 40) B.box(M.concrete, x - 1.4, Y0 - 1.6, Z - W + 1, x + 1.4, Y0, Z + W - 1, { col: [0.55, 0.53, 0.5], skip: '' });
+  for (let x = -half + 20; x < XE; x += 40) B.box(M.concrete, x - 1.4, Y0 - 1.6, Z - W + 1, x + 1.4, Y0, Z + W - 1, { col: [0.55, 0.53, 0.5], skip: '' });
   // 高架の上の事故車(当たり判定なし)
   const cols = [[0.7, 0.1, 0.1], [0.15, 0.25, 0.5], [0.85, 0.85, 0.85], [0.13, 0.11, 0.1]];
-  for (let x = -half + 10; x < half - 10; x += 14 + rnd() * 20) {
+  for (let x = -half + 10; x < XE - 10; x += 14 + rnd() * 20) {
     ctx.prop(rnd() < 0.15 ? 'bus' : 'sedan', x, Z + (rnd() - 0.5) * 9, (rnd() - 0.5) * 0.8, { y: Y1, solid: false, occupy: false, col: cols[Math.floor(rnd() * cols.length)] });
   }
   ctx.B = B0;
@@ -449,7 +449,7 @@ function overpass(ctx) {
   }
   ctx.W.addFader([...clones.values()], (x, z) => Math.abs(z - Z) < W + 4, 0.12);
   // 柱(道のまん中。40m ごと)
-  for (let x = -half + 20; x < half; x += 40) {
+  for (let x = -half + 20; x < XE; x += 40) {
     B0.box(M.concrete, x - 1.1, 0, Z - 1.1, x + 1.1, Y0 - 0.6, Z + 1.1, { col: conc });
     ctx.solid(x - 1.1, Z - 1.1, x + 1.1, Z + 1.1, Y0);
     ctx.prop('jersey', x - 4, Z, 0, {}); ctx.prop('jersey', x + 4, Z, 0, {});
@@ -457,12 +457,12 @@ function overpass(ctx) {
     if (rnd() < 0.5) lamp(ctx, x + 1.6, Z, 0, 0);
   }
   // 高架の下の道(町の外へ続く)
-  for (let x = -half; x < half; x += 40) {
+  for (let x = -half; x < 500; x += 40) {
     if (x >= TOWN.ext[0] && x + 40 <= TOWN.ext[2]) continue;
     B0.flat(M.asphalt, x + 20, 0.012, Z, 40, 12);
     for (let k = 2; k < 40; k += 7) { B0.flat(M.paint, x + k + 1.75, 0.022, Z - 3, 3.5, 0.16, { col: [0.92, 0.92, 0.9] }); B0.flat(M.paint, x + k + 1.75, 0.022, Z + 3, 3.5, 0.16, { col: [0.92, 0.92, 0.9] }); }
     ctx.occupy(x, Z - 8, x + 40, Z + 8);
   }
-  ctx.mapRect(-half, Z - W, half, Z + W, '#6a6862');
+  ctx.mapRect(-half, Z - W, XE, Z + W, '#6a6862');
   void THREE;
 }
