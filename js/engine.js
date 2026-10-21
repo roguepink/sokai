@@ -250,6 +250,7 @@ export const Engine = {
   },
 
   render(realDt) {
+    if (this.bloom) this.bloom.strength = this.viewMode === 'fps' ? 0.35 : this.viewMode === 'tps' ? 0.42 : 0.5;
     this._measureFps(realDt);
     if (this.composer && !this._noBloom) this.composer.render(realDt);
     else this.renderer.render(this.scene, this.camera);

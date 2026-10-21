@@ -123,6 +123,7 @@ function it_min(prio) { return prio >= 2 ? 0 : 0.5; }
 // ---------- 画面フラッシュ ----------
 export function flash(el, color, strength = 0.5, ms = 350) {
   if (!el.animate) return;
+  if (Engine.viewMode && Engine.viewMode !== 'top') strength *= 0.5;   // 肩越し・一人称は光のにじみと重なって白くなりやすい
   el.style.background = color;
   el.animate([{ opacity: strength }, { opacity: 0 }], { duration: ms, easing: 'ease-out' });
 }
