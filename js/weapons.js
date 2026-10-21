@@ -155,12 +155,20 @@ export const Weapons = {
     return best;
   },
 
-  // 銃口の位置(二丁拳銃は 左右こうたいに)
+  // 銃口の位置(二丁拳銃は 左右こうたいに)。手に持った銃の 本当の銃口(weapon-models.js の tips)から出す
   _muzzle(player, w, out) {
+    const alt = w.dual ? (this._alt ^= 1) : 0;
+    const mdl = this._models[this.index], tips = mdl && mdl.userData.tips;
+    if (tips && player.aiming && mdl.parent && !(player._spin > 0)) {
+      mdl.updateWorldMatrix(true, false);
+      out.copy(tips[Math.min(alt, tips.length - 1)]).applyMatrix4(mdl.matrixWorld);
+      const dx = out.x - player.pos.x, dz = out.z - player.pos.z;
+      if (dx * dx + dz * dz < 4 && out.y > 0.6 && out.y < 2.4) return out;
+    }
     player.muzzle(out);
     const f = player.facing, fx = Math.sin(f), fz = -Math.cos(f);
     out.x += fx * (w.muz || 0); out.z += fz * (w.muz || 0);
-    if (w.dual && (this._alt ^= 1)) { out.x -= Math.cos(f) * 0.98; out.z -= Math.sin(f) * 0.98; }
+    if (alt) { out.x -= Math.cos(f) * 0.5; out.z -= Math.sin(f) * 0.5; }
     return out;
   },
 

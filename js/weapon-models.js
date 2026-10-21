@@ -1,6 +1,7 @@
 // 武器係: 銃の見た目(three.js の形を組み合わせて作る。画像は使わない)。
 // 作るときの向き: 銃口は -z、上は +y、にぎる所が (0,0,0)。最後に手の向きに合わせて回す。
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const M = {};
 function mats() {
@@ -52,7 +53,7 @@ const B = {
       tube(g, 0.012, 0.04, x, 0.07, -0.22, m.dark, 6);
       ball(g, 0.008, x, 0.105, -0.17, m.gGreen, 4);
     };
-    one(0); one(-0.66);
+    one(0); one(-0.4);
   },
   shotgun(g, m) {
     tube(g, 0.028, 0.8, 0, 0.1, -0.45, m.metal);
@@ -167,15 +168,76 @@ const B = {
 };
 
 // 武器の見た目を作る。手(Player.holdWeapon)に そのまま渡せる
+// 手の台(Player.parts.gunMount)は いつも水平で -z = 前。なので 回さずに そのまま持たせる。
+// userData.tips = 銃口の位置(この holder の中の位置。matrixWorld をかけると世界の位置。二丁拳銃は [右, 左])
 export function buildModel(id) {
   const m = mats();
   const inner = new THREE.Group();
   (B[id] || B.ar)(inner, m);
+  const keep = new Set(Object.values(inner.userData).flat().filter((o) => o && o.isObject3D));
+  mergeByMaterial(inner, keep);
   inner.traverse((o) => { if (o.isMesh) o.castShadow = true; });
   const holder = new THREE.Group();
   holder.add(inner);
-  holder.rotation.x = -Math.PI / 2;     // 銃口(-z)を 腕の先(-y)へ
-  holder.scale.setScalar(1.3);
+  const S = 1.3;
+  holder.scale.setScalar(S);
   holder.userData = inner.userData;
+  holder.userData.tips = findTips(inner, id);
   return holder;
+}
+
+// 銃口 = いちばん前(-z)にある部品の先。二丁拳銃は 左右それぞれ
+function findTips(inner, id) {
+  inner.updateMatrixWorld(true);
+  const xs = id === 'pistols' ? [0, -0.4] : [0];
+  return xs.map((x0) => {
+    let best = null, bz = Infinity;
+    inner.traverse((o) => {
+      if (!o.isMesh) return;
+      _bb.setFromObject(o);
+      if (_bb.max.x < x0 - 0.2 || _bb.min.x > x0 + 0.2) return;
+      if (_bb.min.z < bz) { bz = _bb.min.z; best = new THREE.Vector3(x0, (_bb.min.y + _bb.max.y) / 2, _bb.min.z); }
+    });
+    return best || new THREE.Vector3(x0, 0.08, -0.6);
+  });
+}
+const _bb = new THREE.Box3();
+
+// 同じ親・同じ材質の 動かない部品を 1 つにまとめる(描く回数をへらす。スマホで軽く)
+// keep に入っている部品(動かす・光らせる物)は そのまま
+export function mergeByMaterial(root, keep = new Set()) {
+  const nodes = [];
+  root.traverse((o) => nodes.push(o));
+  for (const node of nodes) {
+    const byMat = new Map();
+    for (const c of node.children) {
+      if (!c.isMesh || c.isInstancedMesh || keep.has(c) || c.children.length) continue;
+      if (!byMat.has(c.material)) byMat.set(c.material, []);
+      byMat.get(c.material).push(c);
+    }
+    for (const [mat, list] of byMat) {
+      if (list.length < 2) continue;
+      const geos = list.map((o) => {
+        o.updateMatrix();
+        const g = o.geometry.clone();
+        for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal' && k !== 'uv') g.deleteAttribute(k);
+        g.morphAttributes = {};
+        g.clearGroups();
+        g.applyMatrix4(o.matrix);
+        return g;
+      });
+      const anyIdx = geos.some((g) => g.index), allIdx = geos.every((g) => g.index);
+      const fixed = anyIdx && !allIdx ? geos.map((g) => (g.index ? g.toNonIndexed() : g)) : geos;
+      let merged = null;
+      try { merged = mergeGeometries(fixed, false); } catch (e) { merged = null; }
+      for (const g of fixed) if (g !== merged) g.dispose();
+      if (!merged) continue;
+      const mesh = new THREE.Mesh(merged, mat);
+      mesh.castShadow = list.some((o) => o.castShadow);
+      mesh.receiveShadow = list.some((o) => o.receiveShadow);
+      for (const o of list) node.remove(o);
+      node.add(mesh);
+    }
+  }
+  return root;
 }
