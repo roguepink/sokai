@@ -104,7 +104,7 @@ export const ViewHud = {
     const h = this.hint;
     this._hintKind = kind;
     if (kind === 'look') {
-      h.innerHTML = pc ? '<b>🖱️</b><span>画面をクリックすると<br>マウスで 向きが変わる<small>(Esc で もどる)</small></span>'
+      h.innerHTML = pc ? '<b>🖱️</b><span>画面をクリックすると<br>マウスで 向きが変わる<small>(Esc で もどる / B で 視点の設定)</small></span>'
         : '<b class="swipe">👆</b><span>右側を なぞると<br>向きが変わる<small>さわらないと 自動で ゾンビの方を向く</small></span>';
       const s = Engine.settings._get(); Engine.settings._set('hintLook', (s.hintLook || 0) + 1);
       this._hintLook0 = this.ctx.Input.lookT;

@@ -25,8 +25,9 @@ body.pc .btn-dash::after { content: 'F(2回で叩きつけ)'; }
 }
 /* 縦長: 左の親指(スティック)とぶつからないように、回転斬りの上へ */
 @media (orientation: portrait) {
-  #controls .btn-dash { right: calc(var(--sar) + 166px); bottom: calc(var(--sab) + 118px); width: 70px; height: 70px; }
-  .btn-prev { bottom: calc(var(--sab) + 196px) !important; }
+  #controls .btn-dash { right: calc(var(--sar) + 170px); bottom: calc(var(--sab) + 114px); width: 64px; height: 64px; font-size: 13px; }
+  .btn-dash small { font-size: 7.5px; }
+  #controls .btn-prev { right: calc(var(--sar) + 90px); }   /* ◀▶ を 撃つボタンの上に ならべる(ダッシュの場所をあける) */
 }
 
 /* ---- 照準(肩越し・一人称)。撃つと広がる(--sp)・敵に重なると赤(.on) ---- */
