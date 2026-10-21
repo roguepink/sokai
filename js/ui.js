@@ -572,6 +572,11 @@ export const UI = {
     const sBtn = $('btnSettings'), pBtn = $('btnPauseSettings');
     if (sBtn) sBtn.addEventListener('click', () => { Audio.unlock(); open('title'); });
     if (pBtn) pBtn.addEventListener('click', () => open('pauseMenu'));
+    // 視点をえらぶ(カメラ係の ViewHud があるときだけ)
+    document.querySelectorAll('.view-open').forEach((b) => b.addEventListener('click', () => {
+      const vh = window.__game && window.__game.ViewHud;
+      if (vh && typeof vh.openPanel === 'function') { try { vh.openPanel(); } catch (e) { console.warn(e); } }
+    }));
     const back = $('btnSetBack');
     if (back) back.addEventListener('click', () => {
       $('settings').classList.add('hidden');

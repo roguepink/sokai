@@ -22,7 +22,7 @@ const CAUSE_BONUS = { sword: 1.2, spin: 1.5 };
 
 // フィーバー(無双モード)
 const FEVER_DUR = 12;                     // 続く秒数
-const FEVER_KILL = 0.0011;                // 1 体倒すとたまる量(コンボが長いほど少し多い)
+const FEVER_KILL = 0.0005;                // 1 体倒すとたまる量(コンボが長いほど少し多い。だいたい 1 分に 1 回)
 const FEVER_COOL = 4;                     // 終わったあと、たまり始めるまでの秒数
 
 const KILL_STEPS = [10, 25, 50, 100, 200, 300, 500, 750, 1000];
@@ -126,7 +126,7 @@ export const Score = {
 
     // フィーバー
     if (this.feverActive) this._feverKills++;
-    else if (this._feverCool <= 0) this.addFever(FEVER_KILL * (1 + Math.min(1.5, this.combo / 120)) * (k.boss ? 0 : 1));
+    else if (this._feverCool <= 0) this.addFever(FEVER_KILL * (1 + Math.min(1, this.combo / 150)) * (k.boss ? 0 : 1));
 
     // まとめて倒した
     const m = this._multi;
@@ -227,7 +227,7 @@ export const Score = {
           if (m.n > this.stats.bestMulti) this.stats.bestMulti = m.n;
           Events.emit('multiKill', { count: m.n, points: pts, x: m.x, z: m.z });
           this._add(pts, m.x, m.z, 'multi', { count: m.n });
-          if (!this.feverActive && this._feverCool <= 0 && m.n >= 5) this.addFever(m.n * 0.0016);
+          if (!this.feverActive && this._feverCool <= 0 && m.n >= 5) this.addFever(m.n * 0.0006);
           this._personal('multi', m.n);
         }
       }

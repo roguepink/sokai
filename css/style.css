@@ -386,6 +386,8 @@ body.pc #hud .weapon-name { bottom: calc(var(--sab) + 172px); }
 .sub-banner.pb b { color: #7dff6b; }
 .pop.pts.shield { color: #9fd8ff; font-size: 17px; }
 
+.set-row .view-open { font-size: 15px; padding: 7px 16px; border-width: 1px; }
+
 /* 結果: このプレイの記録 */
 .res-extra { grid-template-columns: repeat(3, auto); }
 .res-extra b { font-size: 16px; } .res-extra b small { font-size: 11px; opacity: .8; font-weight: 700; }

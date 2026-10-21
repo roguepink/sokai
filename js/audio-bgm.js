@@ -3,6 +3,7 @@
 //   0: キックとハイハットだけ + うすい和音      1: 4つ打ち + スネア + 8分のベース
 //   2: + 16分ハイハット + アルペジオ(ピコピコ)  3: + 速いアルペジオ + 歪んだベース + シンバル + タム
 // ボスがいる間は、暗いコード進行(E → F → E → D)に変わる。
+// 無双モード中(setFever(true)): 明るい長調 + 8分のキック・裏拍のシンセの和音・1 オクターブ上のアルペジオ(いちばん派手)。
 const BPM = 150;
 const STEP = 60 / BPM / 4;                 // 16分音符 = 0.1 秒
 const LOOKAHEAD = 0.18;
@@ -12,6 +13,7 @@ const PROG = {
   normal: [[0, 'm'], [8, 'M'], [10, 'M'], [7, 'M']],      // Em C D B
   boss: [[0, 'm'], [1, 'M'], [0, 'm'], [10, 'M']],        // Em F Em D
   title: [[0, 'm'], [8, 'M'], [3, 'M'], [10, 'M']],       // Em C G D
+  fever: [[0, 'M'], [8, 'M'], [10, 'M'], [5, 'M']],       // E C D A(明るく 勝ちほこる)
 };
 const E2 = 82.41;
 const hz = (semi) => E2 * Math.pow(2, semi / 12);
@@ -38,7 +40,10 @@ export class Music {
     this.playing = false; this.level = 0; this.want = 0; this.mode = 'normal'; this.wantMode = 'normal';
     this.step = 0; this.bar = 0; this.next = 0; this.timer = null;
     this.volume = 1;
+    this.fever = false; this.feverWant = false;
   }
+
+  setFever(f) { this.feverWant = !!f; }
 
   start(mode = 'normal') {
     const t = this.ctx.currentTime;
@@ -73,6 +78,11 @@ export class Music {
     const now = this.ctx.currentTime;
     if (this.next < now - 0.5) this.next = now + 0.05;   // 止まっていたら追いつく
     while (this.next < now + LOOKAHEAD) {
+      // 無双モードは 拍の頭ですぐ切りかえる(小節の終わりを待たない)
+      if (this.step % 4 === 0 && this.feverWant !== this.fever) {
+        this.fever = this.feverWant;
+        if (this.fever) { this.mode = this.wantMode = 'fever'; this.level = 3; this.bar = 0; this.crash(this.next, 1.2); }
+      }
       if (this.step % 16 === 0) {
         // 小節の頭でもり上がり・曲調を切りかえる
         if (this.wantMode !== this.mode) { this.mode = this.wantMode; this.bar = 0; }
@@ -106,6 +116,12 @@ export class Music {
     }
     // --- 和音(うすく、小節の頭で) ---
     if (s === 0 && L <= 1) this.pad(t, [root + 12, root + 12 + third, root + 19], STEP * 16);
+    // --- 無双モードの上乗せ ---
+    if (this.fever) {
+      if (s % 2 === 0 && s % 4 !== 0) this.kick(t, 0.7);                        // 8分のキック
+      if (s === 2 || s === 6 || s === 10 || s === 14) this.stab(t, [root + 24, root + 24 + third, root + 31]);   // 裏拍の和音
+      if (s % 2 === 1) this.lead(t, hz(root + 36 + [0, 7, 12, 7][(s >> 1) % 4]), 0.03);
+    }
     // --- アルペジオ ---
     if (L >= 2) {
       const arp = [0, third, 7, 12, 7, third, 12, 15 + (third - 3)];
@@ -184,6 +200,17 @@ export class Music {
     const g = c.createGain(); this._env(g, t, 0.003, v, 0.09);
     o.connect(lp).connect(g); g.connect(this.out); g.connect(this.delay);
     o.start(t); o.stop(t + 0.12);
+  }
+
+  // 短い和音(のこぎり波を少しずらして重ねる)
+  stab(t, semis) {
+    const c = this.ctx, lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.setValueAtTime(3200, t); lp.frequency.exponentialRampToValueAtTime(900, t + 0.1);
+    const g = c.createGain(); this._env(g, t, 0.004, 0.05, 0.1);
+    lp.connect(g).connect(this.out); g.connect(this.delay);
+    for (const s of semis) for (const dt of [-9, 9]) {
+      const o = c.createOscillator(); o.type = 'sawtooth'; o.frequency.value = hz(s); o.detune.value = dt;
+      o.connect(lp); o.start(t); o.stop(t + 0.14);
+    }
   }
 
   pad(t, semis, dur) {

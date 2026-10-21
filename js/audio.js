@@ -10,6 +10,7 @@ import { Zombies } from './zombies.js';
 import { Score } from './score.js';
 import { Bosses } from './ui-boss.js';
 import { Music } from './audio-bgm.js';
+import { SOUNDS2, GAP2, LEN2, IMPORTANT2, bossRoar } from './audio-sfx2.js';
 
 const MAX_VOICES = 36;
 // 同じ音を続けて鳴らすときの最短の間隔(秒)
@@ -41,13 +42,42 @@ export const Audio = {
     Events.on('melee', (m) => this.play('melee', m));
     Events.on('spin', (m) => this.play('spin', m));
     Events.on('hit', (h) => { if (h && (h.amount >= 4 || h.crit)) this.play(h.boss ? 'bosshit' : 'hit', h); });
-    Events.on('kill', (k) => this.play('kill', k));
+    Events.on('kill', (k) => {
+      this.play('kill', k);
+      const t = k && k.type;
+      if (t === 'burner') this.play('ignite'); else if (t === 'gasmask') this.play('gas'); else if (t === 'golden') this.play('coin');
+    });
     Events.on('score', (s) => { if (s && s.kind === 'kill') this.play('ding', s); });
     Events.on('multiKill', (m) => this.play('multi', m));
     Events.on('milestone', (m) => this.play('milestone', m));
     Events.on('weaponChange', () => this.play('weapon'));
     Events.on('zombieAttack', () => this.play('attack'));
-    Events.on('bossSpawn', () => { this.play('bossroar'); this.vibrate([40, 60, 40]); });
+    Events.on('bossSpawn', (b) => { this.play('bossroar', { type: b && b.e && b.e.type }); this.vibrate([40, 60, 40]); });
+    // ---- 第2弾 ----
+    Events.on('feverStart', () => { this.play('fever'); this.vibrate([30, 30, 30, 30, 120]); });
+    Events.on('feverEnd', () => this.play('feverend'));
+    Events.on('worldEvent', (w) => {
+      const k = w && w.kind; if (!k || this._state !== 'play') return;
+      const map = { supply: 'supply', supplyOpen: 'supplyOpen', supplyLost: 'goldenEscape', golden: 'golden', goldenDown: 'goldenDown', goldenEscape: 'goldenEscape',
+        march: 'march', tsunami: 'tsunami', skyfall: 'skyfall', bossrush: 'alarm', challenge: 'challenge', challengeClear: 'challengeClear',
+        challengeFail: 'challengeFail', discover: 'discover', bossrushClear: 'challengeClear' };
+      if (k === 'airstrike') { setTimeout(() => this.play('airstrike'), 700); return; }
+      if (map[k]) this.play(map[k]);
+      if (k === 'supplyOpen' || k === 'goldenDown' || k === 'challengeClear') this.vibrate([30, 40, 60]);
+    });
+    Events.on('shieldBreak', () => this.play('clang'));
+    Events.on('dash', () => this.play('dash'));
+    Events.on('dashHit', (d) => { if (d && d.kills > 0) this.play('kill', d); });
+    Events.on('slamJump', () => this.play('slamJump'));
+    Events.on('slam', (s) => { this.play('slam', s); this.vibrate(Math.min(80, 30 + ((s && s.kills) || 0) * 3)); });
+    Events.on('zombieLeap', () => this.play('screech'));
+    Events.on('zombieLand', () => this.play('thud'));
+    Events.on('giantStep', (g) => this.play('stomp', g));
+    Events.on('propExplode', (p) => this.explosion((p && p.radius) || 4));
+    Events.on('bossAct', (b) => {
+      const s = { grab: 'bossgrab', throw: 'bossthrow', birth: 'birth', spit: 'spit', acidHit: 'sizzle', rev: 'rev', charge: 'carhorn' }[b && b.act];
+      if (s) this.play(s);
+    });
     Events.on('bossDown', () => { if (this._state === 'play') { this.play('bossdeath'); this.vibrate([60, 40, 140]); } });
     Events.on('horde', () => this.play('horn'));
     Events.on('newRecord', () => { this.play('fanfare'); this.vibrate([30, 40, 30, 40, 90]); });
@@ -158,9 +188,11 @@ export const Audio = {
     const playing = this._state === 'play' || this._state === 'title';
     if (this.music && this._state === 'play') {
       const boss = Bosses.list.length > 0, combo = Score.combo, n = safeCount();
-      const lv = boss || combo >= 60 ? 3 : combo >= 25 ? 2 : combo >= 5 || n >= 90 ? 1 : 0;
+      const fever = !!Score.feverActive;
+      const lv = fever || boss || combo >= 60 ? 3 : combo >= 25 ? 2 : combo >= 5 || n >= 90 ? 1 : 0;
       this.music.setLevel(lv);
-      this.music.setMode(boss ? 'boss' : 'normal');
+      this.music.setFever(fever);
+      this.music.setMode(fever ? 'fever' : boss ? 'boss' : 'normal');
     } else if (this.music && this._state === 'title') { this.music.setLevel(0); }
     if (playing && !this.muted) {
       const n = safeCount();
@@ -398,16 +430,19 @@ const SOUNDS = {
     A.tn(t, { dur: 0.12, gain: 0.05, wave: 'square', f0: rnd(700, 900), lp: 2500 });
   },
   kill(A, t) {
-    A.nz(t, { dur: 0.09, gain: 0.22, type: 'bandpass', f0: rnd(380, 620), q: 2, pan: rnd(-0.3, 0.3) });
-    A.tn(t, { dur: 0.08, gain: 0.18, f0: 95, f1: 45 });
+    const f = Score.feverActive ? 1.3 : 1;
+    A.nz(t, { dur: 0.09, gain: 0.22 * f, type: 'bandpass', f0: rnd(380, 620), q: 2, pan: rnd(-0.3, 0.3) });
+    A.tn(t, { dur: 0.08, gain: 0.18 * f, f0: 95, f1: 45 });
+    if (f > 1) A.nz(t, { dur: 0.05, gain: 0.12, type: 'highpass', f0: 3500, pan: rnd(-0.4, 0.4) });   // 無双モード: グシャッと はっきり
   },
   // 倒したときの「チーン」。コンボが増えるほど音が高くなる
   ding(A, t, o) {
     const combo = (o && o.combo) || 1;
     const i = Math.min(14, Math.floor(combo / 3));
-    const semi = PENTA[i % 5] + 12 * Math.floor(i / 5) - 12;
+    const semi = PENTA[i % 5] + 12 * Math.floor(i / 5) - 12 + (o && o.fever ? 12 : 0);   // 無双モード中は 1 オクターブ上
     const f = note(semi);
     A.tn(t, { dur: 0.16, gain: 0.1, f0: f });
+    if (o && o.fever) A.tn(t + 0.02, { dur: 0.1, gain: 0.025, wave: 'triangle', f0: f * 1.5, verb: 0.3 });
     A.tn(t, { dur: 0.1, gain: 0.03, wave: 'triangle', f0: f * 2 });
     if (combo >= 100) A.tn(t + 0.03, { dur: 0.12, gain: 0.025, f0: f * 3, verb: 0.3 });
   },
@@ -431,7 +466,8 @@ const SOUNDS = {
   },
 
   // --- ボス ---
-  bossroar(A, t) {
+  bossroar(A, t, o) {
+    if (o && o.type) return bossRoar(A, t, o.type);
     const c = A.ctx;
     // 警報(ウー・ウー)
     for (let i = 0; i < 4; i++) A.tn(t + i * 0.26, { dur: 0.22, gain: 0.07, a: 0.02, wave: 'square', f0: i % 2 ? 330 : 440, lp: 1800 });
@@ -514,4 +550,8 @@ const SOUNDS = {
   },
 };
 
+Object.assign(SOUNDS, SOUNDS2);
+Object.assign(MIN_GAP, GAP2);
+Object.assign(LEN, LEN2);
+for (const k of IMPORTANT2) IMPORTANT.add(k);
 Audio.SOUNDS = SOUNDS;   // 確認用(音の大きさを測るテストで使う)

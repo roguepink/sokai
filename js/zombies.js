@@ -571,7 +571,7 @@ export const Zombies = {
 const _dir = { x: 0, z: 0 };
 const _noOpts = {};
 const _near = [];
-const BOSS_ATTACK = new Set(['slam', 'boss', 'cleaver', 'leap', 'stomp']);
+const BOSS_ATTACK = new Set(['slam', 'boss', 'cleaver', 'leap', 'stomp', 'car', 'acid', 'tank', 'throw']);
 const byT = (a, b) => a.t - b.t;
 function bucket(gx, gz) { return ((gx * 73856093) ^ (gz * 19349663)) & (NB - 1); }
 

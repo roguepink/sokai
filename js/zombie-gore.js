@@ -24,7 +24,7 @@ const ELEC = new Set(['lightning', 'shock', 'tesla', 'electric', 'emp']);
 
 export function causeKind(cause) {
   if (!cause) return 'gun';
-  if (cause === 'spin') return 'spin';
+  if (cause === 'spin' || cause === 'dash') return 'spin';
   if (cause === 'shotgun') return 'shotgun';
   if (EXPLOSIVE.has(cause)) return 'boom';
   if (BLADE.has(cause)) return 'blade';
