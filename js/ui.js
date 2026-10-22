@@ -238,6 +238,14 @@ export const UI = {
     });
     // ---- 出来事 ----
     Events.on('worldEvent', (w) => this._worldEvent(w || {}));
+    // 地区に入ったら 大きく名前を出す(「ここから違う街」の合図。ノブさん 2026-10-23)
+    Events.on('districtEnter', (d) => {
+      if (!d || !d.name || d.id === 'plaza' || !this.banner) return;
+      const now = performance.now();
+      if (now - (this._distT || 0) < 6000 && d.id === this._distId) return;
+      this._distT = now; this._distId = d.id;
+      this.banner.show('― ' + d.name + ' ―', 'ここから先は 別の街', 'gold', 1.8, 1);
+    });
     Events.on('worldChange', (w) => { if (w && w.text && Score.active) this._sub(`<b>${w.text}</b>`, 'ms', 1); });
     Events.on('personalBest', (p) => {
       const what = p.kind === 'combo' ? '最大コンボ' : p.kind === 'kills' ? '倒した数' : 'まとめ倒し';
@@ -379,7 +387,7 @@ export const UI = {
     // 同じ場所に 0.6 秒いたら 出す(境目を行ったり来たりしても ちらつかない)
     if ((this._zoneStable += 0.3) < 0.6) return;
     const now = performance.now();
-    if (now - this._zoneShownT < 2500) return;
+    if (now - this._zoneShownT < 1200) return;
     this._zone = name; this._zoneShownT = now;
     const z = this.el.zone;
     z.textContent = '📍 ' + name;
