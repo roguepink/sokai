@@ -138,6 +138,35 @@ export const Engine = {
   setRoll(rad) { ViewCam.rollWant = rad; },
   // 着地でカメラが沈む(0.1〜0.5)
   landDip(amount) { ViewCam.land(amount); },
+  // 第4弾(演出係): カメラを 少しのあいだ ある場所(ボス)へ向ける。操作は とらない(見る向き・撃つ向きは そのまま)。
+  //   見下ろし: カメラの中心を その場所へ weight だけ寄せ、zoom 倍に引き、pitch だけ 低く(横から見る感じ)する
+  //   肩越し・一人称: カメラだけ その場所へ ふり向く(最大 weight の割合・45° まで)。照準の向きは変わらない
+  //   sec 秒(実時間)たったら なめらかに もどる。y = 見たい高さ(m)
+  focusOn(x, y, z, sec, o = {}) {
+    const f = this.focus;
+    f.x = x; f.y = y; f.z = z; f.t = sec; f.dur = sec;
+    f.weight = o.weight != null ? o.weight : 0.6; f.zoom = o.zoom || 1.25; f.pitch = o.pitch || 0; f.inT = o.inT || 0.25; f.outT = o.outT || 0.45;
+  },
+  focusTrack(x, y, z) { const f = this.focus; if (f.t > 0) { f.x = x; f.y = y; f.z = z; } },
+  focusEnd() { const f = this.focus; if (f.t > f.outT) f.t = f.outT; },
+  focus: { x: 0, y: 0, z: 0, t: 0, dur: 1, w: 0, weight: 0.6, zoom: 1.25, pitch: 0, inT: 0.25, outT: 0.45 },
+  _focusStep(realDt) {
+    const f = this.focus;
+    if (f.t > 0) f.t -= realDt;
+    // 入り(inT)と 出(outT)を なめらかに
+    let w = 0;
+    if (f.t > 0) {
+      const age = f.dur - f.t;
+      w = Math.min(1, age / Math.max(0.01, f.inT), f.t / Math.max(0.01, f.outT));
+      w = w * w * (3 - 2 * w);
+    }
+    f.w = w * f.weight;
+  },
+  // 光のにじみを 一瞬 強く(ボス撃破の光)。一人称・肩越しは 白く飛ばないよう 小さく
+  bloomKick(amount, sec = 0.5) {
+    const cap = this.viewMode === 'fps' ? 0.18 : this.viewMode === 'tps' ? 0.3 : 0.7;
+    this._bk = Math.min(cap, Math.max(this._bk || 0, amount)); this._bkDecay = this._bk / Math.max(0.05, sec);
+  },
 
   // ゲーム計算の速さ(フレームごとに main が呼ぶ。実時間 realDt を渡す)
   stepTime(realDt) {
@@ -186,6 +215,7 @@ export const Engine = {
     this._demo = demo;
     const close = !demo && this.viewMode !== 'top';
     if (!demo && ViewCam.shot) ViewCam.endShot(this.camera);
+    this._focusStep(demo ? 1 : realDt);
     let mode = 'top';
     if (close || ViewCam.shot) this.camTarget.set(target.x, target.y + 1, target.z);   // 見下ろしにもどったとき とばないように
     if (close) {
@@ -250,12 +280,16 @@ export const Engine = {
       this._street = damp(this._street || 0, inside ? 0 : this.street, 2.5, realDt);
       this.camPitch = damp(this.camPitch, C.PITCH + 0.25 * this._street, 4, realDt);
     }
-    const want = (inside ? C.INSIDE_DIST : C.DIST) * (this._zoomMult || 1) * (demo ? 1.12 + 0.08 * Math.sin(this.camYaw * 2.3) : 1 + 0.08 * (this._street || 0));
-    this.camDist = damp(this.camDist, want, 3, realDt);
-    this.camTarget.x = damp(this.camTarget.x, target.x, C.LERP, realDt);
-    this.camTarget.z = damp(this.camTarget.z, target.z, C.LERP, realDt);
-    this.camTarget.y = damp(this.camTarget.y, target.y + 1, C.LERP, realDt);
-    const d = this.camDist, p = this.camPitch;
+    // ボスを見せる(focusOn): 中心を寄せる・引く・少し低い角度
+    const fw = demo ? 0 : this.focus.w, F = this.focus;
+    const want = (inside ? C.INSIDE_DIST : C.DIST) * (this._zoomMult || 1) * (demo ? 1.12 + 0.08 * Math.sin(this.camYaw * 2.3) : 1 + 0.08 * (this._street || 0))
+      * (1 + (F.zoom - 1) * (fw > 0 ? Math.min(1, fw / Math.max(0.01, F.weight)) : 0));
+    this.camDist = damp(this.camDist, want, fw > 0 ? 5 : 3, realDt);
+    const tx = target.x + (F.x - target.x) * fw, tz = target.z + (F.z - target.z) * fw;
+    this.camTarget.x = damp(this.camTarget.x, tx, C.LERP, realDt);
+    this.camTarget.z = damp(this.camTarget.z, tz, C.LERP, realDt);
+    this.camTarget.y = damp(this.camTarget.y, target.y + 1 + (F.y * 0.35) * fw, C.LERP, realDt);
+    const d = this.camDist, p = this.camPitch - F.pitch * (fw > 0 ? Math.min(1, fw / Math.max(0.01, F.weight)) : 0);
     const cam = this.camera;
     cam.position.set(
       this.camTarget.x + Math.sin(this.camYaw) * Math.cos(p) * d,
@@ -304,7 +338,8 @@ export const Engine = {
   render(realDt) {
     // main が shouldRender を呼んでいないとき(古いループ)は、ここで間引く
     if (!this._gated && !this._gate(performance.now(), this._demo ? 'title' : 'play')) return;
-    if (this.bloom) this.bloom.strength = this.viewMode === 'fps' ? 0.35 : this.viewMode === 'tps' ? 0.42 : 0.5;
+    if (this._bk > 0) this._bk = Math.max(0, this._bk - (this._bkDecay || 1) * Math.min(0.1, realDt || 0.016));
+    if (this.bloom) this.bloom.strength = (this.viewMode === 'fps' ? 0.35 : this.viewMode === 'tps' ? 0.42 : 0.5) + (this._bk || 0);
     this._measureFps();
     this._shadowTick();
     for (let i = 0; i < this.beforeRender.length; i++) this.beforeRender[i]();

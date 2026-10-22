@@ -11,8 +11,19 @@
 //   feverStart {dur, level, cause}        無双モード開始(ゲージが満タン / 物資の箱 など)
 //   feverEnd   {kills, points, level}     無双モード終わり
 //   personalBest {kind:'combo'|'kills'|'multi', value, prev}   今までの自分の記録をこえた瞬間(1回だけ)
+// 第4弾(ボス撃破を クセになる ごほうびに):
+//   bossJackpot {name, type, x, z, e, time, base, speed:{mult,label}|null, chain, combo, bonusMult, first, firstPts,
+//                pb, prevBest, pbPts, total, medals, medalTotal}   ボスを倒した(1 体につき 1 回。bossDown のすぐあと)
+//   ・点 = 基本(2万 + 1万×(このプレイで何体目-1))× 強さ(bossTier)+ 今の点数の 5%)× 瞬殺ボーナス × ボス連続撃破
+//          × コンボ倍率(×4 まで)× 無双などの倍率
+//          + はじめて倒した種類(5万×強さ)+ 自己ベスト更新(2万)
+//   ・瞬殺ボーナス: 10 秒以内 ×3「瞬殺!!」/ 20 秒以内 ×2「速攻!」/ 35 秒以内 ×1.5「快速」(強さ bossTier 1 段ごとに 秒が 4 割 のびる)
+//   ・ボス連続撃破: 前のボスを倒してから 100 秒以内に 次のボスを倒すと ×2, ×3 … (×10 まで)
+//   ・倒して 1.9 秒(ゲームの時間)後に 無双モード(ゲージ満タン)。コンボも 8 秒 のびる
+//   ・ボスの衝撃波(novaBegin〜novaEnd)で倒した分は まとめ倒しにせず「一掃ボーナス」= min(数,80)² × 25 × ボス連続撃破 × 倍率
 import { Events } from './events.js';
 import { CONFIG } from './config.js';
+import { BossDex } from './ui-bossdex.js';
 
 const RECORDS_KEY = 'sokai-records';     // ベスト以外の記録(最多コンボ・合計撃破数 など)
 const BASE = 10;                          // 敵の points にかける数(大きい数字は気持ちいい)
@@ -25,6 +36,13 @@ const FEVER_DUR = 12;                     // 続く秒数
 const FEVER_KILL = 0.0005;                // 1 体倒すとたまる量(コンボが長いほど少し多い。だいたい 1 分に 1 回)
 const FEVER_COOL = 4;                     // 終わったあと、たまり始めるまでの秒数
 
+// ボス撃破のごほうび
+const BOSS_SPEED = [[10, 3, '瞬殺!!'], [20, 2, '速攻!'], [35, 1.5, '快速']];
+const BOSS_CHAIN_GAP = 100;               // この秒数のうちに次のボスを倒すと「ボス連続撃破」
+const BOSS_CHAIN_MAX = 10;
+const BOSS_FEVER_DELAY = 1.9;
+const BOSS_COMBO_MAX = 4;                 // 大当たりに かけるコンボ倍率の上限             // 倒してから 無双モードまで(ゲームの秒。スローの間は ゆっくり)
+
 const KILL_STEPS = [10, 25, 50, 100, 200, 300, 500, 750, 1000];
 const COMBO_STEPS = [10, 20, 30, 50, 75, 100, 150, 200, 300, 500, 750, 1000];
 const SCORE_STEPS = [1e5, 5e5, 1e6, 5e6, 1e7, 5e7, 1e8, 5e8, 1e9];
@@ -34,6 +52,7 @@ export const Score = {
   newRecord: false,
   active: false,          // プレイ中だけ数える(タイトルの見本プレイでは数えない)
   maxCombo: 0, time: 0, bossKills: 0,
+  bossChain: 0, _lastBossT: -999, _bossFever: 0,
   comboWindow: COMBO_TIME,
   startBest: 0,           // このプレイを始めたときのベスト
   records: { maxCombo: 0, mostKills: 0, totalKills: 0, plays: 0, longest: 0, bestMulti: 0, fevers: 0 },
@@ -45,6 +64,7 @@ export const Score = {
   _feverCool: 0, _feverKills: 0, _feverPts: 0,
   // ---- 出来事のごほうび: 点数〇倍(秒) ----
   boostMult: 1, boostT: 0,
+  _nova: null,            // ボスの衝撃波で倒している間 {n, pts}(画面係が novaBegin / novaEnd で はさむ)
 
   // ---- このプレイの記録(結果画面) ----
   stats: null,
@@ -52,6 +72,7 @@ export const Score = {
   _multi: null, _killStep: 0, _comboStep: 0, _scoreStep: 0, _savedKills: 0, _wid: '', _pb: null,
 
   init() {
+    BossDex.init();
     try { this.best = +localStorage.getItem(CONFIG.BEST_KEY) || 0; } catch (e) {}
     try { Object.assign(this.records, JSON.parse(localStorage.getItem(RECORDS_KEY)) || {}); } catch (e) {}
     this.startBest = this.best;
@@ -67,6 +88,8 @@ export const Score = {
   reset() {
     this.score = 0; this.kills = 0; this.combo = 0; this.comboTime = 0; this.mult = 1; this.newRecord = false;
     this.maxCombo = 0; this.time = 0; this.bossKills = 0;
+    this.bossChain = 0; this._lastBossT = -999; this._bossFever = 0; this._nova = null;
+    BossDex.resetRun();
     this._multi = null; this._killStep = 0; this._comboStep = 0; this._scoreStep = 0; this._savedKills = 0;
     this.startBest = this.best;
     this.fever = 0; this.feverActive = false; this.feverT = 0; this.feverLevel = 0; this.feverMult = 1;
@@ -115,12 +138,15 @@ export const Score = {
     if (this.combo > this.maxCombo) this.maxCombo = this.combo;
     this.mult = this._calcMult();
     const base = (k.points || 10) * BASE * (CAUSE_BONUS[k.cause] || 1);
-    this._add(base * this.mult * this.bonusMult, k.x, k.z, 'kill');
+    const kp = Math.round(base * this.mult * this.bonusMult);
+    this._add(kp, k.x, k.z, 'kill');
 
     // 記録: どの武器で倒したか
     const st = this.stats;
-    const wk = k.cause === 'spin' ? 'spin' : k.cause === 'sword' ? 'sword' : (this._wid || 'gun');
-    const w = st.weapons[wk] || (st.weapons[wk] = { n: 0, name: wk === 'spin' ? '🌀 回転斬り' : wk === 'sword' ? '🗡️ 剣' : (this._wname || wk) });
+    const nv = this._nova && k.cause === 'spin' ? this._nova : null;
+    const wk = nv ? 'nova' : k.cause === 'spin' ? 'spin' : k.cause === 'sword' ? 'sword' : (this._wid || 'gun');
+    const w = st.weapons[wk] || (st.weapons[wk] = { n: 0, name: wk === 'nova' ? '💥 ボスの衝撃波' : wk === 'spin' ? '🌀 回転斬り' : wk === 'sword' ? '🗡️ 剣' : (this._wname || wk) });
+    if (wk === 'nova') st.novaKills++;
     w.n++;
     if (k.type === 'golden') st.golden++;
 
@@ -128,9 +154,10 @@ export const Score = {
     if (this.feverActive) this._feverKills++;
     else if (this._feverCool <= 0) this.addFever(FEVER_KILL * (1 + Math.min(1, this.combo / 150)) * (k.boss ? 0 : 1));
 
-    // まとめて倒した
+    // まとめて倒した(ボスの衝撃波で倒した分は「一掃」として 別に数える)
     const m = this._multi;
-    if (m && m.gap > 0) { m.n++; m.gap = MULTI_GAP; m.x += (k.x - m.x) / m.n; m.z += (k.z - m.z) / m.n; }
+    if (nv) { nv.n++; nv.pts += kp; }
+    else if (m && m.gap > 0) { m.n++; m.gap = MULTI_GAP; m.x += (k.x - m.x) / m.n; m.z += (k.z - m.z) / m.n; }
     else this._multi = { n: 1, gap: MULTI_GAP, age: 0, x: k.x, z: k.z };
 
     this._steps();
@@ -170,11 +197,51 @@ export const Score = {
 
   onBoss(b) {
     if (!this.active) return;
+    b = b || {};
+    const e = b.e || null, type = b.type || (e && e.type) || '';
     this.bossKills++;
-    this.comboTime = COMBO_TIME + 2;          // ボスを倒したらコンボが少し長持ち
-    const pts = (20000 + 10000 * (this.bossKills - 1)) * Math.max(1, this.mult) * this.bonusMult;
-    this._add(pts, b && b.x, b && b.z, 'boss', { name: b && b.name });
-    if (!this.feverActive) this.addFever(0.3);
+    // ボス連続撃破(前のボスから 100 秒以内)
+    this.bossChain = this.time - this._lastBossT <= BOSS_CHAIN_GAP ? Math.min(BOSS_CHAIN_MAX, this.bossChain + 1) : 1;
+    this._lastBossT = this.time;
+    // 瞬殺ボーナス(出てから倒すまでの秒)
+    const time = b.time > 0 ? b.time : 0;
+    let speed = null;
+    if (time > 0) for (const [sec, m, label] of bossSpeedGoals(e)) if (time <= sec) { speed = { mult: m, label, sec }; break; }
+    const tier = Math.max(1, Math.min(5, +(e && e.bossTier) || 1));
+    // 基本: 2万 + 1万×(何体目-1) + 今の点数の 5%(後半でも ありがたみが へらないように)
+    const base = Math.round(((20000 + 10000 * (this.bossKills - 1)) * (1 + 0.5 * (tier - 1)) + this.score * 0.05) / 1000) * 1000;
+    const combo = Math.min(BOSS_COMBO_MAX, Math.max(1, this.mult)), bm = this.bonusMult;
+    const dex = BossDex.record(type, (e && e.def && e.def.name) || b.name, time);
+    const firstPts = dex.first ? 50000 * tier : 0;
+    const pbPts = dex.pb ? 20000 : 0;
+    const total = Math.round(base * (speed ? speed.mult : 1) * this.bossChain * combo * bm + (firstPts + pbPts) * bm);
+    // 記録
+    const st = this.stats;
+    st.bossPts += total;
+    if (time > 0 && (!st.bossFastest || time < st.bossFastest)) { st.bossFastest = time; st.bossFastestName = b.name || ''; }
+    st.bossChainMax = Math.max(st.bossChainMax, this.bossChain);
+    this.comboTime = Math.max(this.comboTime, 8);       // ボスを倒したら コンボが 8 秒 のびる
+    this._bossFever = BOSS_FEVER_DELAY;                 // 少しあとで 無双モード
+    this._add(total, b.x, b.z, 'boss', { name: b.name });
+    Events.emit('bossJackpot', {
+      name: b.name || (e && e.name) || 'ボス', type, x: b.x, z: b.z, e, n: b.n, time, tier,
+      base: Math.round(base), speed, chain: this.bossChain, combo, bonusMult: bm,
+      first: dex.first, firstPts: Math.round(firstPts * bm), pb: dex.pb, prevBest: dex.prevBest, pbPts: Math.round(pbPts * bm),
+      total, medals: BossDex.count, medalTotal: BossDex.total, bossKills: this.bossKills,
+    });
+  },
+
+  // ---- ボスの衝撃波(画面係 ui-bossfx.js が はさむ)。終わったら 一掃ボーナス ----
+  novaBegin() { if (this.active && !this._nova) this._nova = { n: 0, pts: 0 }; },
+  // {n(倒した数), pts(1 体ずつの点 + 一掃ボーナス), bonus} を返す。一掃ボーナス = min(n,80)² × 25 × ボス連続撃破 × 無双などの倍率
+  novaEnd() {
+    const nv = this._nova; this._nova = null;
+    if (!nv || !this.active) return { n: 0, pts: 0, bonus: 0 };
+    const k = Math.min(80, nv.n), bonus = Math.round(k * k * 25 * Math.max(1, this.bossChain) * this.bonusMult);
+    if (bonus > 0) this._add(bonus, null, null, 'nova', { count: nv.n });
+    this.stats.bossPts += nv.pts + bonus;
+    if (nv.n > this.stats.bestMulti) this.stats.bestMulti = nv.n;
+    return { n: nv.n, pts: nv.pts + bonus, bonus };
   },
 
   // ---------------- フィーバー ----------------
@@ -211,6 +278,12 @@ export const Score = {
     if (!this.active) return;
     this.time += dt;
     if (this.boostT > 0) { this.boostT -= dt; if (this.boostT <= 0) this.boostMult = 1; }
+    // ボスを倒したあと: ゲージを いっきに満タン → 無双モード
+    if (this._bossFever > 0 && (this._bossFever -= dt) <= 0) {
+      this._feverCool = 0;
+      if (this.feverActive) this.startFever(FEVER_DUR, 'boss');      // もう無双中なら 時間をのばす
+      else { this.fever = 1; this.startFever(FEVER_DUR, 'boss'); }
+    }
     if (this.feverActive) {
       this.feverT -= dt;
       this.fever = Math.max(0, this.feverT / this.feverDur);
@@ -261,8 +334,15 @@ export const Score = {
   },
 };
 
+// 瞬殺ボーナスの秒(強いボス = bossTier が高いほど ゆるく。体力バーの「瞬殺まで あと〇秒」も これを使う)
+export function bossSpeedGoals(e) {
+  const tier = Math.max(1, Math.min(5, +(e && e.bossTier) || 1)), k = 1 + 0.4 * (tier - 1);
+  return BOSS_SPEED.map(([sec, m, label]) => [Math.round(sec * k), m, label]);
+}
+
 function newStats() {
-  return { weapons: {}, bestMulti: 0, fevers: 0, feverBest: 0, golden: 0, events: 0, found: 0, challenges: 0 };
+  return { weapons: {}, bestMulti: 0, fevers: 0, feverBest: 0, golden: 0, events: 0, found: 0, challenges: 0,
+    bossPts: 0, bossFastest: 0, bossFastestName: '', bossChainMax: 0, novaKills: 0 };
 }
 
 function nextStep(steps, i) { return i < steps.length ? steps[i] : steps[steps.length - 1] + 500 * (i - steps.length + 1); }

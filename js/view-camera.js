@@ -173,7 +173,17 @@ export const ViewCam = {
     this.hideHero = hide;
     this.heroFade = damp(this.heroFade, fade, 10, dt);
     // 向き(ヨー・ピッチ)+ かたむき + ゆれ(回転のゆれ。位置をゆらすと 壁にめりこむので)
-    _e.set(p, -yaw, this.roll, 'YXZ');
+    // 第4弾: ボスを見せる(Engine.focusOn)= カメラだけ そちらへ ふり向く(照準の向き lookYaw は変えない)
+    let fyaw = 0, fpit = 0;
+    const FC = E.focus;
+    if (FC && FC.w > 0.001) {
+      const dx = FC.x - cam.position.x, dz = FC.z - cam.position.z, dh = Math.hypot(dx, dz) || 1;
+      const want = Math.atan2(dx, -dz);
+      fyaw = Math.max(-0.8, Math.min(0.8, angleDiff(yaw, want))) * FC.w;
+      const wp = Math.atan2(FC.y - cam.position.y, dh);
+      fpit = Math.max(-0.15, Math.min(0.55, wp - p)) * FC.w;
+    }
+    _e.set(p + fpit, -(yaw + fyaw), this.roll, 'YXZ');
     if (E._shake > 0) {
       const s = E._shake * E._shake * (fps ? 0.018 : 0.03);
       const t = (this.shakeT += dt * 31);

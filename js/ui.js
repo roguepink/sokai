@@ -1,8 +1,9 @@
 // 画面係: 点数(数字がくるくる上がる)・コンボ・最高記録・倒した数・ミニマップ・武器の列・回転斬りのたまり具合・
 // ボスの体力・飛び出す数字・大きな文字の演出・タイトル/設定/一時停止/結果の画面。
 // 第2弾: 無双モードのゲージと演出・出来事(worldEvent)の文字・チャレンジの残り・自己ベスト・大量撃破のスロー(キルカム)・結果の記録。
+// 第4弾: ボスの体力バー(太い・形態ごとの区切り・ひび・脅威度・倒すまでの時計)。登場・撃破の演出は ui-bossfx.js、図鑑は ui-bossdex.js
 import { Events } from './events.js';
-import { Score, jpNum } from './score.js';
+import { Score, jpNum, bossSpeedGoals } from './score.js';
 import { Weapons, WEAPONS } from './weapons.js';
 import { Engine, loadSettings, saveSettings } from './engine.js';
 import { Player } from './player.js';
@@ -14,6 +15,8 @@ import { Popups, Banner, Confetti, flash, Avoid } from './ui-fx.js';
 import { Happenings } from './zombie-events.js';
 import { WeaponGrid } from './ui-weapons.js';
 import { Input } from './input.js';
+import { BossShow, bossThreat } from './ui-bossfx.js';
+import { BossDex } from './ui-bossdex.js';
 
 const $ = (id) => document.getElementById(id);
 const fmt = (n) => Math.floor(n).toLocaleString();
@@ -57,8 +60,9 @@ export const UI = {
         <div class="pace" id="hudPaceBox"><i id="hudPace"></i></div>
       </div>
       <div class="hud-boss hidden" id="hudBoss">
-        <div class="boss-name"><span>BOSS</span><b id="hudBossName"></b></div>
-        <div class="boss-bar"><i class="boss-lag" id="hudBossLag"></i><i class="boss-fill" id="hudBossFill"></i></div>
+        <div class="boss-name"><span>BOSS</span><b id="hudBossName"></b><em class="boss-stars" id="hudBossStars"></em><small class="boss-time" id="hudBossTime"></small></div>
+        <div class="boss-bar" id="hudBossBar"><i class="boss-lag" id="hudBossLag"></i><i class="boss-fill" id="hudBossFill"></i><div class="boss-segs" id="hudBossSegs"></div><i class="boss-crack"></i></div>
+        <div class="boss-phase" id="hudBossPhase"></div>
       </div>
       <div class="hud-combo" id="hudCombo">
         <b id="hudComboN">0</b>
@@ -92,6 +96,7 @@ export const UI = {
       combo: q('hudCombo'), comboN: q('hudComboN'), mult: q('hudMult'), comboBar: q('hudComboBar'),
       weapon: q('hudWeapon'), weaponBar: wbar,
       boss: q('hudBoss'), bossName: q('hudBossName'), bossFill: q('hudBossFill'), bossLag: q('hudBossLag'),
+      bossBar: q('hudBossBar'), bossSegs: q('hudBossSegs'), bossStars: q('hudBossStars'), bossTime: q('hudBossTime'), bossPhase: q('hudBossPhase'),
       bossArrow: q('bossArrow'), bossDist: q('bossDist'), vignette: q('vignette'),
       sub: q('subBanner'), pause: q('btnPause'), zone: q('hudZone'), rot: q('rotHint'),
       fever: q('hudFever'), fvFill: q('fvFill'), fvText: q('fvText'), feverTint: q('feverTint'),
@@ -114,6 +119,7 @@ export const UI = {
     };
     this.confetti = new Confetti($('confettiLayer'), low ? 28 : 56);
     Bosses.init();
+    BossShow.init(hud, this);
     Minimap.init(q('minimap'));
 
     // 回転斬りボタンに「たまり具合」の輪をつける
@@ -133,6 +139,7 @@ export const UI = {
   show(v) {
     this.el.hud.classList.toggle('hidden', !v);
     this.el.weaponBar.classList.toggle('hidden', !v);
+    if (BossShow.el.layer) BossShow.el.layer.classList.toggle('hidden', !v);
     if (v) { Minimap.resize(); this._buildWeaponBar(); this._barFitKey = ''; }
   },
 
@@ -167,7 +174,7 @@ export const UI = {
         this.pts.spawn(s.x, 2.0, s.z, '+' + fmt(p), 'pts', sz, 0.8, 46);
       } else {
         if (s.kind === 'multi' && s.count >= 6) return;   // 大きいまとめ倒しは、まんなかの文字で見せる
-        if (s.kind === 'milestone') return;
+        if (s.kind === 'milestone' || s.kind === 'boss') return;   // ボスは 大当たりの札で見せる
         const cls = s.kind === 'boss' ? 'pts boss' : 'pts multi';
         const txt = '+' + fmt(p);
         this.pts.spawn(s.x, 2.4, s.z, txt, cls, s.kind === 'boss' ? 2 : 1.5, s.kind === 'boss' ? 2.2 : 1.3, 80);
@@ -205,19 +212,10 @@ export const UI = {
       this._scoreBump = 1.6;
     });
 
-    Events.on('bossSpawn', (d) => {
-      const name = (d && (d.name || (d.e && d.e.name))) || 'ボス';
-      this.banner.show('⚠ ボス出現!', name, 'boss', 2.6, 3);
-      flash(this.el.flash, '#ff1a1a', 0.45, 700);
-      this.el.vignette.classList.add('boss');
-    });
-
-    Events.on('bossDown', (b) => {
-      const pts = this._bossPts; this._bossPts = 0;
-      this.banner.show('ボス撃破!', pts ? '+' + fmt(pts) + ' 点' : (b.name || ''), 'bossdown', 2.4, 3);
-      flash(this.el.flash, '#fff3b0', 0.38, 450);
-      if (Score.active) this.confetti.burst(Engine.quality === 'low' ? 16 : 30);
-    });
+    // ボスの登場・撃破の演出は ui-bossfx.js(BossShow)
+    Events.on('bossSpawn', () => { this.el.vignette.classList.add('boss'); });
+    // 怒り(形態が変わった): 体力バーに ひび
+    Events.on('bossPhase', (d) => { if (d && d.e === this._bossKey) this._bossCrack(d.phase); });
 
     Events.on('horde', (h) => {
       this.banner.show('大群が来るぞ!', (h && h.text) || (h && h.count ? h.count + '体 接近中' : ''), 'horde', 2.2, 2);
@@ -227,7 +225,8 @@ export const UI = {
     // ---- 無双モード ----
     Events.on('feverStart', (f) => {
       const mult = f && f.mult ? f.mult : 2;
-      this.banner.show('無双モード!!', `点数 ×${mult % 1 ? mult.toFixed(1) : mult} ・ ${Math.round((f && f.dur) || 12)}秒`, 'fever', 2.2, 3);
+      const boss = f && f.cause === 'boss' ? 'ボス撃破ボーナス! ' : '';
+      this.banner.show('無双モード!!', `${boss}点数 ×${mult % 1 ? mult.toFixed(1) : mult} ・ ${Math.round((f && f.dur) || 12)}秒`, 'fever', 2.2, 3);
       flash(this.el.flash, '#ffd23f', 0.45, 600);
       this.el.hud.classList.add('fever');
       if (Engine.quality !== 'low') this.confetti.burst(24);
@@ -280,7 +279,7 @@ export const UI = {
   _resetHud() {
     this.paused = false; this.el.hud.classList.remove('paused');
     this._disp = 0; this._lastScoreTxt = ''; this._lastKills = -1; this._lastTime = -1;
-    this._comboTier = -1; this._comboShown = false; this._bossLag = 1; this._bossKey = null;
+    this._comboTier = -1; this._comboShown = false; this._bossLag = 1; this._bossKey = null; this._rollT = 0;
     this.dmg.clear(); this.pts.clear(); this.banner.clear();
     this.el.scoreBox.classList.remove('record');
     this.el.combo.classList.remove('on', 'end');
@@ -300,7 +299,7 @@ export const UI = {
   // すぐ次が来たら 文字だけ入れかえる(動きを最初からやり直さない = ちらつかない)
   _sub(html, cls, prio = 1) {
     // 大きな文字が出ている間は 順番待ち(重ならないように)。いちばん大事な 1 つだけ覚えておき、大きな文字が消えたら出す
-    if (this.banner.t > 0.05) {
+    if (this.banner.t > 0.05 || this.banner.holdT > 0) {
       const w = this._subWait;
       if (!w || prio >= w.prio || performance.now() - w.at > 1500) this._subWait = { html, cls, prio, at: performance.now() };
       return;
@@ -452,7 +451,12 @@ export const UI = {
 
     // 点数(くるくる上がる)
     const target = Score.score;
-    if (this._disp < target) {
+    if (this._rollT > 0 && this._disp < target) {
+      // ボスの大当たり: ゆっくり くるくる(slowRoll の秒で 追いつく)
+      this._disp += (target - this._disp) * Math.min(1, gdt / this._rollT);
+      this._rollT -= gdt;
+      if (this._rollT <= 0 || target - this._disp < 1) { this._rollT = 0; }
+    } else if (this._disp < target) {
       const diff = target - this._disp;
       this._disp += Math.max(diff * (1 - Math.exp(-9 * dt)), Math.min(diff, 60 * dt * 10));
       if (target - this._disp < 1) this._disp = target;
@@ -486,6 +490,7 @@ export const UI = {
     this._updateSpin();
     this._updateFever();
     Bosses.update(gdt);
+    BossShow.update(dt, gdt);
     this._updateBoss(dt);
 
     // 数字をよける場所: 主人公のまわり・上の点数の帯・右下のボタン
@@ -509,7 +514,7 @@ export const UI = {
     this.banner.update(dt);
     // 順番待ちの 下の 1 行(古すぎるものは 出さない)
     const sw = this._subWait;
-    if (sw && this.banner.t <= 0.05 && !this.paused) {
+    if (sw && this.banner.t <= 0.05 && !(this.banner.holdT > 0) && !this.paused) {
       this._subWait = null;
       if (performance.now() - sw.at < 3500) this._sub(sw.html, sw.cls, sw.prio);
     }
@@ -555,6 +560,9 @@ export const UI = {
     }
   },
 
+  // 点数を ゆっくり くるくる(ボスの大当たり。sec 秒で 追いつく)
+  slowRoll(sec) { this._rollT = Math.max(this._rollT || 0, sec); },
+
   _updateBoss(dt) {
     const el = this.el, B = Bosses.list;
     const cur = B.length ? B[0] : null;
@@ -564,15 +572,43 @@ export const UI = {
     }
     const e = cur.e;
     if (this._bossKey !== e) {
-      this._bossKey = e; this._bossLag = 1;
-      el.boss.classList.remove('hidden');
+      this._bossKey = e; this._bossLag = 1; this._bossPh = 1; this._bossTimeTxt = ''; this._bossGoals = null;
+      el.boss.classList.remove('hidden', 'ph2', 'ph3');
       el.bossName.textContent = cur.name + (B.length > 1 ? ' ほか' + (B.length - 1) + '体' : '');
+      const th = bossThreat(e);
+      el.bossStars.textContent = '★'.repeat(th);
+      // 形態の区切り(ボス係の e.phaseHp = [0.66, 0.33] / e.phases = 3。なければ 3 つ)
+      this._bossCuts = phaseCuts(e);
+      el.bossSegs.innerHTML = this._bossCuts.map((c) => `<i style="left:${(c * 100).toFixed(1)}%"></i>`).join('');
+      el.bossPhase.textContent = '';
+    }
+    // 登場の演出中は 体力バーを出さない(名札と重ならないように)
+    const ing = BossShow.introActive;
+    if (ing !== this._bossIntroing) {
+      this._bossIntroing = ing;
+      el.boss.classList.toggle('introing', ing);
+      if (!ing) { el.boss.style.animation = 'none'; void el.boss.offsetWidth; el.boss.style.animation = ''; }   // 名札が消えたら バーが ぐいっと出る
     }
     const max = e.maxHp || (e.def && e.def.hp) || 1;
     const p = Math.max(0, Math.min(1, e.hp / max));
     if (p < this._bossLag) this._bossLag = Math.max(p, this._bossLag - dt * 0.35); else this._bossLag = p;
     el.bossFill.style.transform = `scaleX(${p.toFixed(4)})`;
     el.bossLag.style.transform = `scaleX(${this._bossLag.toFixed(4)})`;
+    // 今の形態(ボス係の e.phase。なければ 体力の区切りから)
+    let ph = e.phase > 0 ? e.phase : 1;
+    if (!(e.phase > 0)) for (const c of this._bossCuts) if (p <= c) ph++;
+    if (ph > this._bossPh) this._bossCrack(ph);
+    // 倒すまでの時計(瞬殺ボーナスまで あと何秒)
+    if ((this._bossTT = (this._bossTT || 0) - dt) <= 0) {
+      this._bossTT = 0.1;
+      const t = Bosses.clock - (cur.bornT || 0), G = this._bossGoals || (this._bossGoals = bossSpeedGoals(e));
+      const gi = G.findIndex((g) => t < g[0]), goal = gi >= 0 ? G[gi] : null;
+      const txt = goal ? `${gi === 0 ? '⚡' : ''}${goal[2].replace(/!+$/, '')}まで ${(goal[0] - t).toFixed(1)}` : `⏱ ${t.toFixed(0)}秒`;
+      if (txt !== this._bossTimeTxt) {
+        this._bossTimeTxt = txt; el.bossTime.textContent = txt;
+        el.bossTime.className = 'boss-time' + (goal ? ' g' + (gi + 1) : '');
+      }
+    }
 
     // 画面の外なら、端に矢印
     const W = innerWidth, H = innerHeight, sc = Engine.project(e.x, 1.5, e.z, _pt);
@@ -606,6 +642,20 @@ export const UI = {
     el.bossArrow.style.transform = `translate3d(${x.toFixed(0)}px,${y.toFixed(0)}px,0) translate(-50%,-50%)`;
     el.bossArrow.firstChild.style.transform = `rotate(${Math.atan2(ux, -uy).toFixed(3)}rad)`;
     el.bossDist.textContent = Math.round(l) + 'm';
+  },
+
+  // 形態が変わった: 体力バーに ひび・光る・ゆれる
+  _bossCrack(ph) {
+    const el = this.el;
+    ph = Math.max(2, ph || 2);
+    if (ph <= (this._bossPh || 1)) return;
+    this._bossPh = ph;
+    el.boss.classList.toggle('ph2', ph === 2); el.boss.classList.toggle('ph3', ph >= 3);
+    el.bossPhase.textContent = ph >= 3 || ph >= (this._bossCuts || []).length + 1 ? '最終形態' : '怒り状態';
+    // 区切りの印を こわれた印に
+    const segs = el.bossSegs.children, k = segs.length - (ph - 1);
+    for (let i = segs.length - 1; i >= Math.max(0, k); i--) segs[i].classList.add('broke');
+    el.bossBar.classList.remove('crack'); void el.bossBar.offsetWidth; el.bossBar.classList.add('crack');
   },
 
   // ---------------- 画面(タイトル・設定・一時停止・結果) ----------------
@@ -675,7 +725,8 @@ export const UI = {
     if (Score.best > 0) {
       t.innerHTML = `<span>ベスト <b>${fmt(Score.best)}</b></span>` +
         (r.maxCombo ? `<span>最大コンボ <b>${fmt(r.maxCombo)}</b></span>` : '') +
-        (r.totalKills ? `<span>倒した合計 <b>${fmt(r.totalKills)}</b>体</span>` : '');
+        (r.totalKills ? `<span>倒した合計 <b>${fmt(r.totalKills)}</b>体</span>` : '') +
+        `<span>👹 ボス図鑑 <b>${BossDex.count}/${BossDex.total}</b></span>`;
       t.classList.remove('hidden');
     } else t.classList.add('hidden');
   },
@@ -704,8 +755,19 @@ export const UI = {
       if (st.events) items.push(['出来事クリア', st.events + '回']);
       if (st.found) items.push(['見つけた場所', st.found + 'か所']);
       if (st.golden) items.push(['金色ゾンビ', st.golden + '体']);
+      if (st.bossFastest) items.push(['最速ボス撃破', st.bossFastest.toFixed(1) + '秒']);
+      if (st.bossChainMax >= 2) items.push(['ボス連続撃破', '×' + st.bossChainMax]);
+      if (st.bossPts) items.push(['ボスで稼いだ点', fmt(st.bossPts)]);
       ex.innerHTML = items.map(([a, b]) => `<div><small>${a}</small><b>${b}</b></div>`).join('');
       ex.classList.toggle('hidden', !items.length);
+    }
+    // ボス図鑑(メダルの列)
+    const dx = $('resultDex');
+    if (dx) {
+      const M = BossDex.medals();
+      dx.innerHTML = `<small>ボス図鑑 <b>${BossDex.count}/${BossDex.total}</b></small><div class="medals">` +
+        M.map((m) => `<i class="${m.got ? 'got' : ''}${m.isNew ? ' new' : ''}" title="${m.got ? m.name + (m.best ? ' ' + m.best.toFixed(1) + '秒' : '') : '???'}">${m.got ? m.icon : '?'}</i>`).join('') + '</div>';
+      dx.classList.remove('hidden');
     }
     // スコアを 0 からくるくる数える
     const final = Score.score, sEl = $('resultScore'), t0 = performance.now(), dur = Math.min(1600, 500 + Math.log10(final + 1) * 180);
@@ -719,5 +781,15 @@ export const UI = {
   },
 };
 const _pt = {}, _pt2 = {};
+
+// 形態の区切り(体力の割合。高い順)
+function phaseCuts(e) {
+  let c = (e && (e.phaseHp || (e.def && e.def.phaseHp))) || null;
+  if (!Array.isArray(c)) {
+    const n = Math.max(1, Math.min(6, +(e && (e.phases || (e.def && e.def.phases))) || 3));
+    c = []; for (let i = n - 1; i >= 1; i--) c.push(i / n);
+  }
+  return c.filter((v) => v > 0 && v < 1).sort((a, b) => b - a);
+}
 
 export { jpNum };

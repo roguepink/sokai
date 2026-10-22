@@ -74,12 +74,21 @@ export class Banner {
     this.main = el.querySelector('b');
     this.sub = el.querySelector('small');
     this.queue = [];
-    this.t = 0; this.prio = -1;
+    this.t = 0; this.prio = -1; this.holdT = 0; this._cur = null;
   }
 
   // style: 'gold' | 'red' | 'boss' | 'record' | 'horde' | 'combo' | 'kills' | 'start'
   show(text, sub = '', style = 'gold', dur = 1.6, prio = 1) {
     const item = { text, sub, style, dur, prio };
+    // ボスの登場・撃破の演出中(hold)は 出さずに待つ。ふつうの区切り(prio 1 以下)は 捨てる(主役はボス)
+    if (this.holdT > 0) {
+      if (prio < 2) return;
+      this.queue = this.queue.filter((q) => q.style !== style);
+      this.queue.push(item);
+      this.queue.sort((a, b) => b.prio - a.prio);
+      if (this.queue.length > 3) this.queue.length = 3;
+      return;
+    }
     if (this.t > 0 && prio <= this.prio) {
       // 順番待ち(同じ種類の古いものは捨てる。ためすぎない)
       this.queue = this.queue.filter((q) => q.style !== style || q.prio > 1);
@@ -91,6 +100,7 @@ export class Banner {
   }
 
   _play(it) {
+    this._cur = it;
     this.main.textContent = it.text;
     this.sub.textContent = it.sub;
     this.sub.style.display = it.sub ? '' : 'none';
@@ -102,7 +112,20 @@ export class Banner {
     if (this.onPlay) this.onPlay(it);
   }
 
+  // sec 秒のあいだ 大きな文字を止める(出ている文字は すぐ消す)。release() で すぐ再開
+  hold(sec) {
+    this.holdT = Math.max(this.holdT || 0, sec);
+    if (this.t > 0) {
+      // 出ていたものは 大事なら あとで出しなおす
+      if (this.prio >= 3 && this._cur && this._cur.style !== 'start') this.queue.unshift(Object.assign({}, this._cur, { dur: Math.max(1.2, this._cur.dur * 0.7) }));
+      this.t = 0; this.prio = -1; this.el.classList.remove('on');
+    }
+  }
+  release() { this.holdT = 0; }
+
   update(dt) {
+    if (this.holdT > 0) { this.holdT -= dt; return; }
+    if (this.t <= 0 && this.queue.length) { this._play(this.queue.shift()); return; }
     if (this.t > 0) {
       this.t -= dt;
       // 待っている人がいたら、少し早めに次へ
@@ -115,7 +138,7 @@ export class Banner {
     }
   }
 
-  clear() { this.queue.length = 0; this.t = 0; this.prio = -1; this.el.classList.remove('on'); }
+  clear() { this.queue.length = 0; this.t = 0; this.prio = -1; this.holdT = 0; this.el.classList.remove('on'); }
 }
 // 順番待ちがあるとき、今のバナーを最低どれだけ見せるか(秒の残り)
 function it_min(prio) { return prio >= 2 ? 0 : 0.5; }
