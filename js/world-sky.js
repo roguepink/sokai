@@ -10,7 +10,30 @@ import { Events } from './events.js';
 import { seeded } from './util.js';
 
 export const CYCLE = 420;               // 1 日の長さ(秒)
-const START_T = 0.22;                    // はじまりは夕方
+// 昼と夜の割合(ノブさん 2026-10-23「A案」): 時計(u, 一定の速さで進む)を 見た目の時間(t)に読みかえる。
+//   昼 6割 / 夕方 1割 / 夜 2割 / 明け方 1割。はじまりは 朝(明るい)
+//   [u のはじめ, t のはじめ, t の終わり]。t は 0.875〜1.15(=0.15)が明るい昼、0.15〜0.30 夕方、0.30〜0.80 夜、0.80〜0.875 明け方
+const SPANS = [[0, 0.875, 1.15], [0.6, 0.15, 0.30], [0.7, 0.30, 0.80], [0.9, 0.80, 0.875], [1, 0, 0]];
+function tOfU(u) {
+  u = ((u % 1) + 1) % 1;
+  for (let i = 0; i < 4; i++) {
+    const [a, t0, t1] = SPANS[i], b = SPANS[i + 1][0];
+    if (u < b) return (t0 + (t1 - t0) * (u - a) / (b - a)) % 1;
+  }
+  return 0.875;
+}
+function uOfT(t) {
+  t = ((t % 1) + 1) % 1;
+  for (let i = 0; i < 4; i++) {
+    const [a, t0, t1] = SPANS[i], b = SPANS[i + 1][0];
+    let tt = t;
+    if (t1 > 1 && tt < t0) tt += 1;          // 昼は 1 をまたぐ
+    if (tt >= t0 && tt < t1) return a + (b - a) * (tt - t0) / (t1 - t0);
+  }
+  return 0;
+}
+const START_U = 0.08;                    // はじまりは 朝(明るい昼)
+const START_T = tOfU(START_U);
 const WEATHERS = ['clear', 'rain', 'storm', 'fog', 'snow', 'ash'];
 const W_TEXT = { clear: '空が晴れた', rain: '雨が降ってきた', storm: '雷雨だ!', fog: '霧が出てきた', snow: '雪が降ってきた', ash: '灰が降ってきた…' };
 
@@ -290,11 +313,12 @@ export const Sky = {
     this.wetMats = ['asphalt', 'sidewalk', 'pave', 'floorC', 'ground', 'roof', 'car', 'concrete'].filter((k) => M[k]).map((k) => ({ m: M[k], r: M[k].roughness, c: M[k].color.clone(), dk: k === 'ground' ? 0.85 : k === 'car' ? 0.95 : 0.72, wr: k === 'ground' ? 0.7 : k === 'car' ? 0.2 : 0.32, me: M[k].metalness }));
     Events.on('viewChange', (e) => this.setView(e.mode));
     Events.on('start', () => { this.setTime(START_T); this.setWeather('clear', true, true); this._wTimer = 70; });
-    this.setTime(START_T); this._phase = 'dusk';
+    this.setTime(START_T);
     this.apply(0);
   },
 
-  setTime(t) { this.t = ((t % 1) + 1) % 1; this._phase = this.phaseAt(this.t); },
+  // 見た目の時間 t を直接決める(時計 u も合わせる)
+  setTime(t) { this.t = ((t % 1) + 1) % 1; this.u = uOfT(this.t); this._phase = this.phaseAt(this.t); },
   phaseAt(t) { let p = PHASES[PHASES.length - 1][1]; for (const [a, name] of PHASES) if (t >= a) p = name; return p; },
   setWeather(w, instant = false, silent = false) {
     if (!WEATHERS.includes(w)) return;
@@ -321,7 +345,8 @@ export const Sky = {
   update(dt, px, pz) {
     this._time += dt;
     const prevT = this.t;
-    this.t = (this.t + dt * this.speed / CYCLE) % 1;
+    this.u = ((this.u || 0) + dt * this.speed / CYCLE) % 1;
+    this.t = tOfU(this.u);
     // 時間の区切りを こえたら 知らせる
     for (const [a, name, text] of PHASES) {
       if ((prevT < a && this.t >= a) || (prevT > this.t && a < this.t)) {
