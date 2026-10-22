@@ -172,16 +172,23 @@ const B = {
     g.userData.rings = [r1, r2];
   },
   // ---------------- 第2弾 ----------------
+  // チェーンソー: 刃(バー)の先 = 主人公から 約 2m(weapon-extra.js の当たりと同じ長さ)。
+  // チェーンと刃は この武器だけの材質(敵を斬るほど 血で赤黒くなる。sawTint で色を変える)
   chainsaw(g, m) {
-    box(g, 0.16, 0.18, 0.34, 0, 0.04, 0.02, m.orange);            // エンジン
-    box(g, 0.12, 0.1, 0.14, 0, 0.16, 0.08, m.dark);               // 上の取っ手
-    box(g, 0.02, 0.12, 0.7, 0, 0.03, -0.5, m.steel);             // バー(刃の台)
-    const ch = box(g, 0.03, 0.15, 0.72, 0, 0.03, -0.5, m.gOrange);  // チェーン(光る)
-    for (let i = 0; i < 9; i++) box(g, 0.035, 0.03, 0.03, 0, 0.11, -0.2 - i * 0.075, m.steel);
-    for (let i = 0; i < 9; i++) box(g, 0.035, 0.03, 0.03, 0, -0.05, -0.2 - i * 0.075, m.steel);
+    const chainM = m.gOrange.clone(), barM = m.steel.clone();
+    box(g, 0.17, 0.19, 0.36, 0, 0.04, 0.02, m.orange);            // エンジン
+    box(g, 0.12, 0.1, 0.14, 0, 0.17, 0.08, m.dark);               // 上の取っ手
+    box(g, 0.13, 0.025, 0.03, 0, 0.2, -0.04, m.dark);             // 前の取っ手
+    box(g, 0.022, 0.12, 0.86, 0, 0.03, -0.57, barM);             // バー(刃の台)
+    const nose = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.03, 12), barM);
+    nose.rotation.z = Math.PI / 2; nose.position.set(0, 0.03, -1.0); g.add(nose);   // 刃の先(丸い)
+    const ch = box(g, 0.03, 0.15, 0.88, 0, 0.03, -0.57, chainM);  // チェーン(光る)
+    for (let i = 0; i < 11; i++) box(g, 0.036, 0.032, 0.032, 0, 0.11, -0.2 - i * 0.075, barM);
+    for (let i = 0; i < 11; i++) box(g, 0.036, 0.032, 0.032, 0, -0.05, -0.2 - i * 0.075, barM);
     box(g, 0.05, 0.05, 0.05, 0.1, 0.02, 0.1, m.metal);            // 排気
     box(g, 0.045, 0.1, 0.05, 0, -0.06, 0.12, m.dark, -0.3);
     g.userData.chain = ch;
+    g.userData.blood = { chain: chainM, bar: barM, ce: chainM.emissive.clone(), ck: chainM.emissiveIntensity, bc: barM.color.clone(), br: barM.roughness, k: -1 };
   },
   thor(g, m) {
     tube(g, 0.025, 0.55, 0, 0.04, -0.12, m.wood, 8);              // 柄
@@ -312,6 +319,18 @@ export function buildModel(id, set = 'world') {
   holder.userData = inner.userData;
   holder.userData.tips = findTips(inner, id);
   return holder;
+}
+
+// チェーンソーの血: k = 0(きれい)〜 1(血まみれ)。チェーンの光が赤黒く、刃が ぬれた赤に
+const BLOOD_E = new THREE.Color(0x7a0303), BLOOD_B = new THREE.Color(0x4a0606);
+export function sawTint(ud, k) {
+  const b = ud && ud.blood;
+  if (!b || Math.abs(b.k - k) < 0.01) return;
+  b.k = k;
+  b.chain.emissive.copy(b.ce).lerp(BLOOD_E, Math.min(1, k * 1.1));
+  b.chain.emissiveIntensity = b.ck * (1 - 0.45 * k);
+  b.bar.color.copy(b.bc).lerp(BLOOD_B, k * 0.9);
+  b.bar.roughness = b.br - 0.15 * k;
 }
 
 // 銃口 = いちばん前(-z)にある部品の先。二丁拳銃は 左右それぞれ

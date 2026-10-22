@@ -29,6 +29,7 @@ const _hits = [], _near = [], _list = [], _cand = new Array(K).fill(null), _cs =
 let _stamp = 1;
 const _sp = {};
 const _pt = { x: 0, z: 0, d: 0 };
+const SAW = WEAPONS.findIndex((w) => w.kind === 'chainsaw');
 // フィーバー(無双モード)中の 強くした武器の写し
 function boost(w) {
   const f = { ...w, fever: true };
@@ -118,7 +119,9 @@ export const Weapons = {
     HIT.step = 0;
 
     this._aim(dt, input, player, w);
-    this._sword(dt, player);
+    // チェーンソーを ふっている間は 左手の剣は お休み(近くの敵は チェーンソーの刃で斬る)
+    const sawing = input.fire && w.kind === 'chainsaw';
+    if (!sawing) this._sword(dt, player);
 
     // 回転斬り(少し早く押しても、使えるようになったら出る)
     this._spinCool = Math.max(0, this._spinCool - dt);
@@ -131,6 +134,7 @@ export const Weapons = {
     if (w.spinUp) this.spinUp = firing ? Math.min(1, this.spinUp + dt / w.spinUp) : Math.max(0, this.spinUp - dt * 1.2);
     this._cool -= dt; this._evT -= dt; this._decT -= dt;
     Extra.orbIdle += dt;
+    Extra.sawAnim(this, dt, sawing, player, this._models[SAW]);
     if (firing) {
       if (w.designator) Extra.designate(this, w, player, this._muzzle(player, w, _mz), Math.sin(this.aimAngle), -Math.cos(this.aimAngle));
       if (w.continuous) this._stream(w, dt, player);
@@ -228,6 +232,9 @@ export const Weapons = {
       if (this._aoeT <= 0 || (this._aoeE && !this._aoeE.alive)) { this._aoeT = 0.25; this._aoeE = this._bestCluster(n, px, pz, w); }
     } else this._aoeE = null;
     for (let i = 0; i < K; i++) _cand[i] = null;
+    // チェーンソー: いちばん近い敵(飛びこむ相手)を向く
+    const sawT = w.kind === 'chainsaw' && input.fire && Extra.saw.tgt && Extra.saw.tgt.alive ? Extra.saw.tgt : null;
+    if (sawT) tgt = sawT;
     this.target = tgt;
 
     let want = this.aimAngle;
@@ -235,14 +242,19 @@ export const Weapons = {
     if (this.close) {
       // 肩越し・一人称: 照準(画面のまん中)の近くの敵に 吸いつく(ボス優先)。押している間は 視点も少し引っぱる
       want = Engine.lookYaw;
-      const t2 = this._crossAssist(px, pz, w);
+      let t2 = this._crossAssist(px, pz, w);
+      if (sawT) t2 = sawT;          // チェーンソー: 照準の側の 近い敵へ(視点は 弱く引くだけ)
       this.target = t2;
       this._aoeE = null;            // 照準のある所に撃つ(かたまり狙いはしない)
       if (t2) {
         want = Math.atan2(t2.x - px, -(t2.z - pz));
         if (input.fire) {
-          const k = Math.min(1, dt * (t2.boss ? 7 : 5));
-          Engine.look(angleDiff(Engine.lookYaw, want) * k * 0.6, 0);
+          // 指で向きを変えている間は 引っぱらない(Input.assistScale: 0..1。指をはなすと もどる)
+          const asc = input.assistScale ? input.assistScale() : 1;
+          const k = Math.min(1, dt * (t2.boss ? 7 : 5)) * asc;
+          const df = angleDiff(Engine.lookYaw, want);
+          if (!sawT) Engine.look(df * k * 0.6, 0);
+          else if (Math.abs(df) > 0.3) Engine.look(df * k * 0.25, 0);
         }
       }
       this.aimAngle = want;

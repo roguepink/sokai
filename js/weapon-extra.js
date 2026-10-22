@@ -1,5 +1,6 @@
 // 武器係: 第2弾の武器の「撃ち方」。weapons.js の _fire / _stream から呼ばれる。
 // W = Weapons(狙い・銃口などの道具を持っている)、w = 武器の数字(フィーバー中は強くした写し)
+import * as THREE from 'three';
 import { Zombies } from './zombies.js';
 import { World } from './world.js';
 import { FX } from './fx.js';
@@ -9,9 +10,12 @@ import { Proj, GRAV } from './weapon-proj.js';
 import { Summon, RAINBOW } from './weapon-summon.js';
 import { VM } from './weapon-view.js';
 import { hurt, area, LOW } from './weapon-hit.js';
+import { sawTint } from './weapon-models.js';
+import { angleDiff } from './util.js';
 
 const rnd = Math.random;
 const _list = [], _near = [], _cp = { x: 0, z: 0 };
+const _r0 = new THREE.Vector3(), _r1 = new THREE.Vector3();
 function wallDamage(x, z, r, amount, cause) { if (World.damage) World.damage(x, z, r, amount, { cause }); }
 // 一人称・肩越しで 上下の向きから 弾の上下の速さ(下を向けば 地面へ)
 function slope(W) { return W.close ? Math.max(-0.6, Math.min(0.15, Math.tan(Engine.lookPitch))) : 0; }
@@ -19,7 +23,7 @@ function slope(W) { return W.close ? Math.max(-0.6, Math.min(0.15, Math.tan(Engi
 export const Extra = {
   orbIdle: 1, orb: { x: 0, z: 0 }, _decT: 0, _sawSfx: 0,
 
-  reset() { this.orbIdle = 1; },
+  reset() { this.orbIdle = 1; const S = this.saw; S.blood = 0; S.lungeT = 0; S.tgt = null; S.vic = null; S.base = 0; S.sweep = 0; },
 
   // 1 発ずつ撃つ武器。撃たなかったら false
   fire(W, w, player, m, dx, dz) {
@@ -249,45 +253,218 @@ export const Extra = {
     return true;
   },
 
-  // ================= チェーンソー: 目の前の列を けずり取る =================
+  // ================= チェーンソー: 刃に さわった敵だけを 斬る(近づいた敵を 無双する) =================
+  // - 当たりは 見えている刃(手に持った形の 根元〜先、主人公から 約 0.8〜2m)だけ。さわっていない敵は 死なない
+  // - 押している間: 近く(range m)の敵へ 自分から 短く飛びこむ / 刃を 敵から敵へ 大きく横にふる(sweep)
+  // - 刃が さわると 食いこんで止まる(sink 秒。火花と血)→ まっぷたつ(倒れ方は zombie-gore.js の 'blade')
+  // - 斬るほど 刃が血で赤黒くなる(ゆっくり もどる)。一人称では 画面に 小さな血しぶき
+  // 状態は saw に まとめる(毎フレーム new しない)
+  saw: {
+    ph: 0, base: 0, sweep: 0, prev: 0, vicOff: 0, vic: null, lungeT: 0, lungeCool: 0, lvx: 0, lvz: 0, blood: 0, hsT: 0,
+    tgt: null, tgtD: 99, contact: 0, time: 0, firing: false, log: null, nLunge: 0, r0: _r0, r1: _r1,
+  },
+
+  // 毎フレーム(撃っていなくても)weapons.js が呼ぶ: 刃のふり・血のもどり・手の武器の向き
+  // 刃の向き(sweep)= 体の向きからの角度。とどく敵(vic)がいれば その敵へ すばやく ふる → 食いこんだら 細かく ふるえて けずる
+  sawAnim(W, dt, firing, player, mdl) {
+    const S = this.saw, fps = Engine.viewMode === 'fps';
+    S.firing = firing;
+    S.hsT -= dt;
+    S.blood = Math.max(0, S.blood - dt * (S.blood > 0.6 ? 0.06 : 0.035));
+    if (!firing) { S.lungeT = 0; S.tgt = null; S.vic = null; S.contact = 0; }
+    const lim = fps ? 0.6 : (W.current.sweep || 0.85) * (Engine.viewMode === 'tps' ? 1.3 : 1.6);
+    const want = firing && S.vic ? Math.max(-lim, Math.min(lim, S.vicOff)) : 0;
+    const mv = (firing ? (W.fever ? 20 : 15) : 5) * dt, d = want - S.base;
+    S.base += Math.max(-mv, Math.min(mv, d));
+    // 食いこんでいる間は 小さく速く ふるえる / 敵がいないときは ゆっくり 小さく ふる(空ぶかし)
+    S.ph += dt * (S.contact ? 30 : 7);
+    const wob = !firing ? 0 : S.contact ? 0.05 : S.vic ? 0.08 : 0.3;
+    S.prev = S.sweep;
+    S.sweep = S.base + wob * Math.sin(S.ph);
+    if (mdl) { mdl.rotation.y = -S.sweep; mdl.rotation.z = S.contact ? Math.sin(S.ph * 1.7) * 0.05 : 0; sawTint(mdl.userData, S.blood); }
+    VM.sawYaw = S.sweep; VM.sawBlood = S.blood;
+  },
+
   chainsaw(W, w, dt, player, m, dx, dz, tick) {
-    const px = player.pos.x, pz = player.pos.z;
-    const nx = -dz, nz = dx;
-    const L = w.range, Wd = w.width;
-    const bx = m.x + dx * 0.4, bz = m.z + dz * 0.4, by = Math.max(0.6, m.y - 0.1);
-    // 刃の火花・排気の煙
-    if (rnd() < 0.7) FX.spark(bx, by, bz, dx * 3 + (rnd() - 0.5) * 4, 1 + rnd() * 3, dz * 3 + (rnd() - 0.5) * 4, 0.2, 0.035, 0xffd090, 6, 0xff5010, 2);
-    if (rnd() < 0.15 * FX.quality) FX.smoke(px - dx * 0.3 + nx * 0.4, 1.3, pz - dz * 0.3 + nz * 0.4, 0.15, 0.7, 0x6a6662, 0, 0.8, 0, 0.35);
-    VM.vibrate(0.5);
-    // 吸いよせる(目の前の線へ)
-    Zombies.queryCircle(px, pz, L + 4, _near);
-    let hits = 0;
+    const S = this.saw, px = player.pos.x, pz = player.pos.z;
+    const close = W.close, fps = Engine.viewMode === 'fps';
+    // ---- 刃の位置(見えている形から)。根元 r0 → 先 r1(世界の座標) ----
+    const mdl = W._models[W.index];
+    if (mdl && mdl.parent && player.aiming && !(player._spin > 0)) {
+      mdl.updateWorldMatrix(true, false);
+      _r0.set(0, 0.03, -0.12).applyMatrix4(mdl.matrixWorld);
+      _r1.copy(mdl.userData.tips[0]).applyMatrix4(mdl.matrixWorld);
+    } else {
+      const f = player.facing, a = f + S.sweep;
+      const gx = px + Math.sin(f) * 0.66 + Math.cos(f) * 0.38, gz = pz - Math.cos(f) * 0.66 + Math.sin(f) * 0.38;
+      _r0.set(gx + Math.sin(a) * 0.16, 1.4, gz - Math.cos(a) * 0.16);
+      _r1.set(gx + Math.sin(a) * 1.4, 1.4, gz - Math.cos(a) * 1.4);
+    }
+    const bx0 = _r0.x, bz0 = _r0.z;
+    let ux = _r1.x - bx0, uz = _r1.z - bz0;
+    const L = Math.hypot(ux, uz) || 1;
+    ux /= L; uz /= L;
+    const by = Math.max(0.8, Math.min(1.5, _r1.y));
+    // 刃が動く向き(ふっている向き)= 斬った体が飛ぶ向き
+    const sgn = S.sweep - S.prev >= 0 ? 1 : -1;
+    const tx = -uz * sgn, tz = ux * sgn;
+    // カメラの方(血しぶきを こちらへ)
+    const cam = Engine.camera.position;
+
+    // ---- 近くの敵(飛びこむ相手)をさがす ----
+    const vx = close ? Engine.viewDir.x : dx, vz = close ? Engine.viewDir.z : dz;
+    const mvx = player.vel.x, mvz = player.vel.z, mv = Math.hypot(mvx, mvz);
+    Zombies.queryCircle(px, pz, w.range + 1.5, _near);
+    let tgt = null, ts = 1e9, td = 99;
+    S.time += dt;
     for (let i = 0; i < _near.length; i++) {
       const e = _near[i];
-      const ex = e.x - px, ez = e.z - pz;
-      const along = ex * dx + ez * dz, side = ex * nx + ez * nz;
-      if (along < -0.5) continue;
-      if (!e.boss && along < L + 3 && Math.abs(side) > 0.3) {
-        const k = Math.min(Math.abs(side) - 0.3, 7 * dt) * Math.sign(side);
-        e.x -= nx * k; e.z -= nz * k;
+      if (!e.alive || (e.y || 0) > 2) continue;
+      const ex = e.x - px, ez = e.z - pz, d = Math.hypot(ex, ez) || 0.01;
+      if (d > w.range + e.r) continue;
+      const cf = (ex * vx + ez * vz) / d;
+      if (close && d > 1.5 && cf < 0.55) continue;           // 肩越し・一人称: 見ている方(照準の側)の敵だけ
+      // 見下ろし: 刃が いま何にも さわっていなければ、いちばん近い敵へ すぐ向きを変える(かこまれても 次々に斬る)
+      let sc = d - cf * (close ? 1.5 : S.contact ? 1 : 0.25);
+      if (!close && mv > 1) sc -= 1.2 * (ex * mvx + ez * mvz) / (d * mv);   // 見下ろし: 進む方を少し優先
+      if (e.boss) sc -= 1;
+      if (sc < ts) { ts = sc; tgt = e; td = d; }
+    }
+    if (tgt && td > 1.6 && World.segmentHit(px, pz, tgt.x, tgt.z, LOW) < 0.97) { tgt = null; td = 99; }
+    S.tgt = tgt; S.tgtD = td;
+    // 刃でとどく敵(vic): 食いこんでいる敵は 倒すまで そのまま。いなければ 刃の今の向きから いちばん近い角度の敵へ
+    {
+      const f = player.facing, gx = px + Math.sin(f) * 0.66 + Math.cos(f) * 0.38, gz = pz - Math.cos(f) * 0.66 + Math.sin(f) * 0.38;
+      const lim = fps ? 0.7 : 1.6;
+      let best = null, bs = 1e9, bo = 0;
+      for (let i = 0; i < _near.length; i++) {
+        const e = _near[i];
+        if (!e.alive || (e.y || 0) > 1.6) continue;
+        const ex = e.x - gx, ez = e.z - gz, dg = Math.hypot(ex, ez);
+        if (dg > 1.45 + e.r) continue;
+        const off = angleDiff(f, Math.atan2(ex, -ez));
+        if (Math.abs(off) > lim) continue;
+        let sc = Math.abs(off - S.base) * 0.7 + dg * 0.25;
+        if (e === S.vic) sc -= 0.25;
+        if (S.time - (e._sawT || -9) < 0.06) sc -= 2;     // いま けずっている敵
+        if (sc < bs) { bs = sc; best = e; bo = off; }
       }
-      if (!tick || along > L || Math.abs(side) > Wd + e.r) continue;
-      if (along > 1.5 && World.segmentHit(px, pz, e.x, e.z, LOW) < 0.97) continue;
+      // 次の敵へ 大きく ふる: 刃の通り道に 赤い光の弧(一人称は出さない)
+      if (best && best !== S.vic && !fps && Math.abs(bo - S.base) > 0.6) {
+        const a0 = f + S.base, a1 = f + bo, dir = a1 > a0 ? 1 : -1;
+        FX.slash(px, 1.35, pz, (a0 + a1) / 2, Math.abs(a1 - a0) + 0.3, 0.9, 2.1, 0xff3a1a, 0.14, dir, 0, 1.6, 0.7, 0.18);
+      }
+      S.vic = best; if (best) S.vicOff = bo;
+    }
+
+    // ---- 刃に さわっている敵 ----
+    let hits = 0, kills = 0, bossHit = false;
+    for (let i = 0; i < _near.length; i++) {
+      const e = _near[i];
+      if (!e.alive || (e.y || 0) > 1.6) continue;
+      const ex = e.x - bx0, ez = e.z - bz0;
+      const t = Math.max(0.05, Math.min(L, ex * ux + ez * uz));
+      const cx = bx0 + ux * t, cz = bz0 + uz * t;
+      const ox = e.x - cx, oz = e.z - cz;
+      const rr = e.r + 0.14;
+      if (ox * ox + oz * oz > rr * rr) continue;
+      if (t > 0.9 && World.segmentHit(px, pz, e.x, e.z, LOW) < 0.97) continue;   // 壁ごしは 斬らない
       hits++;
-      const sgn = rnd() < 0.5 ? 1 : -1;
-      hurt(e, w.dmg, dx * 0.6 + nx * sgn * 0.8, dz * 0.6 + nz * sgn * 0.8, w.force, 'chainsaw');
-      const ey = (0.9 + rnd() * 0.5) * ((e.def && e.def.scale) || 1);
-      FX.blood(e.x, ey, e.z, nx * sgn, nz * sgn, 1.3);
-      FX.blood(e.x, ey, e.z, -dx, -dz, 0.6);
-      if (rnd() < 0.35 * FX.quality) FX.chunks.add(e.x, ey, e.z, nx * sgn * 5 + (rnd() - 0.5) * 3, 3 + rnd() * 4, nz * sgn * 5 + (rnd() - 0.5) * 3, 0.08, 0.06, 0.08, 0x5a0606, 1.4, 0.2);
-      if (rnd() < 0.2) FX.decal(e.x + nx * sgn * 1.2, e.z + nz * sgn * 1.2, 0.6 + rnd() * 0.6, 'blood', 16);
+      // 食いこむ: さわっている時間を足していく(刃が行き来しても 0.4 秒以内なら 続き)
+      if (S.time - (e._sawT || -9) > 0.4) e._sawA = 0;
+      e._sawT = S.time;
+      e._sawA = (e._sawA || 0) + dt;
+      const sc = (e.def && e.def.scale) || 1;
+      const cy = Math.min(by, 1.25 * sc);
+      if (!e.boss) { e.stun = Math.max(e.stun || 0, 0.18); e.kx *= 0.4; e.kz *= 0.4; }
+      else bossHit = true;
+      // 火花(刃が骨に当たる)
+      if (rnd() < 0.55) FX.spark(cx, cy, cz, tx * 4 + (rnd() - 0.5) * 3, 1 + rnd() * 3.5, tz * 4 + (rnd() - 0.5) * 3, 0.16 + rnd() * 0.1, 0.035, 0xffe0a0, 6, 0xff5010, 2);
+      if (!tick) continue;
+      // けずる(1 回分)
+      // 血は カメラの側へ(一人称は 目の前が血で うまらないよう 横へ。画面には VM.splatter の小さな しぶき)
+      let ccx = cam.x - cx, ccz = cam.z - cz; const cl = Math.hypot(ccx, ccz) || 1; ccx /= cl; ccz /= cl;
+      if (fps) { ccx = 0; ccz = 0; }
+      const dead = hurt(e, w.dmg * (e.boss ? 1.6 : 0.35), tx, tz, 0, 'chainsaw');
+      FX.blood(cx, cy, cz, ccx * 0.7 + tx * 0.5, ccz * 0.7 + tz * 0.5, fps ? 0.4 : e.boss ? 0.6 : 0.8);
+      S.blood = Math.min(1, S.blood + 0.012);
+      if (fps && rnd() < 0.25 && cl < 3) VM.splatter(1);
+      if (e.boss) {
+        for (let k = 0; k < 5; k++) FX.spark(cx, cy, cz, tx * 7 + (rnd() - 0.5) * 6, 2 + rnd() * 5, tz * 7 + (rnd() - 0.5) * 6, 0.3, 0.05, 0xfff0c0, 7, 0xff6010, 2);
+        Engine.shake(0.12);
+        if (!dead) continue;
+      }
+      // まっぷたつ(食いこんで sink 秒たったら)
+      if (!dead && !e.boss && e._sawA >= (w.fever ? w.sink * 0.6 : w.sink)) {
+        if (!hurt(e, e.hp + 999, tx * 0.85 + ux * 0.35, tz * 0.85 + uz * 0.35, w.force, 'chainsaw')) continue;   // 盾が受けた
+      } else if (!dead) continue;
+      kills++;
+      this._sawCut(S, e, cx, cy, cz, tx, tz, ux, uz, ccx, ccz, cl, px, pz, fps);
     }
     _near.length = 0;
+    S.contact = hits;
+    if (S.log) { S.dN = (S.dN || 0) + 1; S.dC = (S.dC || 0) + hits; if (S.tgtD < 2.6 && !hits) S.dZ = (S.dZ || 0) + 1; if (S.vic) S.dCr = (S.dCr || 0) + 1; }
+
+    // ---- 飛びこみ(短いダッシュ)----
+    if (S.lungeT > 0) {
+      const k = Math.min(dt, S.lungeT);
+      player.pos.x += S.lvx * k; player.pos.z += S.lvz * k;
+      World.collideCircle(player.pos, player.radius);
+      S.lungeT -= dt;
+      if (hits || S.lungeT <= 0 || !tgt) { S.lungeT = 0; S.lungeCool = 0.1; }
+      if (rnd() < 0.5) FX.smoke(px, 0.15, pz, 0.3, 0.5, 0x6a6052, -S.lvx * 0.15, 0.4, -S.lvz * 0.15, 0.35);
+    } else if (S.lungeCool > 0) S.lungeCool -= dt;
+    else if (tgt && !hits && !(player.moves && player.moves.busy)) {
+      // 刃のまん中あたりで 止まる(一人称は 目の前が ふさがらないよう 少し手前)
+      const need = Math.min(4.6, td - ((fps ? 1.35 : 1.15) + tgt.r));
+      if (need > 0.45) {
+        const T = 0.11 + need * 0.02, ex = (tgt.x - px) / td, ez = (tgt.z - pz) / td;
+        S.lungeT = T; S.lvx = ex * need / T; S.lvz = ez * need / T;
+        S.nLunge++;
+        FX.ring(px, pz, 0.2, 1.4, 0.25, 0xc8b8a0, 0.2, 1.4, 0.7, 0);
+        for (let k = 0; k < FX.q(4); k++) FX.smoke(px, 0.2, pz, 0.35, 0.6, 0x7a6e60, -ex * 4 + (rnd() - 0.5) * 3, 0.6, -ez * 4 + (rnd() - 0.5) * 3, 0.4);
+        if (close) Engine.fovKick(3.5);
+        VM.vibrate(1);
+      }
+    }
+
+    // ---- 刃のまわりの見た目(空ぶかし)----
+    if (rnd() < 0.4) FX.spark(_r1.x, by, _r1.z, tx * 2 + (rnd() - 0.5) * 3, 1 + rnd() * 2, tz * 2 + (rnd() - 0.5) * 3, 0.15, 0.03, 0xffd090, 5, 0xff5010, 2);
+    if (rnd() < 0.15 * FX.quality) FX.smoke(px - dx * 0.3 - dz * 0.4, 1.3, pz - dz * 0.3 + dx * 0.4, 0.15, 0.7, 0x6a6662, 0, 0.8, 0, 0.35);
+    VM.vibrate(hits ? 1.3 : 0.5);
+    if (hits) {
+      Engine.shake(bossHit ? 0.16 : 0.09);
+      if (tick) FX.muzzleLight(_r1.x, by + 0.3, _r1.z, 0xff4020, 5);
+    }
+    if (kills) {
+      Engine.shake(Math.min(0.5, 0.22 + kills * 0.06));
+      if (S.hsT <= 0) { S.hsT = 0.13; Engine.hitStop(0.03); }
+      Events.emit('melee', { x: px, z: pz, kills });
+    }
     if (tick) {
-      if (hits) { VM.vibrate(1.2); Engine.shake(0.18); FX.muzzleLight(bx, by + 0.4, bz, 0xff4020, 5); }
-      wallDamage(px + dx * 2, pz + dz * 2, 1.5, w.dmg, 'chainsaw');
+      wallDamage(_r1.x, _r1.z, 0.8, w.dmg, 'chainsaw');
       if (hits && (this._sawSfx -= 1) <= 0) { this._sawSfx = 3; Events.emit('weaponSfx', { name: 'grind', x: px, z: pz, hits }); }
     }
+  },
+
+  // まっぷたつにした瞬間の 血・肉片・床の血(gore 側の倒れ方に 足す)
+  _sawCut(S, e, cx, cy, cz, tx, tz, ux, uz, ccx, ccz, cl, px, pz, fps) {
+    const sc = (e.def && e.def.scale) || 1, ey = 1.1 * sc;
+    if (S.log) S.log.push({ d: Math.hypot(e.x - px, e.z - pz), a: e._sawA || 0 });
+    FX.blood(e.x, ey, e.z, tx, tz, fps ? 1.2 : 2.2);
+    if (!fps) FX.blood(cx, cy, cz, ccx, ccz, 1.1);
+    // 噴き上がる血
+    FX.burst({ x: e.x, y: ey + 0.2, z: e.z, count: 14, color: 0x6a0404, speed: 2.4, up: 7, life: 0.8, size: 0.1, grav: 16, drag: 0.5, glow: false });
+    const nc = FX.q(3);
+    for (let k = 0; k < nc; k++) FX.chunks.add(e.x, ey, e.z, tx * 6 + (rnd() - 0.5) * 3, 3 + rnd() * 4, tz * 6 + (rnd() - 0.5) * 3, 0.09, 0.07, 0.09, 0x5a0606, 1.6, 0.25);
+    // 床の血: 斬った所と 主人公のまわり
+    FX.decal(e.x + tx * 0.8, e.z + tz * 0.8, 0.9 + rnd() * 0.8, 'blood', 30);
+    const a = rnd() * Math.PI * 2, r = 0.6 + rnd() * 1.7;
+    FX.decal(px + Math.cos(a) * r, pz + Math.sin(a) * r, 0.4 + rnd() * 0.6, 'blood', 30);
+    S.blood = Math.min(1, S.blood + 0.1);
+    VM.vibrate(1.6);
+    if (fps && cl < 3.2) VM.splatter(2 + Math.floor(rnd() * 3));
+    if ((this._cutSfx = (this._cutSfx || 0) + 1) % 2) Events.emit('weaponSfx', { name: 'sawCut', x: e.x, z: e.z });
   },
 
   // ================= 衛星レーザー: 空から太い光が落ち、狙いを追って地面をなぞる =================
