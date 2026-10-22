@@ -65,7 +65,7 @@ export const Director = {
     const lap = Math.floor(this._bossIdx / BOSS_ORDER.length);
     const e = Zombies.spawn(type, x, z);
     if (e) {
-      e.hp = e.maxHp = Math.round(def.hp * (1 + this.time / 300) * (1 + lap * 0.25) * hpMul);
+      e.hp = e.maxHp = Math.round(def.hp * Math.min(2, 1 + this.time / 600) * (1 + lap * 0.2) * hpMul);
       if (lap > 0) e.name = def.name + ' ' + ['', 'II', 'III', 'IV', 'V'][Math.min(4, lap)];
     }
     return e;

@@ -19,7 +19,7 @@ const _v = new THREE.Vector3(), _near = [];
 // ゾンビ巨神(22m)
 // =====================================================================
 const titan = {
-  def: { name: 'ゾンビ巨神', title: '天を衝く屍の神', icon: '🗿', hp: 46000, speed: 3.6, r: 4.6, points: 5000, scale: 8.0, size: 22, tier: 3, S: 4.2, color: 0x6a7068 },
+  def: { name: 'ゾンビ巨神', title: '天を衝く屍の神', icon: '🗿', hp: 57600, speed: 3.6, r: 4.6, points: 5000, scale: 8.0, size: 22, tier: 3, S: 4.2, color: 0x6a7068 },
   stride: 0.5, feet: { w: 0.42, f: 0.1, s: 1.6 }, turn: 1.6, fallT: 1.8, fallSink: 0,
   build(m) {
     const skin = mat(m, { map: skinTex('#7a8478', { stitches: 6, wounds: 22, rep: 2, vein: 'rgba(255,90,20,0.55)', veins: 60 }), color: 0xffffff, roughness: 0.8 });
@@ -189,7 +189,7 @@ export function stepLater(dt) { for (let i = _later.length - 1; i >= 0; i--) { c
 // 鬼 オニ(14m)
 // =====================================================================
 const oni = {
-  def: { name: '鬼 オニ', title: '金棒の大鬼', icon: '👺', hp: 34000, speed: 4.4, r: 3.4, points: 4000, scale: 5.6, size: 14, tier: 2, S: 3.3, color: 0xa02a1a },
+  def: { name: '鬼 オニ', title: '金棒の大鬼', icon: '👺', hp: 44000, speed: 4.4, r: 3.4, points: 4000, scale: 5.6, size: 14, tier: 2, S: 3.3, color: 0xa02a1a },
   stride: 0.75, feet: { w: 0.3, f: 0.1, s: 1.1 },
   build(m) {
     const skin = mat(m, { map: skinTex('#b83a28', { wounds: 8, veins: 30, vein: 'rgba(80,0,0,0.5)', drips: 6 }), color: 0xffffff, roughness: 0.6 });
@@ -360,7 +360,7 @@ const LIST_O = [['club', 0, 20, 3], ['swing', 0, 16, 3], ['jump', 14, 60, 3], ['
 // 首なし騎士(巨大な 骨の馬に のる)
 // =====================================================================
 const knight = {
-  def: { name: '首なし騎士', title: '地獄の騎馬', icon: '🐎', hp: 32000, speed: 9, r: 3.4, points: 4000, scale: 4.6, size: 12, tier: 2, S: 3.0, color: 0x2a2a30 },
+  def: { name: '首なし騎士', title: '地獄の騎馬', icon: '🐎', hp: 40000, speed: 9, r: 3.4, points: 4000, scale: 4.6, size: 12, tier: 2, S: 3.0, color: 0x2a2a30 },
   stride: 0.45, feet: { w: 0.35, f: -0.5, s: 0.7 }, turn: 3, noStand: true, enter: 'rise',
   build(m) {
     const horse = mat(m, { map: skinTex('#3a3634', { wounds: 14, rep: 2, veins: 20 }), color: 0xffffff, roughness: 0.7 });
@@ -542,7 +542,7 @@ function scatter(G, bone, mt, BG, n, rx, ry, rz, cy = 0, cz = 0) {
   }
 }
 const legion = {
-  def: { name: '合体ゾンビ レギオン', title: '千の屍の集合体', icon: '💀', hp: 38000, speed: 3.2, r: 4.4, points: 4000, scale: 5.5, size: 15, tier: 3, S: 3.5, color: 0x7a5a50 },
+  def: { name: '合体ゾンビ レギオン', title: '千の屍の集合体', icon: '💀', hp: 52800, speed: 3.2, r: 4.4, points: 4000, scale: 5.5, size: 15, tier: 3, S: 3.5, color: 0x7a5a50 },
   stride: 0.6, feet: { w: 0.5, f: 0, s: 1.2 }, fall: 'collapse', fallT: 1.5,
   build(m) {
     const flesh = mat(m, { map: bodiesTex(), color: 0xffffff, roughness: 0.65 });

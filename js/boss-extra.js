@@ -29,7 +29,7 @@ function heldCar(bone) {
 // 変異ゴリラ マッドコング
 // =====================================================================
 const gorilla = {
-  def: { name: '変異ゴリラ マッドコング', title: '車を投げる暴君', icon: '🦍', hp: 30000, speed: 4.6, r: 3.6, points: 3000, scale: 4.6, size: 13, tier: 2, S: 3.0, color: 0x3a3430 },
+  def: { name: '変異ゴリラ マッドコング', title: '車を投げる暴君', icon: '🦍', hp: 41600, speed: 4.6, r: 3.6, points: 3000, scale: 4.6, size: 13, tier: 2, S: 3.0, color: 0x3a3430 },
   stride: 0.7, feet: { w: 0.55, f: -0.2, s: 1 },
   build(m) {
     const fur = mat(m, { map: furTex('#4a3e36'), color: 0xffffff, roughness: 0.95 });
@@ -202,7 +202,7 @@ const LIST_G = [['car', 12, 70, 3], ['pound', 0, 14, 3], ['swipe', 0, 14, 3], ['
 // 女王ハイブ クイーン
 // =====================================================================
 const queen = {
-  def: { name: '女王ハイブ クイーン', title: '群れを産む女王', icon: '🪲', hp: 27000, speed: 3.0, r: 3.8, points: 3000, scale: 4.2, size: 13, tier: 2, S: 3.2, color: 0x6a7a40 },
+  def: { name: '女王ハイブ クイーン', title: '群れを産む女王', icon: '🪲', hp: 40000, speed: 3.0, r: 3.8, points: 3000, scale: 4.2, size: 13, tier: 2, S: 3.2, color: 0x6a7a40 },
   stride: 0.9, feet: { w: 1.2, f: 0, s: 0.5 }, fall: 'collapse', fallT: 1.4,
   build(m) {
     const shell = mat(m, { map: chitinTex('#3a3a28'), color: 0xffffff, roughness: 0.35, metalness: 0.15 });
@@ -373,7 +373,7 @@ const LIST_Q = [['spit', 8, 50, 3], ['eggs', 8, 50, 2], ['scythe', 0, 15, 3], ['
 // ゾンビ装甲車 デスローダー
 // =====================================================================
 const tank = {
-  def: { name: 'ゾンビ装甲車 デスローダー', title: 'ゾンビを轢く鉄の棺', icon: '🚚', hp: 32000, speed: 8, r: 4.6, points: 3000, scale: 2.2, size: 16, tier: 2, S: 2.6, color: 0x4a4a40 },
+  def: { name: 'ゾンビ装甲車 デスローダー', title: 'ゾンビを轢く鉄の棺', icon: '🚚', hp: 44800, speed: 8, r: 4.6, points: 3000, scale: 2.2, size: 16, h: 7, zoom: 12, tier: 2, S: 2.6, color: 0x4a4a40 },
   vehicle: true, noStand: true, enter: 'drive', fall: 'crash', fallT: 1.0, heroGap: 0.7, collR: 3,
   build(m) {
     const plate = mat(m, { map: plateTex('#7a7866', { skull: true }), color: 0xffffff, roughness: 0.7, metalness: 0.2 });

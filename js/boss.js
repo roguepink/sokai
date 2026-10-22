@@ -165,8 +165,8 @@ export const Bosses = {
     if (Engine.viewMode === 'top' && !spec.vehicle && !spec.noStand && d < 40) {
       const wide = innerWidth >= innerHeight;
       let sx, sz;
-      if (wide) { const side = e.x >= px ? 1 : -1; sx = px + side * clamp(4 + e.size * 0.38, 8, 14); sz = pz - 1 - e.size * 0.1; }
-      else { sx = px + clamp(e.x - px, -3, 3); sz = pz - clamp(6 + e.size * 0.45, 9, 17); }
+      if (wide) { const side = e.x >= px ? 1 : -1, hs = e.def.h || e.size; sx = px + side * clamp(4 + hs * 0.38, 8, 14); sz = pz - 1 - hs * 0.1; }
+      else { sx = px + clamp(e.x - px, -3, 3); sz = pz - clamp(6 + (e.def.h || e.size) * 0.45, 9, 17); }
       const ox = sx - e.x, oz = sz - e.z, od = Math.hypot(ox, oz) || 0.001;
       mx = ox / od; mz = oz / od; arrive = clamp(od / 4, 0, 1);
     }
@@ -288,7 +288,7 @@ export const Bosses = {
       const sx = bx - ax, sz = bz - az, L2 = sx * sx + sz * sz || 1;
       const t = clamp(((e.x - ax) * sx + (e.z - az) * sz) / L2, 0, 1);
       const qx = ax + sx * t - e.x, qz = az + sz * t - e.z, h = ay + (by - ay) * t;
-      if (t > 0.02 && Math.hypot(qx, qz) < e.r * 1.6 + 1.5 && h < e.size * 1.05) want = 0.3;
+      if (t > 0.02 && Math.hypot(qx, qz) < e.r * 1.6 + 1.5 && h < (e.def.h || e.size) * 1.05 + (e.y || 0)) want = 0.3;
     }
     m.fade += (want - m.fade) * min(1, dt * 8);
     const o = Math.round(m.fade * 20) / 20;
@@ -338,7 +338,7 @@ export const Bosses = {
       const e = m.e;
       if (e && !m.dead && top && this._player && e.state !== 'enter') {
         const d = Math.hypot(e.x - this._player.pos.x, e.z - this._player.pos.z);
-        const z = 1 + clamp((e.size - 3) / 12, 0, 1.0) * clamp(1.5 - d / 50, 0, 1);
+        const z = 1 + clamp(((e.def.zoom || e.size) - 3) / 12, 0, 1.0) * clamp(1.5 - d / 50, 0, 1);
         zoom = max(zoom, z);
       }
       if (!m.dead) continue;
