@@ -513,17 +513,17 @@ class DBld extends Bld {
 function pachinko(ctx) {
   const { M, rnd } = ctx;
   const x0 = 121, x1 = 169, z0 = -31, z1 = -8, h = 6.6;
-  const B = new DBld(ctx, { name: 'パチンコ店', x0, z0, x1, z1, h, y0: Y, bay: 4, rows: [[0, 4.6, [41]], [4.6, 20, [11, 8, 11]]], skinCol: [1, 1, 1], floor: M.tile, floorCol: [0.55, 0.2, 0.25], wallCol: [0.9, 0.85, 0.8], wall: M.plaster });
+  const B = new DBld(ctx, { name: 'パチンコ店', x0, z0, x1, z1, h, y0: Y, bay: 4, rows: [[0, 4.6, [41]], [4.6, 20, [11, 8, 11]]], skinCol: [1, 1, 1], floor: M.tile, floorCol: [0.42, 0.18, 0.2], wallCol: [0.7, 0.6, 0.62], wall: M.plaster, ceilCol: [0.35, 0.3, 0.32] });
   B.shell([{ side: 'N', at: 145, w: 8 }, { side: 'W', at: -20, w: 4 }, { side: 'E', at: -20, w: 4 }, { side: 'S', at: 145, w: 5 }]);
   // 台の列(背中あわせ。前が光る)
   for (const z of [-25.5, -19.8, -14.1]) for (const [a, b] of [[125.5, 143], [147, 164.5]]) {
     ctx.B.box(M.plain, a, Y, z - 0.75, b, Y + 1.9, z + 0.75, { col: [0.55, 0.12, 0.15] });
-    for (let x = a + 0.3; x < b - 0.5; x += 0.9) for (const s of [-1, 1]) ctx.B.box(M.glow, x, Y + 0.9, z + s * 0.76 - 0.02, x + 0.6, Y + 1.7, z + s * 0.76 + 0.02, { col: pick(ctx, [[2.6, 1.8, 0.4], [2.2, 0.5, 1.8], [0.6, 2.2, 2.6]]), skip: 'b' });
-    ctx.B.box(M.glow, a, Y + 1.9, z - 0.1, b, Y + 2.0, z + 0.1, { col: [3, 2.4, 1] });
+    for (let x = a + 0.3; x < b - 0.5; x += 0.9) for (const s of [-1, 1]) ctx.B.wall(M.glow, x + 0.3, Y + 0.95, z + s * 0.77, 0, s, 0.55, 0.7, { col: pick(ctx, [[1.3, 0.9, 0.25], [1.1, 0.3, 0.9], [0.3, 1.1, 1.3]]) });
+    ctx.B.box(M.plain, a, Y + 1.9, z - 0.1, b, Y + 2.0, z + 0.1, { col: [0.85, 0.7, 0.2] });
     ctx.solid(a, z - 0.75, b, z + 0.75, 1.9, B.b);
   }
   B.prop('counter', 133, -10.4, 0, { col: [0.85, 0.75, 0.3] }); B.prop('counter', 157, -10.4, 0, { col: [0.85, 0.75, 0.3] });
-  for (let x = 126; x < 166; x += 8) for (const z of [-28, -22.6, -17, -11.4]) B.light(x, z, 4.5, [0.5, 0.3, 0.35]);
+  for (let x = 128; x < 166; x += 12) for (const z of [-22.6, -11.4]) B.light(x, z, 4.5, [0.26, 0.16, 0.2]);
   B.flatRoof({ ac: 4 });
   // 屋上の大きな看板と 電球
   B.RB.box(M.plain, 132, h + 0.4, z0 + 0.2, 158, h + 4.4, z0 + 0.6, { col: [0.15, 0.1, 0.12] });
