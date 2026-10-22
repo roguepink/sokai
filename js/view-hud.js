@@ -3,6 +3,7 @@
 import { Engine } from './engine.js';
 import { Events } from './events.js';
 import { damp } from './util.js';
+import { Look } from './view-look.js';
 
 const $ = (id) => document.getElementById(id);
 const NAMES = { top: '見下ろし', tps: '肩越し', fps: '一人称' };
@@ -79,7 +80,7 @@ export const ViewHud = {
   onStart() {
     this._playing = true; this._slamHinted = false;
     this.hideHint();
-    if (Engine.viewMode !== 'top' && (Engine.settings._get().hintLook || 0) < 3) setTimeout(() => { if (Engine.viewMode !== 'top' && this._playing) this.showHint('look'); }, 900);
+    if (Engine.viewMode !== 'top' && (Engine.settings._get().hintLook2 || 0) < 3) setTimeout(() => { if (Engine.viewMode !== 'top' && this._playing) this.showHint('look'); }, 900);
   },
 
   // ---------- 視点が変わった ----------
@@ -88,7 +89,7 @@ export const ViewHud = {
     this.showToast(mode);
     if (mode !== 'top') {
       const s = Engine.settings._get();
-      if ((s.hintLook || 0) < 3) setTimeout(() => { if (Engine.viewMode !== 'top' && this._playing) this.showHint('look'); }, 450);
+      if ((s.hintLook2 || 0) < 3) setTimeout(() => { if (Engine.viewMode !== 'top' && this._playing) this.showHint('look'); }, 1500);   // 視点の名前(1.6 秒)と 重ならないように
     } else if (this._hintKind === 'look') this.hideHint();
   },
   showToast(mode) {
@@ -105,8 +106,8 @@ export const ViewHud = {
     this._hintKind = kind;
     if (kind === 'look') {
       h.innerHTML = pc ? '<b>🖱️</b><span>画面をクリックすると<br>マウスで 向きが変わる<small>(Esc で もどる / B で 視点の設定)</small></span>'
-        : '<b class="swipe">👆</b><span>右側を なぞると<br>向きが変わる<small>さわらないと 自動で ゾンビの方を向く</small></span>';
-      const s = Engine.settings._get(); Engine.settings._set('hintLook', (s.hintLook || 0) + 1);
+        : '<b class="swipe">👆</b><span>撃つボタンを 押したまま<br>左右に なぞると 向きが変わる<small>右側の あいている所を なぞっても OK</small></span>';
+      const s = Engine.settings._get(); Engine.settings._set('hintLook2', (s.hintLook2 || 0) + 1);
       this._hintLook0 = this.ctx.Input.lookT;
       this._hintT = 7;
     } else {
@@ -137,8 +138,8 @@ export const ViewHud = {
       <div class="vp-views">${['top', 'tps', 'fps'].map((m) => `<button type="button" data-view="${m}"><b>${ICONS[m]}</b>${NAMES[m]}</button>`).join('')}</div>
       <div class="set-row"><span>向きを変える速さ</span><div class="seg" data-vset="sens">${SENS.map(([v, l]) => `<button type="button" data-v="${v}">${l}</button>`).join('')}</div></div>
       <div class="set-row"><span>自動で ゾンビの方を向く</span><div class="seg" data-vset="autoTurn"><button type="button" data-v="on">オン</button><button type="button" data-v="off">オフ</button></div></div>
-      <div class="set-row"><span>上下の向き</span><div class="seg" data-vset="invertY"><button type="button" data-v="off">ふつう</button><button type="button" data-v="on">反対</button></div></div>
-      <p class="set-note">肩越し・一人称は、右側を なぞると 向きが変わります</p>
+      <div class="set-row pc-only"><span>上下の向き(マウス)</span><div class="seg" data-vset="invertY"><button type="button" data-v="off">ふつう</button><button type="button" data-v="on">反対</button></div></div>
+      <p class="set-note">肩越し・一人称は、撃つボタンを押したまま 左右になぞると 向きが変わります</p>
       <button type="button" class="big vp-close">もどる</button>`;
     root.appendChild(p);
     p.querySelectorAll('[data-view]').forEach((b) => b.addEventListener('click', () => {
@@ -150,6 +151,7 @@ export const ViewHud = {
       const b = e.target.closest('button'); if (!b) return;
       const k = seg.dataset.vset, v = b.dataset.v;
       if (k === 'sens') Engine.settings.sens = +v;
+      else if (k === 'autoTurn') Look.setAuto(Engine, v === 'on');
       else Engine.settings[k] = v === 'on';
       this._sync();
     }));
@@ -162,7 +164,7 @@ export const ViewHud = {
     const sens = st.sens;
     let best = SENS[0][0];
     for (const [v] of SENS) if (Math.abs(+v - sens) < Math.abs(+best - sens)) best = v;
-    const vals = { sens: best, autoTurn: st.autoTurn ? 'on' : 'off', invertY: st.invertY ? 'on' : 'off' };
+    const vals = { sens: best, autoTurn: Look.autoOn(Engine) ? 'on' : 'off', invertY: st.invertY ? 'on' : 'off' };
     p.querySelectorAll('.seg').forEach((seg) => seg.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === vals[seg.dataset.vset]))));
   },
   openPanel() {

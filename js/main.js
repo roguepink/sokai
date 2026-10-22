@@ -240,13 +240,20 @@ function handleView(real) {
     if (next === 'top' && document.pointerLockElement) document.exitPointerLock();
   }
   if (Engine.viewMode !== 'top') Look.update(real, Engine, Input, Engine.ctx);
-  else { Input.consumeLook(_look); Input.consumeLookMouse(_look); }
+  else { Input.consumeLook(_look); Input.consumeLookMouse(_look); Input.consumeTurn(); }
 }
 
 function step(dt) {
   Game.time += dt;
   Player.update(dt, Input);
+  // 肩越し・一人称: 武器の「照準への吸いつき」は 指で向きを変えている間は 止める(はなすと だんだん もどる)。
+  // 吸いつきが 指より強くて「前しか向けない」ことがあったため(2026-10-22 ノブさんの実機)
+  const y0 = Engine.lookYaw;
   Weapons.update(dt, Input, Player);
+  if (Engine.viewMode !== 'top' && Engine.lookYaw !== y0 && !Input.auto) {
+    const k = Input.assistScale();
+    if (k < 1) Engine.lookYaw = y0 + (Engine.lookYaw - y0) * k;
+  }
   Zombies.update(dt, Player);
   Director.update(dt, Player);
   FX.update(dt);

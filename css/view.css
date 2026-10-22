@@ -117,3 +117,22 @@ body.pc .view-hint.look { right: auto; left: calc(var(--sal) + 14px); top: 40%; 
   .vp-views button { padding: 6px 14px; font-size: 15px; } .vp-views button b { font-size: 24px; }
   .view-panel .set-row > span { font-size: 14px; }
 }
+
+/* 指の機械では 上下の設定は使わない(指は 左右だけ回す) */
+body:not(.pc) .view-panel .pc-only { display: none; }
+
+/* ◀▶(武器の切りかえ)を 撃つボタンから 少し はなす(すきまが 2〜4px しかなく、撃つつもりが 武器が変わることがあった)。
+   武器の名前も いっしょに上へ */
+@media (orientation: landscape) {
+  #controls .btn-prev, #controls .btn-next { bottom: calc(var(--sab) + 162px); }
+  #hud .weapon-name { bottom: calc(var(--sab) + 220px); }
+}
+@media (orientation: landscape) and (max-height: 380px) {
+  #controls .btn-prev, #controls .btn-next { bottom: calc(var(--sab) + 150px); }
+  #hud .weapon-name { bottom: calc(var(--sab) + 204px); }
+}
+body.pc #hud .weapon-name { bottom: calc(var(--sab) + 172px); }
+@media (orientation: portrait) {
+  #controls .btn-prev, #controls .btn-next { bottom: calc(var(--sab) + 160px); width: 48px; height: 48px; }
+  #controls .btn-next { right: calc(var(--sar) + 28px); }
+}
