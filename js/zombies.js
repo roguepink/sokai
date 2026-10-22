@@ -13,7 +13,7 @@ import { Gore, causeKind } from './zombie-gore.js';
 import { Flow } from './zombie-flow.js';
 import { poseAlive } from './zombie-anim.js';
 import { OUTFITS, SKINS, HAIR, TILE } from './zombie-models.js';
-import { Bosses, BOSS_TYPES } from './boss.js';
+import { Bosses, BOSS_TYPES, BOSS_CAUSES, BOSS_MAX_R } from './boss.js';
 
 const MAX = CONFIG.ZOMBIES.MAX;
 const HCELL = 3;          // 近くさがし用の区画(m)
@@ -142,6 +142,7 @@ export const Zombies = {
     Gore.px = px; Gore.pz = pz;
     this._rebuildHash();
     this._atkCool -= dt;
+    Bosses.pre(dt);
     // ふくれゾンビの連鎖爆発(少しずつずらして)
     for (const p of this._pending) if (p.on && (p.t -= dt) <= 0) { p.on = false; this._bloaterBlast(p.x, p.z, p.s); }
     for (const g of this._gas) if (g.on) this._gasTick(g, dt);
@@ -370,7 +371,7 @@ export const Zombies = {
   queryCircle(x, z, r, out = []) {
     out.length = 0;
     const H = this._hHead, N = this._hNext, E = this._hEnt, HX = this._hCx, HZ = this._hCz;
-    const pad = 3;   // いちばん大きいボスの半径
+    const pad = Math.max(3, BOSS_MAX_R);   // いちばん大きいボスの半径
     const c0x = Math.floor((x - r - pad) / HCELL), c1x = Math.floor((x + r + pad) / HCELL);
     const c0z = Math.floor((z - r - pad) / HCELL), c1z = Math.floor((z + r + pad) / HCELL);
     for (let cz = c0z; cz <= c1z; cz++) for (let cx = c0x; cx <= c1x; cx++) {
@@ -421,6 +422,16 @@ export const Zombies = {
           if (px2 * px2 + pz2 * pz2 <= e.r * e.r * 1.4) out.push({ e, t });
         }
       }
+    }
+    // ボスは 体が大きいので 区画の外からも 当たる(数体だけ)
+    for (const m of Bosses._active) {
+      const e = m.e;
+      if (!e || !e.alive || e._ray === stamp) continue;
+      e._ray = stamp;
+      const ex = e.x - x, ez = e.z - z, t = ex * dx + ez * dz;
+      if (t < 0 || t > maxDist) continue;
+      const px2 = ex - dx * t, pz2 = ez - dz * t;
+      if (px2 * px2 + pz2 * pz2 <= e.r * e.r * 1.4) out.push({ e, t });
     }
     if (out.length > 1) out.sort(byT);
     return out;
@@ -573,7 +584,7 @@ export const Zombies = {
 const _dir = { x: 0, z: 0 };
 const _noOpts = {};
 const _near = [];
-const BOSS_ATTACK = new Set(['slam', 'boss', 'cleaver', 'leap', 'stomp', 'car', 'acid', 'tank', 'throw']);
+const BOSS_ATTACK = new Set(BOSS_CAUSES);
 const byT = (a, b) => a.t - b.t;
 function bucket(gx, gz) { return ((gx * 73856093) ^ (gz * 19349663)) & (NB - 1); }
 

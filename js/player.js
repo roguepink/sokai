@@ -22,6 +22,9 @@ export const Player = {
   moves: Moves,             // 大技(ダッシュ・ジャンプ叩きつけ)。dashing / airborne / busy
   parts: {},                // 体の部品(動かすため)。gunMount = 右手の銃をつける所(-z が前、+y が上)
   _swing: 0, _swingSide: 1, _spin: 0, _recoil: 0, _walk: 0, _t: 0, _lean: 0, _speed: 0,
+  // ボスに吹っとばされた(体力は減らない。見た目と手ごたえだけ)。knocked = 吹っとび中
+  _kb: { t: 0, dur: 0.3, vx: 0, vz: 0, y: 0, vy: 0, cool: 0, ang: 0, spin: 0, ax: 1, az: 0, land: 0 },
+  get knocked() { return this._kb.t > 0 || this._kb.y > 0; },
 
   init(scene) {
     this.mesh = buildHero();
@@ -38,7 +41,76 @@ export const Player = {
     Moves.init(scene);
   },
 
-  reset() { this.pos.set(0, 0, 0); this.vel.set(0, 0, 0); this.facing = 0; this._swing = this._spin = this._recoil = 0; Moves.reset(); },
+  reset() {
+    this.pos.set(0, 0, 0); this.vel.set(0, 0, 0); this.facing = 0; this._swing = this._spin = this._recoil = 0; Moves.reset();
+    const k = this._kb; k.t = k.y = k.vy = k.cool = k.ang = 0;
+  },
+
+  // ボスの攻撃で 吹っとぶ(キャラ係・ボス)。dir = 吹っとぶ向き(XZ)、force = 速さ(m/秒 の目安 8〜30)、lift = 上へ(m/秒)
+  // 体力は減らない。0.3〜0.45 秒で 操作がもどる。続けて何度も くらわない(0.9 秒あける)。ダッシュ・叩きつけ中は 当たらない
+  // 当たったら true(呼んだ側が heroHit を出す)
+  knock(dirX, dirZ, force = 14, lift = 0, src = null) {
+    const k = this._kb;
+    if (k.cool > 0 || Moves.busy) return false;
+    const l = Math.hypot(dirX, dirZ) || 1; dirX /= l; dirZ /= l;
+    const f = Math.min(30, Math.max(4, force));
+    lift = Math.min(12, Math.max(0, lift));
+    k.vx = dirX * f; k.vz = dirZ * f;
+    k.dur = k.t = 0.28 + Math.min(0.14, f * 0.004 + lift * 0.008);
+    k.vy = Math.max(k.vy, lift); k.cool = 0.9;
+    k.ax = dirZ; k.az = -dirX;                       // たおれる軸(上 × 向き)
+    k.spin = lift > 4.5 ? 1 : 0;                     // 大きく浮いたら 宙返り、ちがえば のけぞる
+    k.ang = 0; k.land = 0;
+    // 見下ろしでは 当たった方を向く(後ろへ 宙返り)
+    if (Engine.viewMode === 'top') this.facing = Math.atan2(-dirX, dirZ);
+    this._swing = this._spin = 0;
+    Engine.shake(Math.min(2, 0.8 + f / 22 + lift / 20));
+    Engine.hitStop(0.045 + Math.min(0.05, f / 700));
+    if (Engine.fovKick) Engine.fovKick(Engine.viewMode === 'top' ? 4 : 6 + f * 0.25);
+    if (Engine.viewMode !== 'top' && Engine.setRoll) {
+      const y = Engine.lookYaw, side = dirX * Math.cos(y) + dirZ * Math.sin(y);
+      Engine.setRoll(side * 0.18);
+    }
+    return true;
+  },
+
+  // 吹っとびの動き(update の中。移動のあと・壁の判定の前)
+  _knockMove(dt) {
+    const k = this._kb;
+    k.cool = Math.max(0, k.cool - dt);
+    if (k.t > 0) {
+      const w = Math.min(1, (k.t / k.dur) * 1.8);    // 最後の方は スティックの操作がもどってくる
+      this.vel.x = this.vel.x * (1 - w) + k.vx * w;
+      this.vel.z = this.vel.z * (1 - w) + k.vz * w;
+      const d = Math.exp(-4 * dt); k.vx *= d; k.vz *= d;
+      k.t = Math.max(0, k.t - dt);
+      if (Engine.viewMode !== 'top' && Engine.setRoll) Engine.setRoll((Engine.camera ? 1 : 0) * 0.15 * (k.t / k.dur) * Math.sign(k.vx * Math.cos(Engine.lookYaw) + k.vz * Math.sin(Engine.lookYaw)));
+    }
+    if (k.y > 0 || k.vy > 0) {
+      k.vy -= 32 * dt; k.y += k.vy * dt;
+      if (k.y <= 0) { k.y = 0; k.vy = 0; k.land = 0.25; if (Engine.landDip) Engine.landDip(0.3); }
+    }
+    k.land = Math.max(0, k.land - dt);
+    // 宙返り / のけぞり の角度
+    const air = k.y > 0 || k.t > 0;
+    if (air) k.ang = k.spin ? Math.min(Math.PI * 2, k.ang + dt * 17) : Math.min(0.55, k.ang + dt * 6);
+    else k.ang = k.spin ? 0 : Math.max(0, k.ang - dt * 5);
+  },
+  // 見た目: 腰を中心に 回す(_animate のあと)
+  _knockPose() {
+    const k = this._kb, m = this.mesh;
+    const yaw = m.rotation.y;
+    m.rotation.set(0, yaw, 0);
+    if (k.ang <= 0.001 && k.land <= 0) return;
+    let a = k.ang;
+    if (k.spin && a >= Math.PI * 2 - 0.01) a = 0;
+    _kq.setFromAxisAngle(_kax.set(k.ax, 0, k.az), a);
+    m.quaternion.premultiply(_kq);
+    // 腰(高さ 0.95)を中心に回るように ずらす
+    _khip.set(0, 0.95, 0).applyQuaternion(_kq);
+    m.position.x += -_khip.x; m.position.y += 0.95 - _khip.y; m.position.z += -_khip.z;
+    if (k.land > 0) m.position.y -= 0.15 * Math.sin((k.land / 0.25) * Math.PI);
+  },
 
   update(dt, input) {
     // 移動(壁で止まる・すべる)
@@ -58,15 +130,18 @@ export const Player = {
       this.vel.x = damp(this.vel.x, mx * sp, 14, dt);
       this.vel.z = damp(this.vel.z, mz * sp, 14, dt);
     }
+    this._knockMove(dt);
     this.pos.x += this.vel.x * dt; this.pos.z += this.vel.z * dt;
-    this.pos.y = Moves.y;
+    this.pos.y = Math.max(Moves.y, this._kb.y);
     World.collideCircle(this.pos, this.radius);
+    if (World.half) { const h = World.half - 1; this.pos.x = Math.max(-h, Math.min(h, this.pos.x)); this.pos.z = Math.max(-h, Math.min(h, this.pos.z)); }
 
     // 向き: 撃っている間は狙いの方、それ以外は進む方
     const moving = Math.hypot(this.vel.x, this.vel.z) > 0.5;
     let want = this.facing;
     if (close) want = Engine.lookYaw;            // 肩越し・一人称: いつも見ている向き
     else if (Moves.busy) want = Math.atan2(Moves.dirX, -Moves.dirZ);   // 突進・ジャンプの向き
+    else if (this.knocked) want = this.facing;    // 吹っとび中は 向きを変えない
     else if (this.aiming) want = Math.atan2(this.aimDir.x, -this.aimDir.z);
     else if (moving) want = Math.atan2(this.vel.x, -this.vel.z);
     this.facing = close ? want : dampAngle(this.facing, want, Moves.busy ? 30 : 18, dt);
@@ -74,6 +149,7 @@ export const Player = {
     this._setFade(Engine.heroFade);
 
     this._animate(dt, moving);
+    this._knockPose();
   },
 
   // ---------- 動き(武器係が呼ぶ) ----------
@@ -237,6 +313,7 @@ export const Player = {
 };
 
 const _pq = new THREE.Quaternion(), _rq = new THREE.Quaternion(), _yAxis = new THREE.Vector3(0, 1, 0);
+const _kq = new THREE.Quaternion(), _kax = new THREE.Vector3(), _khip = new THREE.Vector3();
 
 // ---------- 主人公の見た目 ----------
 function buildHero() {

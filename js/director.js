@@ -4,7 +4,7 @@
 // - 大群: 35〜50 秒ごとに、1 つの方向から一気に押しよせる(`horde` イベント)。種類も変わる
 // - 地面から はい出てくるゾンビ(画面の中でも出る。見ていて楽しい)
 // - 建物の中・森からも出る
-// - ボス: 最初は 40 秒、そのあと 70 秒ごと。種類を順番に(だんだん強くなる)
+// - ボス: 最初は 30 秒、そのあと 45〜60 秒ごと(ときどき 2 体)。16 種類を 袋から順に(同じのが続かない)。出る前に形を用意しておく
 // - 出来事(zombie-events.js): 30〜45 秒ごとに 物資投下・金色ゾンビ・空爆・津波 … / 新しい場所の発見
 // - 無双モード中(Score.feverActive): 数を増やし、まわりから波のように押しよせる(なぎ倒す相手)
 import { Zombies } from './zombies.js';
@@ -12,7 +12,7 @@ import { World } from './world.js';
 import { Events } from './events.js';
 import { Engine } from './engine.js';
 import { FX } from './fx.js';
-import { BOSS_ORDER, BOSS_TYPES } from './boss.js';
+import { BOSS_ORDER, BOSS_TYPES, Bosses } from './boss.js';
 import { CONFIG } from './config.js';
 import { Score } from './score.js';
 import { Happenings } from './zombie-events.js';
@@ -38,15 +38,17 @@ const HORDES = [
 export const Director = {
   time: 0,
   _acc: 0,
-  _nextBoss: 40,
+  _nextBoss: 30,
   _bossIdx: 0,
+  _bag: [], _nextType: null, _pairT: 0, _lastType: '',
   _nextHorde: 26,
   _hordeIdx: 0,
   _queue: [],
   _stat: { want: 0, ok: 0 },   // 確認用: 近くに出したかった数 / 出せた数               // 大群の「これから出す」予定 {type, x, z, t}
 
   reset() {
-    this.time = 0; this._acc = 0; this._nextBoss = 40; this._bossIdx = 0;
+    this.time = 0; this._acc = 0; this._nextBoss = 30; this._bossIdx = 0;
+    this._bag.length = 0; this._nextType = null; this._pairT = 0; this._lastType = '';
     this._nextHorde = 26; this._hordeIdx = 0; this._queue.length = 0; this._waveT = 0;
     Happenings.reset();
   },
@@ -60,10 +62,44 @@ export const Director = {
     const lap = Math.floor(this._bossIdx / BOSS_ORDER.length);
     const e = Zombies.spawn(type, x, z);
     if (e) {
-      e.hp = e.maxHp = Math.round(def.hp * (1 + this.time / 150) * (1 + lap * 0.3) * hpMul);
+      e.hp = e.maxHp = Math.round(def.hp * (1 + this.time / 300) * (1 + lap * 0.25) * hpMul);
       if (lap > 0) e.name = def.name + ' ' + ['', 'II', 'III', 'IV', 'V'][Math.min(4, lap)];
     }
     return e;
+  },
+  // 次に出すボス(袋から。はじめの 2 体は 大きすぎない種類)
+  _pickType() {
+    if (!this._bag.length) {
+      const all = BOSS_ORDER.slice().sort(() => Math.random() - 0.5);
+      if (this._bossIdx === 0) {        // はじめは 中くらい → だんだん 大物
+        all.sort((a, b) => ((BOSS_TYPES[a].tier || 1) + Math.random() * 1.6) - ((BOSS_TYPES[b].tier || 1) + Math.random() * 1.6));
+      }
+      if (all[0] === this._lastType && all.length > 1) all.push(all.shift());
+      this._bag = all;
+    }
+    return this._bag.shift();
+  },
+  // ボスの出る場所: 見ている方(見下ろしなら 画面の上 = 北)の 24〜34m 先。だめなら まわり
+  _bossPoint(px, pz) {
+    const v = Engine.viewDir || { x: 0, z: -1 };
+    const base = Math.atan2(v.z, v.x);
+    for (let i = 0; i < 14; i++) {
+      const a = base + R(-1.1, 1.1) * (i < 8 ? 1 : 2.8), d = R(24, 34);
+      const x = px + Math.cos(a) * d, z = pz + Math.sin(a) * d;
+      if (World.blockedAt(x, z, 3) || World.buildingAt(x, z) || !World.connected(x, z, px, pz)) continue;
+      return { x, z };
+    }
+    return World.spawnPoint(px, pz, 22, 36);
+  },
+  _spawnNextBoss(px, pz) {
+    const p = this._bossPoint(px, pz);
+    if (!p) return false;
+    const type = this._nextType || this._pickType();
+    this._nextType = null;
+    this.spawnBoss(type, p.x, p.z);
+    this._lastType = type;
+    this._bossIdx++;
+    return true;
   },
 
   // 今の時間に、まわりに何体いてほしいか(ゆっくり増えて、ときどき波がある)
@@ -203,20 +239,22 @@ export const Director = {
       if (e && q.rush) { e.spdMul *= 1.25; e.reachL = 1; }
     }
 
-    // ---- ボス(必ず出る) ----
+    // ---- ボス(必ず出る。最初 30 秒、そのあと 45〜60 秒ごと。ときどき 2 体) ----
+    // 8 秒前に 次の種類を決めて 形を用意しておく(出たときに 固まらないように)
+    if (!this._nextType && this.time >= this._nextBoss - 8) { this._nextType = this._pickType(); Bosses.prepare(this._nextType); }
+    let alive = 0;
+    if (this.time >= this._nextBoss || (this._pairT > 0 && this.time >= this._pairT)) for (const e of Zombies.list) if (e.boss) alive++;
+    if (this._pairT > 0 && this.time >= this._pairT) {
+      this._pairT = 0;
+      if (alive < 2) { if (!this._nextType) { this._nextType = this._pickType(); } this._spawnNextBoss(px, pz); alive++; }
+    }
     if (this.time >= this._nextBoss) {
-      let alive = 0;
-      for (const e of Zombies.list) if (e.boss) alive++;
-      if (alive >= 2) { this._nextBoss = this.time + 10; }
-      else {
-        const p = this._offscreenPoint(px, pz, 24, 34, false, 2.5) || World.spawnPoint(px, pz, 20, 34);
-        if (p) {
-          const type = BOSS_ORDER[this._bossIdx % BOSS_ORDER.length];
-          this.spawnBoss(type, p.x, p.z);
-          this._bossIdx++;
-          this._nextBoss = this.time + 70;
-        } else this._nextBoss = this.time + 2;
-      }
+      if (alive >= 2) { this._nextBoss = this.time + 8; }
+      else if (this._spawnNextBoss(px, pz)) {
+        this._nextBoss = this.time + R(45, 60);
+        // 2 分を すぎたら ときどき もう 1 体(5 秒あと)
+        if (this.time > 120 && alive === 0 && Math.random() < 0.3) { this._pairT = this.time + 5; this._nextType = this._pickType(); Bosses.prepare(this._nextType); }
+      } else this._nextBoss = this.time + 2;
     }
   },
 
