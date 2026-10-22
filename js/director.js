@@ -76,7 +76,7 @@ export const Director = {
   // スマホが重いときは数を減らす(解像度を下げても追いつかないとき)
   perfScale() {
     const E = Engine;
-    if (E._noBloom || (E._dprScale || 1) <= 0.6) return E.fps < 40 ? 0.55 : 0.75;
+    if (E._noBloom || (E._dprScale || 1) <= 0.6) return E.fps < (E._cap || 60) * 0.67 ? 0.55 : 0.75;   // 省エネ(1 秒 30 回)でも 正しく
     return 1;
   },
   // 主人公の近く(だいたい画面のまわり 26m)に いてほしい数。画面がからっぽにならないように

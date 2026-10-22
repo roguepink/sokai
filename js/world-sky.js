@@ -43,7 +43,7 @@ float h3(vec3 p){ return fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 4375
 float h2(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float n2(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);
   return mix(mix(h2(i), h2(i+vec2(1,0)), f.x), mix(h2(i+vec2(0,1)), h2(i+vec2(1,1)), f.x), f.y); }
-float fbm(vec2 p){ float a = 0.5, s = 0.0; for (int i = 0; i < 5; i++){ s += a * n2(p); p = p * 2.03 + vec2(1.7, 9.2); a *= 0.5; } return s; }
+float fbm(vec2 p){ float a = 0.5, s = 0.0; for (int i = 0; i < OCT; i++){ s += a * n2(p); p = p * 2.03 + vec2(1.7, 9.2); a *= 0.5; } return s; }
 void main(){
   vec3 d = normalize(vDir);
   float h = d.y;
@@ -239,9 +239,14 @@ export const Sky = {
       uSunCol: { value: new THREE.Color() }, uSunDir: { value: new THREE.Vector3(0, 0.2, 1).normalize() }, uMoonDir: { value: new THREE.Vector3(0.4, 0.55, 0.7).normalize() },
       uCloudCol: { value: new THREE.Color() }, uStars: { value: 0 }, uCloud: { value: 0.3 }, uTime: { value: 0 }, uFlash: { value: 0 }, uSunVis: { value: 1 }, uMoonVis: { value: 0 },
     };
-    const dome = this.dome = new THREE.Mesh(new THREE.SphereGeometry(370, 32, 16), new THREE.ShaderMaterial({ uniforms: U, vertexShader: SKY_VS, fragmentShader: SKY_FS, side: THREE.BackSide, depthWrite: false, fog: false }));
-    dome.renderOrder = -10; dome.frustumCulled = false; dome.matrixAutoUpdate = false;
+    // 軽量化: 雲の細かさ(重ねる回数)はスマホでは 4 回(5 回目は 1/32 の強さで 見た目は ほぼ同じ)
+    const dome = this.dome = new THREE.Mesh(new THREE.SphereGeometry(370, 32, 16), new THREE.ShaderMaterial({ uniforms: U, vertexShader: SKY_VS, fragmentShader: SKY_FS, side: THREE.BackSide, depthWrite: false, fog: false, defines: { OCT: q === 'high' ? 5 : 4 } }));
+    // 軽量化: 空は いちばん最後(ふつうの物のあと)に描く。建物や地面で かくれた所は 計算しない(前は 画面ぜんぶを先に塗っていた)。
+    // 奥行きは書かないので、半透明の物(雨・煙・光)は これまでどおり 空の上に重なる
+    dome.renderOrder = 9; dome.frustumCulled = false; dome.matrixAutoUpdate = false;
     W.group.add(dome);
+    // 描く直前に「空が画面に入っているか」を決める(一時停止中に視点を変えても 正しく)
+    if (Engine.beforeRender) Engine.beforeRender.push(() => { this.dome.visible = this._skySeen(); });
     // 遠くの景色の輪(霧の終わりの所に立てる)
     const RU = this.RU = { uMap: { value: ringTexture() }, uFog: U.uFog, uSil: { value: new THREE.Color(0x1a1820) }, uCam: { value: new THREE.Vector3() }, uNight: { value: 0 }, uTime: U.uTime, uVis: { value: 1 }, uFlash: U.uFlash };
     const ring = this.ring = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 0.24, 96, 1, true), new THREE.ShaderMaterial({ uniforms: RU, vertexShader: RING_VS, fragmentShader: RING_FS, side: THREE.BackSide, fog: false }));
@@ -367,6 +372,21 @@ export const Sky = {
     this.bolt.visible = true; this._boltT = 0.22;
     Events.emit('lightning', { x, z, near });
     if (near && this.W.lightningHit) this.W.lightningHit(x, z);
+  },
+
+  // 画面に 空(地平線より上)が 少しでも入っているか。見下ろしでは まず入らないので 空を描かない(地平線の下の空は 霧の色 = 背景の色と同じ)
+  _skySeen() {
+    const cam = Engine.camera;
+    cam.updateMatrixWorld();
+    const ty = Math.tan((cam.fov * Math.PI) / 360), tx = ty * cam.aspect, e = cam.matrixWorld.elements;
+    // 画面の 4 つの角の向きの 上向きの成分(y)。いちばん上を向いた角で決める
+    let best = -1;
+    for (let k = 0; k < 4; k++) {
+      const x = (k & 1 ? 1 : -1) * tx, y = (k & 2 ? 1 : -1) * ty, z = -1;
+      const dy = e[1] * x + e[5] * y + e[9] * z, dx = e[0] * x + e[4] * y + e[8] * z, dz = e[2] * x + e[6] * y + e[10] * z;
+      best = Math.max(best, dy / Math.hypot(dx, dy, dz));
+    }
+    return best > -0.1;       // 少し余裕(ゆれ・画角のパンチ)
   },
 
   // 今の時間・天気の色を 空・霧・光・材質に入れる

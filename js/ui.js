@@ -460,18 +460,23 @@ export const UI = {
     const txt = fmt(this._disp);
     if (txt !== this._lastScoreTxt) { el.score.textContent = txt; this._lastScoreTxt = txt; this._fitWeaponBar(); }
     this._scoreBump += (1 - this._scoreBump) * (1 - Math.exp(-10 * dt));
-    el.score.style.transform = `scale(${this._scoreBump.toFixed(3)})`;
+    const sTf = `scale(${this._scoreBump.toFixed(3)})`;
+    if (sTf !== this._scoreTf) { this._scoreTf = sTf; el.score.style.transform = sTf; }
 
     // ベストと「記録まであと」
+    // 軽量化: 文字・形は 変わったときだけ書きかえる(毎フレーム書くと ブラウザが 毎回 並べなおす)
+    let bestTxt, paceTf;
     if (Score.newRecord && Score.startBest > 0) {
-      el.best.textContent = '最高記録 更新中!';
-      el.pace.style.transform = 'scaleX(1)';
+      bestTxt = '最高記録 更新中!'; paceTf = 'scaleX(1)';
     } else {
       const sb = Score.startBest;
-      el.best.textContent = sb > 0 ? 'ベスト ' + fmt(sb) : 'はじめての記録に挑戦中!';
-      el.pace.style.transform = `scaleX(${sb > 0 ? Math.min(1, Score.score / sb).toFixed(3) : 0})`;
+      bestTxt = sb > 0 ? 'ベスト ' + fmt(sb) : 'はじめての記録に挑戦中!';
+      paceTf = `scaleX(${sb > 0 ? Math.min(1, Score.score / sb).toFixed(3) : 0})`;
     }
-    el.paceBox.style.visibility = Score.startBest > 0 ? 'visible' : 'hidden';
+    if (bestTxt !== this._bestTxt) { this._bestTxt = bestTxt; el.best.textContent = bestTxt; }
+    if (paceTf !== this._paceTf) { this._paceTf = paceTf; el.pace.style.transform = paceTf; }
+    const paceVis = Score.startBest > 0 ? 'visible' : 'hidden';
+    if (paceVis !== this._paceVis) { this._paceVis = paceVis; el.paceBox.style.visibility = paceVis; }
 
     if (Score.kills !== this._lastKills) { this._lastKills = Score.kills; el.kills.textContent = fmt(Score.kills); }
     const ts = Math.floor(Score.time || 0);
@@ -631,6 +636,16 @@ export const UI = {
       $(this._settingsFrom || 'title').classList.remove('hidden');
     });
 
+    // 省エネモード(スマホが熱いとき): 1 秒に描く回数を 30 回にして、絵を少し軽くする(engine.js の setEco)
+    const qRow = document.querySelector('#settings [data-set=quality]');
+    if (qRow && !document.querySelector('#settings [data-set=eco]')) {
+      const row = document.createElement('div');
+      row.className = 'set-row eco-row';
+      row.innerHTML = '<span>省エネ<small>スマホが熱いとき</small></span><div class="seg" data-set="eco"><button type="button" data-v="on">オン</button><button type="button" data-v="off">オフ</button></div>';
+      qRow.closest('.set-row').after(row);
+      const note = document.querySelector('#settings .set-note');
+      if (note) note.textContent = 'スマホが熱い・重いときは「省エネ」をオンに。画質を変えると 読みこみ直します';
+    }
     document.querySelectorAll('#settings .seg').forEach((seg) => {
       seg.addEventListener('click', (e) => {
         const b = e.target.closest('button'); if (!b) return;
@@ -640,6 +655,7 @@ export const UI = {
         else if (key === 'music') Audio.setMusic(v === 'on');
         else if (key === 'vibrate') { const s = loadSettings(); s.vibrate = v === 'on'; saveSettings(s); if (v === 'on') Audio.vibrate(40, true); }
         else if (key === 'quality' && v !== Engine.quality) { Score.save(); Engine.setQuality(v); return; }
+        else if (key === 'eco' && Engine.setEco) Engine.setEco(v === 'on');
         this._syncSettings();
       });
     });
@@ -647,7 +663,7 @@ export const UI = {
 
   _syncSettings() {
     const s = loadSettings();
-    const vals = { sound: Audio.muted ? 'off' : 'on', music: Audio.musicOn ? 'on' : 'off', vibrate: s.vibrate === false ? 'off' : 'on', quality: Engine.quality };
+    const vals = { sound: Audio.muted ? 'off' : 'on', music: Audio.musicOn ? 'on' : 'off', vibrate: s.vibrate === false ? 'off' : 'on', quality: Engine.quality, eco: Engine.eco ? 'on' : 'off' };
     document.querySelectorAll('#settings .seg').forEach((seg) => {
       seg.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === vals[seg.dataset.set])));
     });

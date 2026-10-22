@@ -7,7 +7,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { CONFIG } from './config.js';
 import { World } from './world.js';
 import { Events } from './events.js';
-import { damp, hashValue } from './util.js';
+import { damp, hashValue, HASH } from './util.js';
 import { ViewCam } from './view-camera.js';
 
 const C = CONFIG.CAMERA, V = CONFIG.VIEW;
@@ -41,8 +41,13 @@ export const Engine = {
     const q = hashValue('q');
     const saved = loadSettings();
     this.quality = q || saved.quality || (isMobile() ? 'mid' : 'high');
+    // 省エネモード: 設定で保存。アドレスの #eco でも(確認用。#eco=0 で切る)
+    this.eco = HASH.has('eco') || (hashValue('eco') ? hashValue('eco') !== '0' : saved.eco === true);
+    this.prof = PROFILE[this.quality] || PROFILE.high;
 
-    const r = new THREE.WebGLRenderer({ antialias: this.quality !== 'low', powerPreference: 'high-performance', stencil: false });
+    // 軽量化: 画面効果(光のにじみ)を使うときは、絵は いったん別の紙(にじみ用)に描くので、
+    // キャンバスの なめらか処理(MSAA)は 効かない(重いだけ)。だから切る(見た目は変わらない)
+    const r = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance', stencil: false });
     r.outputColorSpace = THREE.SRGBColorSpace;
     r.toneMapping = THREE.ACESFilmicToneMapping;
     r.toneMappingExposure = 1.05;
@@ -67,6 +72,9 @@ export const Engine = {
     sun.castShadow = r.shadowMap.enabled;
     const S = CONFIG.RENDER.SHADOW_AREA;
     sun.shadow.mapSize.set(this.quality === 'high' ? CONFIG.RENDER.SHADOW_SIZE : 1024, this.quality === 'high' ? CONFIG.RENDER.SHADOW_SIZE : 1024);
+    // 影の地図は 自分で「今回 描きなおす」を決める(スマホは 2 回に 1 回。render() を見る)
+    r.shadowMap.autoUpdate = false;
+    r.shadowMap.needsUpdate = true;
     Object.assign(sun.shadow.camera, { left: -S, right: S, top: S, bottom: -S, near: 1, far: 200 });
     sun.shadow.bias = -0.0004;
     sun.shadow.normalBias = 0.03;
@@ -78,9 +86,21 @@ export const Engine = {
       this.composer = new EffectComposer(r);
       this.composer.addPass(new RenderPass(scene, this.camera));
       this.bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.5, 0.45, 0.9);
+      lightenBloom(this.bloom, this);
+      this._bloomScale = this.prof.bloom >= 1 && !this.eco ? 1 : 0.5;
       this.composer.addPass(this.bloom);
       this.composer.addPass(new OutputPass());
+      this.bloom.setScale(this._bloomScale);
     }
+
+    // 自動で軽くする段(見た目の変化が小さい順に 積み上げる)
+    const lv = [{ dpr: 1 }];
+    const add = (o) => lv.push(Object.assign({}, lv[lv.length - 1], o));
+    if (this.composer && this.prof.bloom >= 1) add({ halfBloom: true });
+    if (r.shadowMap.enabled && this.prof.shadowEvery < 2) add({ shadow: 2 });
+    for (const d of [0.85, 0.72, 0.62, 0.55]) add({ dpr: d });
+    if (this.composer) add({ noBloom: true });
+    this._levels = lv;
 
     addEventListener('resize', () => this.resize());
     this.resize();
@@ -88,7 +108,8 @@ export const Engine = {
 
   resize() {
     const w = innerWidth, h = innerHeight;
-    const maxDpr = this.quality === 'high' ? 2 : this.quality === 'mid' ? 1.5 : 1;
+    // 絵の細かさ(1 CSS ピクセルを 何ピクセルで描くか)。スマホ(中)は 1.25 まで(点数などの文字は HTML なので くっきりのまま)
+    const maxDpr = this.eco ? Math.min(this.prof.dpr, 1) : this.prof.dpr;
     const dpr = Math.min(window.devicePixelRatio || 1, maxDpr) * (this._dprScale || 1);
     this.renderer.setPixelRatio(dpr);
     this.renderer.setSize(w, h, false);
@@ -131,6 +152,7 @@ export const Engine = {
     ViewCam.startBlend(this.camera, this.viewMode === 'top' || mode === 'top' ? V.BLEND : V.BLEND * 0.7);
     const prev = this.viewMode;
     this.viewMode = mode;
+    this._viewT = 3;            // 切りかえ直後は 影を毎回 描きなおす
     if (yaw !== undefined) this.lookYaw = yaw;
     if (prev === 'top' || yaw !== undefined) this.lookPitch = mode === 'fps' ? V.FPS.PITCH0 : V.TPS.PITCH0;
     this.look(0, 0);
@@ -161,6 +183,7 @@ export const Engine = {
   // カメラをプレイヤーに追従させる
   updateCamera(realDt, target, inside, demo) {
     if (!this._vcInit) { this._vcInit = true; ViewCam.init(); }
+    this._demo = demo;
     const close = !demo && this.viewMode !== 'top';
     if (!demo && ViewCam.shot) ViewCam.endShot(this.camera);
     let mode = 'top';
@@ -249,11 +272,57 @@ export const Engine = {
     cam.lookAt(this.camTarget);
   },
 
+  // ---------- 軽量化: 1 秒に描く回数をそろえる ----------
+  // 120Hz・90Hz の画面のスマホでも 1 秒に 60 回まで(省エネモードは 30 回)。タイトルの見本は 30 回、一時停止中は 15 回。
+  // ゲームの計算は main が 1/60 秒きざみで進めるので、描く回数を減らしても 速さは変わらない。
+  // main のループの最初で `if (!Engine.shouldRender(now, state)) return;` と呼ぶ(呼ばれないときは render() が自分で間引く)
+  // state: 'play' | 'title' | 'paused' | 'result'(省略 = 'play')
+  maxFps(state) {
+    const s = state || this._state || 'play';
+    if (s === 'paused' || s === 'result') return 15;
+    if (s === 'title') return 30;
+    return this.eco ? 30 : 60;
+  },
+  shouldRender(now, state) {
+    this._gated = true;
+    return this._gate(now, state);
+  },
+  _gate(now, state) {
+    if (state) this._state = state;
+    const cap = this.maxFps();
+    this._cap = cap;
+    const iv = 1000 / cap;
+    // 画面の切りかえの ゆらぎ(数ミリ秒)で 1 回とばさないよう、4 分の 1 だけ ゆるす
+    if (now < this._nextT - iv * 0.25) return false;
+    this._nextT = Math.max(this._nextT + iv, now);
+    if (this._nextT > now + iv * 1.5) this._nextT = now + iv;     // 回数の上限が変わった直後(一時停止 → プレイ)に 待ちすぎない
+    return true;
+  },
+  beforeRender: [],           // 描く直前に呼ぶ(ほかの係が足してよい。軽い処理だけ)
+  _nextT: 0, _cap: 60, _state: 'play', _gated: false, _shadowN: 0,
+
   render(realDt) {
+    // main が shouldRender を呼んでいないとき(古いループ)は、ここで間引く
+    if (!this._gated && !this._gate(performance.now(), this._demo ? 'title' : 'play')) return;
     if (this.bloom) this.bloom.strength = this.viewMode === 'fps' ? 0.35 : this.viewMode === 'tps' ? 0.42 : 0.5;
-    this._measureFps(realDt);
+    this._measureFps();
+    this._shadowTick();
+    for (let i = 0; i < this.beforeRender.length; i++) this.beforeRender[i]();
     if (this.composer && !this._noBloom) this.composer.render(realDt);
     else this.renderer.render(this.scene, this.camera);
+  },
+
+  // 影の地図を描きなおすか。スマホ(中)は 2 回に 1 回(影は 1 秒に 30 回。動きの小さいゾンビの影では 分からない)。
+  // 主人公が ダッシュ・ジャンプ中、視点を切りかえた直後、1 秒 30 回以下で描いているときは 毎回
+  _shadowTick() {
+    const sm = this.renderer.shadowMap;
+    if (!sm.enabled) return;
+    let every = this._shadowEvery || this.prof.shadowEvery;
+    if (this._cap <= 30) every = 1;
+    const P = this.ctx && this.ctx.Player, mv = P && P.moves;
+    if (mv && (mv.dashing || mv.airborne)) every = 1;
+    if (this._viewT > 0) { this._viewT--; every = 1; }
+    if (++this._shadowN >= every) { this._shadowN = 0; sm.needsUpdate = true; }
   },
 
   // 3D の位置 → 画面の位置(px)。画面の外・後ろなら null
@@ -268,31 +337,48 @@ export const Engine = {
     return out;
   },
 
-  // 遅いときは自動で解像度を下げる(スマホで固まらないように)
-  _measureFps(dt) {
+  // 遅いとき(スマホが熱くなって 力を落としたときも)は 自動で 少しずつ軽くする。余裕がもどったら 少しずつ戻す。
+  // 段(_levels。init で作る): そのまま → 光のにじみを半分の細かさ → 影を 2 回に 1 回 → 絵の細かさ 0.85 … 0.55 → 光のにじみをやめる
+  // (はじめから そうなっている段は とばす。見た目の変化が小さい順)
+  // 「遅い」= 目標(1 秒 60 回。省エネ 30 回)の 4 分の 3 より少ない が 3 秒続いた。戻すのは 目標の 93% 以上が 8 秒(下げたばかりの段は もっと長く)
+  _measureFps() {
+    const now = performance.now(), dt = this._fpsLast ? Math.min(0.25, (now - this._fpsLast) / 1000) : 0;   // 描いた間の 本当の時間(main が間引いても 正しく)
+    this._fpsLast = now;
     this._fpsAcc += dt; this._fpsN++;
-    if (this._fpsAcc >= 1) {
-      this.fps = this._fpsN / this._fpsAcc;
-      this._fpsAcc = 0; this._fpsN = 0;
-      if (document.hidden) return;
-      const sc = this._dprScale || 1;
-      if (this.fps < 40) { this._lowFpsTime++; this._goodFpsTime = 0; }
-      else { this._lowFpsTime = Math.max(0, this._lowFpsTime - 1); this._goodFpsTime = this.fps > 56 ? (this._goodFpsTime || 0) + 1 : 0; }
-      if (this._lowFpsTime >= 3 && sc > 0.55) {
-        // 遅い: 解像度を下げる
-        this._dprScale = Math.max(0.55, sc * 0.85);
-        this._lowFpsTime = 0;
-        this.resize();
-      } else if (this._lowFpsTime >= 4 && sc <= 0.55 && this.composer && !this._noBloom) {
-        // それでも遅い: 光のにじみをやめる(いちばん重い画面効果)
-        this._noBloom = true; this._lowFpsTime = 0;
-      } else if (this._goodFpsTime >= 8 && sc < 1) {
-        // 余裕がもどった: 少しずつ戻す
-        this._dprScale = Math.min(1, sc * 1.08);
-        this._goodFpsTime = 0;
-        this.resize();
-      }
+    if (this._fpsAcc < 1) return;
+    this.fps = this._fpsN / this._fpsAcc;
+    this._fpsAcc = 0; this._fpsN = 0;
+    if (document.hidden || this._state !== 'play') { this._lowFpsTime = 0; this._goodFpsTime = 0; return; }
+    const cap = this._cap || 60;
+    if (this.fps < cap * 0.75) { this._lowFpsTime++; this._goodFpsTime = 0; }
+    else { this._lowFpsTime = Math.max(0, this._lowFpsTime - 1); this._goodFpsTime = this.fps > cap * 0.93 ? (this._goodFpsTime || 0) + 1 : 0; }
+    const lv = this.level || 0;
+    if (this._lowFpsTime >= 3 && lv < this._levels.length - 1) {
+      this._setLevel(lv + 1);
+      this._lowFpsTime = 0;
+      this._upWait = Math.min(60, (this._upWait || 8) * 1.5);   // 行ったり来たり しないように、戻すのは だんだん慎重に
+    } else if (lv > 0 && this._goodFpsTime >= (this._upWait || 8)) {
+      this._setLevel(lv - 1);
+      this._goodFpsTime = 0;
     }
+  },
+  level: 0,
+  _setLevel(lv) {
+    this.level = lv;
+    const L = this._levels[lv];
+    this._dprScale = L.dpr;
+    this._shadowEvery = L.shadow ? Math.max(L.shadow, this.prof.shadowEvery) : 0;
+    this._noBloom = !!L.noBloom;
+    if (this.bloom) this.bloom.setScale(L.halfBloom || this.eco || this.prof.bloom < 1 ? 0.5 : 1);
+    this.resize();
+  },
+
+  // 省エネモード(設定で えらぶ。保存される): 1 秒 30 回・絵の細かさ 1 まで・光のにじみは半分の細かさ。読みこみ直しは いらない
+  setEco(on) {
+    this.eco = !!on;
+    const s = loadSettings(); s.eco = this.eco; saveSettings(s);
+    this._setLevel(0);
+    this._upWait = 8;
   },
 
   setQuality(q) {
@@ -304,7 +390,48 @@ export const Engine = {
 const _v = new THREE.Vector3();
 const _sd = new THREE.Vector3(), _md = new THREE.Vector3(), _ld = new THREE.Vector3(), _rt = new THREE.Vector3(), _up = new THREE.Vector3(), _c = new THREE.Vector3();
 
-function isMobile() { return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && innerWidth < 1100); }
+// スマホ・タブレット: iPad は「Mac」と名のるので、指でさわれる Mac も タブレットとみなす
+function isMobile() {
+  const ua = navigator.userAgent, tp = navigator.maxTouchPoints || 0;
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(ua) || (/Macintosh/.test(ua) && tp > 1) || (tp > 1 && innerWidth < 1100);
+}
+
+// 画質ごとの重さ: dpr = 絵の細かさの上限 / bloom = 光のにじみの細かさ(1 = 半分の大きさで計算、0.5 = 4 分の 1)/ shadowEvery = 影を何回に 1 回 描きなおすか
+const PROFILE = {
+  high: { dpr: 2, bloom: 1, shadowEvery: 1 },
+  mid: { dpr: 1.25, bloom: 0.5, shadowEvery: 2 },
+  low: { dpr: 1, bloom: 0.5, shadowEvery: 2 },
+};
+
+// 光のにじみ(UnrealBloomPass)を 軽くできるようにする: pass.setScale(0.5) で 4 分の 1 の大きさで計算する。
+// ぼかしの幅は 半分の点数で 同じ広さになるようにし(見た目の広がりは同じ)、明るい所を取り出すときは 4 点の平均をとる(小さな火花が ちらつかない)
+function lightenBloom(pass) {
+  const full = pass.separableBlurMaterials, lite = [3, 5, 7, 9, 11].map((k) => pass._getSeparableBlurMaterial(k));
+  const hpFull = pass.materialHighPassFilter, U = pass.highPassUniforms;
+  U.uTexel = { value: new THREE.Vector2(1 / 1024, 1 / 1024) };
+  const hpLite = new THREE.ShaderMaterial({
+    uniforms: U, vertexShader: hpFull.vertexShader,
+    fragmentShader: `uniform sampler2D tDiffuse; uniform vec3 defaultColor; uniform float defaultOpacity; uniform float luminosityThreshold; uniform float smoothWidth; uniform vec2 uTexel;
+      varying vec2 vUv;
+      vec4 hp(vec2 uv){ vec4 t = texture2D(tDiffuse, uv); float v = luminance(t.xyz); return mix(vec4(defaultColor, defaultOpacity), t, smoothstep(luminosityThreshold, luminosityThreshold + smoothWidth, v)); }
+      void main(){ gl_FragColor = 0.25 * (hp(vUv + uTexel * vec2(-1.0, -1.0)) + hp(vUv + uTexel * vec2(1.0, -1.0)) + hp(vUv + uTexel * vec2(-1.0, 1.0)) + hp(vUv + uTexel * vec2(1.0, 1.0))); }`,
+  });
+  const setSize = pass.setSize.bind(pass);
+  pass._scale = 1; pass._w = 2; pass._h = 2;
+  pass.setSize = (w, h) => {
+    pass._w = w; pass._h = h;
+    U.uTexel.value.set(1 / Math.max(1, w), 1 / Math.max(1, h));
+    setSize(Math.max(4, Math.round(w * pass._scale)), Math.max(4, Math.round(h * pass._scale)));
+  };
+  pass.setScale = (s) => {
+    s = s < 1 ? 0.5 : 1;
+    if (s === pass._scale) return;
+    pass._scale = s;
+    pass.separableBlurMaterials = s < 1 ? lite : full;
+    pass.materialHighPassFilter = s < 1 ? hpLite : hpFull;
+    pass.setSize(pass._w, pass._h);
+  };
+}
 
 export function loadSettings() {
   try { return JSON.parse(localStorage.getItem(CONFIG.SETTINGS_KEY)) || {}; } catch (e) { return {}; }
