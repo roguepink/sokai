@@ -169,7 +169,9 @@ export const Gore = {
         break;
       }
       case 'blade': {
-        const r = rnd();
+        const saw = opts.cause === 'chainsaw';    // チェーンソーは かならず まっぷたつ(+ときどき腕も)
+        const r = saw ? 0 : rnd();
+        if (saw && rnd() < 0.5) this._limbOff(B, rnd() < 0.5 ? P.UAL : P.UAR, dx, dz, 6, 4);
         if (r < 0.55 && e.def.anim !== 'crawl') {
           this._split(B, dx, dz, Math.min(9, 4 + F * 0.25), R(3.5, 5.5), 0.8);
           B.bleed = 1.3;
@@ -182,8 +184,8 @@ export const Gore = {
           launch(2.5 + F * 0.1, 1.5); tip(3.5);
           B.bleed = 0.8; B.bleedP = P.TORSO; B.bleedY = 0.45;
         }
-        FX.blood(e.x, fxy, e.z, dx, dz, 1.6 * bloodAmt);
-        this.chunks(e.x, fxy, e.z, lite ? 2 : 4, 5, 3, dx, dz);
+        FX.blood(e.x, fxy, e.z, dx, dz, (saw ? 2.6 : 1.6) * bloodAmt);
+        this.chunks(e.x, fxy, e.z, lite ? 2 : saw ? 7 : 4, 5, 3, dx, dz);
         this.splat(e.x + dx * 0.8, e.z + dz * 0.8, R(1.4, 2.2), dx, dz, 2.2);
         break;
       }
