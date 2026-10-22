@@ -17,7 +17,7 @@
 //   ・点 = 基本(2万 + 1万×(このプレイで何体目-1))× 強さ(bossTier)+ 今の点数の 5%)× 瞬殺ボーナス × ボス連続撃破
 //          × コンボ倍率(×4 まで)× 無双などの倍率
 //          + はじめて倒した種類(5万×強さ)+ 自己ベスト更新(2万)
-//   ・瞬殺ボーナス: 10 秒以内 ×3「瞬殺!!」/ 20 秒以内 ×2「速攻!」/ 35 秒以内 ×1.5「快速」
+//   ・瞬殺ボーナス: 10 秒以内 ×3「瞬殺!!」/ 20 秒以内 ×2「速攻!」/ 35 秒以内 ×1.5「快速」(強さ bossTier 1 段ごとに 秒が 4 割 のびる)
 //   ・ボス連続撃破: 前のボスを倒してから 100 秒以内に 次のボスを倒すと ×2, ×3 … (×10 まで)
 //   ・倒して 1.9 秒(ゲームの時間)後に 無双モード(ゲージ満タン)。コンボも 8 秒 のびる
 //   ・ボスの衝撃波(novaBegin〜novaEnd)で倒した分は まとめ倒しにせず「一掃ボーナス」= min(数,80)² × 25 × ボス連続撃破 × 倍率
@@ -206,7 +206,7 @@ export const Score = {
     // 瞬殺ボーナス(出てから倒すまでの秒)
     const time = b.time > 0 ? b.time : 0;
     let speed = null;
-    if (time > 0) for (const [sec, m, label] of BOSS_SPEED) if (time <= sec) { speed = { mult: m, label, sec }; break; }
+    if (time > 0) for (const [sec, m, label] of bossSpeedGoals(e)) if (time <= sec) { speed = { mult: m, label, sec }; break; }
     const tier = Math.max(1, Math.min(5, +(e && e.bossTier) || 1));
     // 基本: 2万 + 1万×(何体目-1) + 今の点数の 5%(後半でも ありがたみが へらないように)
     const base = Math.round(((20000 + 10000 * (this.bossKills - 1)) * (1 + 0.5 * (tier - 1)) + this.score * 0.05) / 1000) * 1000;
@@ -333,6 +333,12 @@ export const Score = {
     try { localStorage.setItem(RECORDS_KEY, JSON.stringify(r)); } catch (e) {}
   },
 };
+
+// 瞬殺ボーナスの秒(強いボス = bossTier が高いほど ゆるく。体力バーの「瞬殺まで あと〇秒」も これを使う)
+export function bossSpeedGoals(e) {
+  const tier = Math.max(1, Math.min(5, +(e && e.bossTier) || 1)), k = 1 + 0.4 * (tier - 1);
+  return BOSS_SPEED.map(([sec, m, label]) => [Math.round(sec * k), m, label]);
+}
 
 function newStats() {
   return { weapons: {}, bestMulti: 0, fevers: 0, feverBest: 0, golden: 0, events: 0, found: 0, challenges: 0,

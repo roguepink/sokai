@@ -569,6 +569,7 @@ body:not(.pc) .pc-only { display: none; }
 .bs-jack li { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 14px; line-height: 1.38; white-space: nowrap; animation: liIn .3s cubic-bezier(.2,1.6,.4,1) both; }
 .bs-jack li b { color: var(--gold); font-variant-numeric: tabular-nums; }
 .bs-jack li small { font-size: 11px; opacity: .8; }
+.bs-jack li small.st { color: #ffb020; opacity: 1; letter-spacing: -1px; }
 .bs-jack li.hot b { color: #ff8a2a; font-size: 17px; }
 .bs-jack li.new span { color: #7dff9a; } .bs-jack li.new b { color: #7dff9a; }
 .bs-jack li.more span { color: #ffb0a0; }
@@ -598,6 +599,7 @@ body:not(.pc) .pc-only { display: none; }
 .bs-chip i { font-style: normal; font-size: 14px; }
 .bs-chip b { font-size: 16px; font-variant-numeric: tabular-nums; }
 .bs-chip em { font-style: normal; font-size: 10px; padding: 0 5px; border-radius: 4px; background: var(--gold); color: #3a2000; text-shadow: none; letter-spacing: .05em; }
+.bs-chip em.chain { background: linear-gradient(180deg, #ff8a3a, #d02000); color: #fff; text-shadow: 0 1px 0 #000; font-size: 11px; }
 .bs-chip.on { animation: chipIn .4s cubic-bezier(.2,1.5,.4,1); }
 @keyframes chipIn { from { transform: translateX(-50%) scale(.4); opacity: 0; } }
 .bs-chip.soon { border-color: #ff3a3a; background: rgba(90,0,0,.6); }
@@ -614,7 +616,16 @@ body:not(.pc) .pc-only { display: none; }
 .res-dex .medals i.new { animation: medalNew .7s ease-in-out infinite alternate; }
 @keyframes medalNew { to { box-shadow: 0 0 14px rgba(255,210,63,1); transform: scale(1.12); } }
 
+#result { justify-content: safe center; }
 @media (max-height: 430px) {
+  #result { gap: 4px; }
+  #result .res-title { font-size: 17px; margin: 0; } #result .newrec { font-size: 20px; } #result .res-score b { font-size: min(44px, 11vh); }
+  #result .res-grid b { font-size: 19px; }
+  .res-extra { grid-template-columns: repeat(5, auto); gap: 4px; }
+  .res-extra div { padding: 3px 10px; }
+  .res-dex { flex-direction: row; margin: 0; gap: 8px; }
+  .res-dex .medals { flex-wrap: nowrap; gap: 4px; }
+  .res-dex .medals i { width: 24px; height: 24px; font-size: 13px; }
   .boss-bar { height: 14px; }
   .bs-alert { top: calc(var(--sat) + 58px); height: 30px; } .bs-alert span { font-size: 17px; }
   .bs-card { top: calc(var(--sat) + 94px); } .bs-card small { font-size: 13px; } .bs-card b { font-size: min(36px, 7vw, calc(80vw / var(--nlen, 8))); } .bs-card em { font-size: 12px; }

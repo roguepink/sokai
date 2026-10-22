@@ -100,9 +100,9 @@ export const SOUNDS4 = {
   jpCoin(A, t, o) {
     const i = Math.min(24, (o && o.i) || 0), semi = PENTA[i % 5] + 12 * Math.floor(i / 5) + 7;
     const f = note(Math.min(31, semi)), pan = rnd(-0.5, 0.5);
-    A.tn(t, { dur: 0.12, gain: 0.055, f0: f, pan });
-    A.tn(t, { dur: 0.07, gain: 0.022, f0: f * 2.76, pan });
-    A.tn(t + 0.03, { dur: 0.1, gain: 0.02, wave: 'triangle', f0: f * 1.5, pan, verb: 0.2 });
+    A.tn(t, { dur: 0.12, gain: 0.09, f0: f, pan });
+    A.tn(t, { dur: 0.07, gain: 0.035, f0: f * 2.76, pan });
+    A.tn(t + 0.03, { dur: 0.1, gain: 0.03, wave: 'triangle', f0: f * 1.5, pan, verb: 0.2 });
   },
 
   jpLine(A, t, o) {
@@ -114,7 +114,7 @@ export const SOUNDS4 = {
 
   jpTick(A, t, o) {
     const k = (o && o.k) || 0;
-    A.tn(t, { dur: 0.03, gain: 0.035, wave: 'square', f0: 700 + 1300 * k, lp: 4000 });
+    A.tn(t, { dur: 0.03, gain: 0.05, wave: 'square', f0: 700 + 1300 * k, lp: 4000 });
   },
 
   jpTotal(A, t) {

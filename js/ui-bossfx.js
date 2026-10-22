@@ -41,7 +41,7 @@ export const BossShow = {
   _waves: [],                // 走っている衝撃波
   _introAt: -1e9, _hitAt: -1e9, _heroHitSeen: false,
   _chipT: 0, _chipTxt: '', _chipOn: false, _tick: -1,
-  _coins: [], _coinN: 0, _q: [],
+  _coins: [], _coinN: 0,
 
   init(hud, ui) {
     this.ui = ui;
@@ -58,14 +58,14 @@ export const BossShow = {
       <div class="bs-jack" id="bsJack"><ul id="bsLines"></ul><div class="bs-total"><span>JACKPOT</span><b id="bsTotal">0</b></div></div>
       <div class="bs-nova" id="bsNova"></div>
       <div class="bs-coins" id="bsCoins"></div>
-      <div class="bs-chip hidden" id="bsChip"><i>👹</i><span id="bsChipTxt"></span><b id="bsChipT"></b><em id="bsChipNew">NEW</em></div>`;
+      <div class="bs-chip hidden" id="bsChip"><i>👹</i><span id="bsChipTxt"></span><b id="bsChipT"></b><em id="bsChipNew">NEW</em><em class="chain" id="bsChipChain"></em></div>`;
     // 操作のボタン・武器の列より上(z-index 14)。HUD と いっしょに 出し入れする(UI.show)
     (hud.parentNode || document.body).appendChild(L);
     const q = (id) => L.querySelector('#' + id);
     this.el = {
       layer: L, hit: q('bsHit'), chroma: q('bsChroma'), rage: q('bsRage'), alert: q('bsAlert'), card: q('bsCard'), ord: q('bsOrd'), name: q('bsName'), title: q('bsTitle'),
       pips: q('bsPips'), size: q('bsSize'), stamp: q('bsStamp'), stampSub: q('bsStampSub'), speed: q('bsSpeed'), jack: q('bsJack'), lines: q('bsLines'), total: q('bsTotal'),
-      nova: q('bsNova'), coins: q('bsCoins'), chip: q('bsChip'), chipTxt: q('bsChipTxt'), chipT: q('bsChipT'), chipNew: q('bsChipNew'),
+      nova: q('bsNova'), coins: q('bsCoins'), chip: q('bsChip'), chipTxt: q('bsChipTxt'), chipT: q('bsChipT'), chipNew: q('bsChipNew'), chipChain: q('bsChipChain'),
     };
     // お金・宝石(使い回す)
     const low = Engine.quality === 'low';
@@ -92,9 +92,9 @@ export const BossShow = {
   },
 
   clear() {
-    this.intro = null; this.seq = null; this._pending.length = 0; this._waves.length = 0; this._q.length = 0;
+    this.intro = null; this.seq = null; this._pending.length = 0; this._waves.length = 0;
     if (Score._nova) Score._nova = null;
-    this._introAt = -1e9; this._tick = -1; this._chipTxt = ''; this._chipOn = false;
+    this._introAt = -1e9; this._tick = -1; this._chipTxt = ''; this._chipOn = false; this._chainTxt = null;
     const el = this.el; if (!el.layer) return;
     for (const k of ['alert', 'card', 'stamp', 'jack']) el[k].classList.remove('on', 'out');
     el.layer.classList.remove('paused');
@@ -427,6 +427,10 @@ export const BossShow = {
       try { nt = Director.nextBossType || BOSS_ORDER[Director._bossIdx % BOSS_ORDER.length]; } catch (e) {}
       el.chipNew.style.display = nt && !BossDex.has(nt) ? '' : 'none';
     }
+    // ボス連続撃破の チャンス(前のボスから 100 秒以内に 次を倒すと ×(連続+1))
+    const chainOk = Score.bossChain >= 1 && Score.time - Score._lastBossT <= 100;
+    const ctxt = chainOk ? `🔥×${Math.min(10, Score.bossChain + 1)}` : '';
+    if (ctxt !== this._chainTxt) { this._chainTxt = ctxt; el.chipChain.textContent = ctxt; el.chipChain.style.display = ctxt ? '' : 'none'; }
     // のこり 3・2・1 秒で カウントの音
     const sec = Math.ceil(left);
     if (sec !== this._tick) { if (sec <= 3 && sec >= 1 && this._tick > sec) Audio.play('bossTick', { n: sec }); this._tick = sec; }
@@ -470,7 +474,7 @@ function threat(e, size) {
 function jackLines(j) {
   const L = [];
   const fx = (m) => '×' + (m % 1 ? m.toFixed(1) : m);
-  L.push({ label: 'ボス撃破' + (j.tier > 1 ? ' ' + '★'.repeat(Math.min(5, j.tier)) : ''), val: '+' + fmt(j.base) });
+  L.push({ label: 'ボス撃破 <small class="st">' + '★'.repeat(bossThreat(j.e)) + '</small>', val: '+' + fmt(j.base) });
   if (j.speed) L.push({ label: `⚡ ${j.speed.label.replace(/!+$/, '')}ボーナス <small>${j.time.toFixed(1)}秒</small>`, val: fx(j.speed.mult), cls: 'hot' });
   if (j.chain >= 2) L.push({ label: `🔥 ボス連続撃破 <small>${j.chain}体目</small>`, val: fx(j.chain), cls: 'hot' });
   if (j.combo > 1) L.push({ label: 'コンボ', val: fx(j.combo) });

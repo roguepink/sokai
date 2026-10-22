@@ -3,7 +3,7 @@
 // 第2弾: 無双モードのゲージと演出・出来事(worldEvent)の文字・チャレンジの残り・自己ベスト・大量撃破のスロー(キルカム)・結果の記録。
 // 第4弾: ボスの体力バー(太い・形態ごとの区切り・ひび・脅威度・倒すまでの時計)。登場・撃破の演出は ui-bossfx.js、図鑑は ui-bossdex.js
 import { Events } from './events.js';
-import { Score, jpNum } from './score.js';
+import { Score, jpNum, bossSpeedGoals } from './score.js';
 import { Weapons, WEAPONS } from './weapons.js';
 import { Engine, loadSettings, saveSettings } from './engine.js';
 import { Player } from './player.js';
@@ -572,7 +572,7 @@ export const UI = {
     }
     const e = cur.e;
     if (this._bossKey !== e) {
-      this._bossKey = e; this._bossLag = 1; this._bossPh = 1; this._bossTimeTxt = '';
+      this._bossKey = e; this._bossLag = 1; this._bossPh = 1; this._bossTimeTxt = ''; this._bossGoals = null;
       el.boss.classList.remove('hidden', 'ph2', 'ph3');
       el.bossName.textContent = cur.name + (B.length > 1 ? ' ほか' + (B.length - 1) + '体' : '');
       const th = bossThreat(e);
@@ -601,12 +601,12 @@ export const UI = {
     // 倒すまでの時計(瞬殺ボーナスまで あと何秒)
     if ((this._bossTT = (this._bossTT || 0) - dt) <= 0) {
       this._bossTT = 0.1;
-      const t = Bosses.clock - (cur.bornT || 0);
-      const goal = t < 10 ? ['⚡瞬殺', 10] : t < 20 ? ['速攻', 20] : t < 35 ? ['快速', 35] : null;
-      const txt = goal ? `${goal[0]}まで ${(goal[1] - t).toFixed(1)}` : `⏱ ${t.toFixed(0)}秒`;
+      const t = Bosses.clock - (cur.bornT || 0), G = this._bossGoals || (this._bossGoals = bossSpeedGoals(e));
+      const gi = G.findIndex((g) => t < g[0]), goal = gi >= 0 ? G[gi] : null;
+      const txt = goal ? `${gi === 0 ? '⚡' : ''}${goal[2].replace(/!+$/, '')}まで ${(goal[0] - t).toFixed(1)}` : `⏱ ${t.toFixed(0)}秒`;
       if (txt !== this._bossTimeTxt) {
         this._bossTimeTxt = txt; el.bossTime.textContent = txt;
-        el.bossTime.className = 'boss-time' + (goal ? (t < 10 ? ' g1' : t < 20 ? ' g2' : ' g3') : '');
+        el.bossTime.className = 'boss-time' + (goal ? ' g' + (gi + 1) : '');
       }
     }
 
