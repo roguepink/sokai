@@ -7,7 +7,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { CONFIG } from './config.js';
 import { World } from './world.js';
 import { Events } from './events.js';
-import { damp, hashValue } from './util.js';
+import { damp, hashValue, HASH } from './util.js';
 import { ViewCam } from './view-camera.js';
 
 const C = CONFIG.CAMERA, V = CONFIG.VIEW;
@@ -41,7 +41,8 @@ export const Engine = {
     const q = hashValue('q');
     const saved = loadSettings();
     this.quality = q || saved.quality || (isMobile() ? 'mid' : 'high');
-    this.eco = hashValue('eco') ? hashValue('eco') !== '0' : saved.eco === true;
+    // 省エネモード: 設定で保存。アドレスの #eco でも(確認用。#eco=0 で切る)
+    this.eco = HASH.has('eco') || (hashValue('eco') ? hashValue('eco') !== '0' : saved.eco === true);
     this.prof = PROFILE[this.quality] || PROFILE.high;
 
     // 軽量化: 画面効果(光のにじみ)を使うときは、絵は いったん別の紙(にじみ用)に描くので、
@@ -304,7 +305,7 @@ export const Engine = {
     // main が shouldRender を呼んでいないとき(古いループ)は、ここで間引く
     if (!this._gated && !this._gate(performance.now(), this._demo ? 'title' : 'play')) return;
     if (this.bloom) this.bloom.strength = this.viewMode === 'fps' ? 0.35 : this.viewMode === 'tps' ? 0.42 : 0.5;
-    this._measureFps(realDt);
+    this._measureFps();
     this._shadowTick();
     for (let i = 0; i < this.beforeRender.length; i++) this.beforeRender[i]();
     if (this.composer && !this._noBloom) this.composer.render(realDt);
@@ -340,7 +341,9 @@ export const Engine = {
   // 段(_levels。init で作る): そのまま → 光のにじみを半分の細かさ → 影を 2 回に 1 回 → 絵の細かさ 0.85 … 0.55 → 光のにじみをやめる
   // (はじめから そうなっている段は とばす。見た目の変化が小さい順)
   // 「遅い」= 目標(1 秒 60 回。省エネ 30 回)の 4 分の 3 より少ない が 3 秒続いた。戻すのは 目標の 93% 以上が 8 秒(下げたばかりの段は もっと長く)
-  _measureFps(dt) {
+  _measureFps() {
+    const now = performance.now(), dt = this._fpsLast ? Math.min(0.25, (now - this._fpsLast) / 1000) : 0;   // 描いた間の 本当の時間(main が間引いても 正しく)
+    this._fpsLast = now;
     this._fpsAcc += dt; this._fpsN++;
     if (this._fpsAcc < 1) return;
     this.fps = this._fpsN / this._fpsAcc;

@@ -643,6 +643,8 @@ export const UI = {
       row.className = 'set-row eco-row';
       row.innerHTML = '<span>省エネ<small>スマホが熱いとき</small></span><div class="seg" data-set="eco"><button type="button" data-v="on">オン</button><button type="button" data-v="off">オフ</button></div>';
       qRow.closest('.set-row').after(row);
+      const note = document.querySelector('#settings .set-note');
+      if (note) note.textContent = 'スマホが熱い・重いときは「省エネ」をオンに。画質を変えると 読みこみ直します';
     }
     document.querySelectorAll('#settings .seg').forEach((seg) => {
       seg.addEventListener('click', (e) => {
