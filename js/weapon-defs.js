@@ -40,8 +40,10 @@ export const WEAPONS = [
   { id: 'blackhole', name: 'ブラックホール', icon: '🌑', sound: 'blackhole', kind: 'blackhole', cluster: true,
     rate: 1.4, dmg: 800, radius: 11, range: 22, force: 42, color: 0xb060ff, recoil: 0.8, shake: 0.3, muz: 0.5 },
   // ---------------- 第2弾(2026-10-22) ----------------
+  // チェーンソー: 刃に さわった敵だけ斬る(刃の先 = 主人公から 約 2m)。range = 近くの敵へ 自分から飛びこむ距離。
+  //   dmg = けずる 1 回の威力(ボスはこれで けずる)/ sink = 刃が食いこんでから まっぷたつになるまで(秒)/ sweep = 左右にふる角度
   { id: 'chainsaw', name: 'チェーンソー', icon: '🪚', sound: 'chainsaw', kind: 'chainsaw', continuous: true, near: true,
-    rate: 15, dmg: 75, range: 6.5, width: 1.25, force: 14, color: 0xff6a20, recoil: 0.07, shake: 0.13, muz: 0.95 },
+    rate: 15, dmg: 60, range: 6, sink: 0.09, sweep: 0.85, force: 12, color: 0xff6a20, recoil: 0.07, shake: 0.08, muz: 0.95 },
   { id: 'thor', name: '雷神ハンマー', icon: '🔨', sound: 'hammer', kind: 'hammer',
     rate: 1.7, dmg: 600, radius: 8.5, range: 5.5, bolts: 8, boltRange: 18, boltDmg: 320, force: 46, color: 0x8ad0ff, recoil: 1, shake: 1.1, muz: 0.7 },
   { id: 'disc', name: '丸ノコ', icon: '💿', sound: 'disc', kind: 'disc',

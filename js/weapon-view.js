@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import { Engine } from './engine.js';
 import { Player } from './player.js';
 import { WEAPONS } from './weapon-defs.js';
-import { buildModel } from './weapon-models.js';
+import { buildModel, sawTint } from './weapon-models.js';
 import { angleDiff } from './util.js';
 
 const OUT = /* glsl */`
@@ -86,6 +86,7 @@ export const VM = {
   _t: 0, _bob: 0, _bobAmt: 0, _swayX: 0, _swayY: 0, _lastYaw: 0, _lastPitch: 0, _kick: 0, _kickRot: 0, _chop: 0,
   _raise: 1, _flashT: 0, _flashLife: 0.05, _flashSize: 1, _shake: 0,
   _slashT: 1, _slashDir: 1, _spinT: 1, _lastNow: 0, _vib: 0, _fever: 0,
+  sawYaw: 0, sawBlood: 0, _spl: [], _splN: 0,     // チェーンソー: 左右にふる角度 / 刃の血(0..1)/ 画面の血しぶき
 
   init(renderer) {
     const sc = this.scene = new THREE.Scene();
@@ -155,6 +156,17 @@ export const VM = {
       m.position.z = -1;
       root.add(m);
       this.arcs.push(m);
+    }
+
+    // 画面に飛ぶ 小さな血しぶき(チェーンソー)。決まった数を使い回す
+    const splG = new THREE.CircleGeometry(1, 9);
+    for (let i = 0; i < 12; i++) {
+      const mat = new THREE.MeshBasicMaterial({ color: 0x5a0303, transparent: true, opacity: 0, depthTest: false, depthWrite: false });
+      const o = new THREE.Mesh(splG, mat);
+      o.visible = false; o.frustumCulled = false; o.renderOrder = 12;
+      o.userData.t = 0; o.userData.life = 1; o.userData.vy = 0;
+      root.add(o);
+      this._spl.push(o);
     }
 
     // 武器(手元用の材質で作る)
@@ -233,6 +245,21 @@ export const VM = {
     m.visible = true;
   },
   vibrate(s) { this._vib = Math.max(this._vib, s); },
+  // 画面に 小さな血しぶきを n 個(白くならない 暗い赤。画面のふちの方に多く)
+  splatter(n = 2) {
+    if (!this.active) return;
+    for (let i = 0; i < n; i++) {
+      const o = this._spl[this._splN++ % this._spl.length], u = o.userData;
+      const a = Math.random() * Math.PI * 2, r = 0.08 + Math.random() * 0.3;
+      o.position.set(Math.cos(a) * r * 1.3, Math.sin(a) * r * 0.8 - 0.03, -0.62);
+      const s = 0.006 + Math.random() * 0.018;
+      o.scale.set(s * (0.7 + Math.random() * 0.8), s * (0.7 + Math.random() * 0.8), 1);
+      o.rotation.z = Math.random() * Math.PI;
+      u.t = 0; u.life = 0.5 + Math.random() * 0.5; u.vy = -(0.01 + Math.random() * 0.03);
+      o.material.color.setHex(Math.random() < 0.5 ? 0x5a0303 : 0x7a0606);
+      o.visible = true;
+    }
+  },
 
   // 銃口の世界の位置(弾が出る所)。見えている銃口と同じ画面の位置で、カメラから dist m 先
   muzzleWorld(out, dist = 1.5, tipIndex = 0) {
@@ -307,7 +334,7 @@ export const VM = {
     const b = this._bobAmt, ph = this._bob;
     const raise = 1 - this._raise, rz = raise * raise;
     const vib = this._vib;
-    const p = this.pivot;
+    const p = this.pivot, mdl0 = this.model;
     p.position.set(
       BASE.x - this._heavy * 0.03 + Math.sin(ph) * 0.014 * b + this._swayX + (Math.random() - 0.5) * vib * 0.012,
       BASE.y - this._heavy * 0.04 - Math.abs(Math.cos(ph)) * 0.02 * b + this._swayY - rz * 0.35 + this._kick * 0.012 + (Math.random() - 0.5) * vib * 0.012,
@@ -315,7 +342,17 @@ export const VM = {
     );
     // ハンマー: 上から ふりおろす
     const ch = this._chop, chopA = ch > 0.75 ? (1 - ch) / 0.25 * -1.1 : ch * 1.6 * -1.1 / 1.2;
-    p.rotation.set(this._kickRot * 0.22 + rz * 0.6 + this._swayY * 1.5 + (ch > 0 ? -chopA * 0.8 : 0), 0.06 + this._swayX * 2, -0.04 + Math.sin(ph) * 0.02 * b);
+    // チェーンソー: 刃を 左右に ふる(当たりの向きと同じ角度)
+    const saw = mdl0 && mdl0.userData.blood ? this.sawYaw : 0;
+    p.rotation.set(this._kickRot * 0.22 + rz * 0.6 + this._swayY * 1.5 + (ch > 0 ? -chopA * 0.8 : 0), 0.06 + this._swayX * 2 - saw, -0.04 + Math.sin(ph) * 0.02 * b - saw * 0.35);
+    // 画面の血しぶき: たれて うすくなる
+    for (let i = 0; i < this._spl.length; i++) {
+      const o = this._spl[i]; if (!o.visible) continue;
+      const u = o.userData; u.t += dt;
+      if (u.t >= u.life) { o.visible = false; continue; }
+      o.position.y += u.vy * dt;
+      o.material.opacity = 0.85 * Math.min(1, (u.life - u.t) / (u.life * 0.5));
+    }
 
     // 銃口の火(見えている銃口にくっつける)
     const mdl = this.model;
@@ -338,6 +375,7 @@ export const VM = {
     if (mdl) {
       const u = mdl.userData;
       if (u.chain) u.chain.position.y = 0.03 + (Math.random() - 0.5) * 0.006;
+      if (u.blood) sawTint(u, this.sawBlood);
       if (u.disc) u.disc.rotation.y += dt * 30;
       if (u.star) u.star.rotation.y += dt * 12;
       if (u.head) u.head.rotation.z = Math.sin(this._t * 3) * 0.05;
