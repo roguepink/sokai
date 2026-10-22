@@ -173,6 +173,8 @@ function toTitle() {
 let last = performance.now(), acc = 0, saveT = 0;
 function loop(now) {
   requestAnimationFrame(loop);
+  // 描く回数を決める(プレイ 60 / 省エネ 30 / タイトル 30 / 止めている間 15。スマホが熱くならないように)
+  if (!Engine.shouldRender(now, ViewHud.open || WeaponGrid.open ? 'paused' : Game.state)) return;
   try {
     const real = Math.min((now - last) / 1000, CONFIG.MAX_FRAME); last = now;
     const menu = ViewHud.open || WeaponGrid.open;      // 視点の設定・武器の一覧を開いている間は 止める

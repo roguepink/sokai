@@ -41,6 +41,7 @@ export const Audio = {
     });
     Events.on('explosion', (e) => this.explosion((e && e.radius) || 4));
     Events.on('melee', (m) => this.play('melee', m));
+    Events.on('weaponSfx', (w) => { if (w && SOUNDS[w.name]) this.play(w.name, w); });   // 武器の追加の音(知らない名前は鳴らさない)
     Events.on('spin', (m) => this.play('spin', m));
     Events.on('hit', (h) => { if (h && (h.amount >= 4 || h.crit)) this.play(h.boss ? 'bosshit' : 'hit', h); });
     Events.on('kill', (k) => {

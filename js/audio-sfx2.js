@@ -6,7 +6,7 @@ const note = (semi) => 523.25 * Math.pow(2, semi / 12);
 
 // 同じ音を続けて鳴らすときの最短の間隔(秒)
 export const GAP2 = {
-  chainsaw: 0.09, hammer: 0.12, crossbow: 0.1, airstrike: 0.8, cannon: 0.15, disc: 0.08, drone: 0.06, tornado: 0.3,
+  chainsaw: 0.09, grind: 0.07, sawCut: 0.06, hammer: 0.12, crossbow: 0.1, airstrike: 0.8, cannon: 0.15, disc: 0.08, drone: 0.06, tornado: 0.3,
   meteor: 0.25, acid: 0.1, nailgun: 0.05, emp: 0.3, shuriken: 0.05, whip: 0.1, beam: 0.1, gatling: 0.035,
   dash: 0.15, slamJump: 0.3, slam: 0.2, clang: 0.08, screech: 0.25, thud: 0.06, stomp: 0.22, ignite: 0.12, gas: 0.25, coin: 0.05, sizzle: 0.15,
   fever: 1, feverend: 1, fevertick: 0.05, supply: 1, supplyOpen: 0.5, golden: 1, goldenDown: 0.5, goldenEscape: 1,
@@ -46,6 +46,15 @@ export const SOUNDS2 = {
   chainsaw(A, t) {           // ブィィィン(エンジン + 刃)
     osc(A, t, { wave: 'sawtooth', f0: rnd(95, 110), dur: 0.11, gain: 0.16, a: 0.01, lp: 1400, lfo: 38, lfoAmt: 22, dist: true });
     A.nz(t, { dur: 0.1, gain: 0.12, a: 0.01, type: 'bandpass', f0: rnd(1600, 2200), q: 2 });
+  },
+  grind(A, t) {              // 刃が食いこむ(ガリガリ・低くうなる)
+    osc(A, t, { wave: 'sawtooth', f0: rnd(62, 72), dur: 0.09, gain: 0.13, a: 0.005, lp: 900, lfo: 55, lfoAmt: 14, dist: true });
+    A.nz(t, { dur: 0.08, gain: 0.1, a: 0.005, type: 'bandpass', f0: rnd(700, 1000), q: 3 });
+  },
+  sawCut(A, t) {             // ズシャッ(肉を切る)
+    A.nz(t, { dur: 0.16, gain: 0.22, a: 0.004, type: 'lowpass', f0: 2200, f1: 300 });
+    A.tn(t, { dur: 0.12, gain: 0.18, f0: 140, f1: 55 });
+    A.nz(t + 0.03, { dur: 0.12, gain: 0.08, type: 'bandpass', f0: 3200, f1: 1200, q: 1.5 });
   },
   hammer(A, t) {             // ブンッ … ドゴォン
     A.nz(t, { dur: 0.12, gain: 0.18, a: 0.04, type: 'bandpass', f0: 500, f1: 1400, q: 1.2 });
