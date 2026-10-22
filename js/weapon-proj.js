@@ -193,6 +193,8 @@ export const Proj = {
     for (let i = 0; i < _tmp.length; i++) {
       const e = _tmp[i];
       if (e._pl === p.stamp) continue;
+      // 大きいボスには 何発も重なって当たりやすいので、1体につき 0.12 秒に1回まで(ボスが数秒で溶けないように)
+      if (e.boss) { const now = performance.now(); if (now - (e._plT || 0) < 120) continue; e._plT = now; }
       e._pl = p.stamp;
       const sp = p.spd || 1;
       hurt(e, w.dmg, p.vx / sp, p.vz / sp, w.force, 'plasma');
