@@ -51,6 +51,11 @@
 - World: `timeOfDay`(0 = 昼, 0.25 = 夕, 0.5 = 真夜中, 0.75 = 夜明け、1周 7分)`weather` `night` `wet` `setTime(t)` `setWeather(w,instant)` `damage(x,z,r,amount,{cause})` `hitLine(...)` `explode(x,z,r,amount)` `props`。マップは 1200m(川・港・遊園地・空港・基地・墓地・農場)
 - イベント(追加): `hitMarker {crit,kill}` `dash` `dashHit` `slamJump` `slam` `feverStart` `feverEnd` `worldEvent` `worldChange` `propExplode` `propBreak` `lightning` `heliPass` `distantBoom` `crows` `personalBest` `shieldBreak` `zombieLeap` `zombieLand` `giantStep` `bossAct` `weaponSfx {name}` `viewChange {mode,prev}`
 
+### 第3弾(軽量化・操作)
+- Engine: `shouldRender(now,state)`(プレイ 60 / 省エネ 30 / タイトル 30 / 停止 15。main のループの頭で呼ぶ)`setEco(on)` `eco` `level`(自動で軽くした段階)`beforeRender[]`。`#eco` で省エネ
+- Input: タッチは指ごとに役目(スティック/撃つ/右側)を `changedTouches` で追う。撃つボタンを押したまま左右になぞると向きが変わる(上下は固定)。`turn` `consumeTurn()` `assistScale()` `releaseAll()`
+- 自動で向く(autoTurn2)は はじめオフ。チェーンソーは刃に当たった敵だけ(`weaponSfx` grind / sawCut)
+
 ## 公開のしかた
 - `main` が GitHub Pages で公開中(https://roguepink.github.io/sokai/)。**`main` に入れる = 公開**。大きな更新は別の枝(例 `round2`)でまとめて、ノブさんに見せて OK をもらってから `main` へ
 

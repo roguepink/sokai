@@ -26,6 +26,14 @@ export const Player = {
   init(scene) {
     this.mesh = buildHero();
     this.parts = this.mesh.userData.parts;
+    // 軽量化: 小さい部品は影を落とさない(影の計算の回数を減らす。見た目はほぼ同じ)
+    let nShadow = 0;
+    this.mesh.traverse((o) => {
+      if (!o.isMesh || !o.castShadow) return;
+      if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere();
+      if (o.geometry.boundingSphere.radius < 0.2) o.castShadow = false; else nShadow++;
+    });
+    this.mesh.userData.shadowCasters = nShadow;
     scene.add(this.mesh);
     Moves.init(scene);
   },
