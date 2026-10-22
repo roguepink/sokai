@@ -102,8 +102,8 @@ export function plateTex(base = '#7a7866', o = {}) {
 }
 
 // 毛皮(すじ)+ はげた肉
-export function furTex(base = '#4a3e36') {
-  return canvasTex('fur' + base, 256, 256, (c, S) => {
+export function furTex(base = '#4a3e36', patches = 14) {
+  return canvasTex('fur' + base + patches, 256, 256, (c, S) => {
     c.fillStyle = base; c.fillRect(0, 0, S, S);
     const col = new THREE.Color(base);
     for (let i = 0; i < 2800; i++) {
@@ -111,7 +111,7 @@ export function furTex(base = '#4a3e36') {
       c.strokeStyle = `rgba(${(col.r * 255 * v) | 0},${(col.g * 255 * v) | 0},${(col.b * 255 * v) | 0},0.7)`; c.lineWidth = R(0.8, 1.8);
       c.beginPath(); c.moveTo(x, y); c.lineTo(x + R(-2, 2), y + R(5, 13)); c.stroke();
     }
-    for (let i = 0; i < 14; i++) {
+    for (let i = 0; i < patches; i++) {
       const x = R(0, S), y = R(0, S), w = R(10, 30), h = R(8, 22);
       c.fillStyle = '#8a3a34'; c.beginPath(); c.ellipse(x, y, w, h, R(0, 3), 0, 7); c.fill();
       c.fillStyle = '#b05a4a'; c.beginPath(); c.ellipse(x - 2, y - 2, w * 0.6, h * 0.5, R(0, 3), 0, 7); c.fill();

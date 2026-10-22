@@ -32,8 +32,8 @@ const gorilla = {
   def: { name: '変異ゴリラ マッドコング', title: '車を投げる暴君', icon: '🦍', hp: 41600, speed: 4.6, r: 3.6, points: 3000, scale: 4.6, size: 13, tier: 2, S: 3.0, color: 0x3a3430 },
   stride: 0.7, feet: { w: 0.55, f: -0.2, s: 1 },
   build(m) {
-    const fur = mat(m, { map: furTex('#4a3e36'), color: 0xffffff, roughness: 0.95 });
-    const silver = mat(m, { map: furTex('#9a948a'), color: 0xffffff, roughness: 0.95 });
+    const fur = mat(m, { map: furTex('#4a3e36', 4), color: 0xffffff, roughness: 0.95 });
+    const silver = mat(m, { map: furTex('#9a948a', 2), color: 0xffffff, roughness: 0.95 });
     const flesh = mat(m, { color: 0x9a4a40, roughness: 0.5, emissive: 0x2a0606 });
     const bone = mat(m, { color: BONE, roughness: 0.5 });
     const eye = mat(m, { color: 0x300808, emissive: 0xff2010, emissiveIntensity: 3.2, glow: true });

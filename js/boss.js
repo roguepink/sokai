@@ -108,7 +108,7 @@ export const Bosses = {
     e.enter = spec.enter || 'rise';
     if (spec.spawn) spec.spawn(this, e, m);
     this._active.push(m);
-    if (e.enter === 'rise') e.y = -def.size * 0.95;
+    if (e.enter === 'rise') e.y = -(def.h || def.size) * 0.95;
     else if (e.enter === 'sky') e.y = 46;
     quake(this, e.x, e.z, 1.2, 120);
     FX.burst({ x: e.x, y: 0.5, z: e.z, count: 50, color: 0x3a3028, speed: 12, up: 6, life: 1.2, size: 0.35, drag: 2 });
@@ -149,10 +149,13 @@ export const Bosses = {
     const px = player.pos.x, pz = player.pos.z;
     let dx = px - e.x, dz = pz - e.z;
     let d = Math.hypot(dx, dz) || 0.001;
-    // 遠くへ はなれすぎたら 近くへ もどってくる(戦いが 終わらないように)
-    if (d > 110 && e.state === 'walk') {
-      const p = World.spawnPoint(px, pz, 40, 55);
-      if (p) { e.x = p.x; e.z = p.z; dx = px - e.x; dz = pz - e.z; d = Math.hypot(dx, dz) || 0.001; e.state = 'enter'; e.enter = spec.enter || 'rise'; e.st = 0; if (e.enter === 'rise') e.y = -def.size * 0.95; else if (e.enter === 'sky') e.y = 46; }
+    // 遠くへ はなれすぎた・道がなくて 近づけない → 主人公の近くに あらためて 現れる(いつも 攻めてくる)
+    e.farT = d > 36 && e.state === 'walk' ? (e.farT || 0) + dt : 0;
+    if ((d > 110 || e.farT > 6) && e.state === 'walk') {
+      e.farT = 0;
+      let p = null;
+      for (let i = 0; i < 12 && !p; i++) { const q = World.spawnPoint(px, pz, 16, 26); if (q && !World.buildingAt(q.x, q.z) && !World.blockedAt(q.x, q.z, 2.5)) p = q; }
+      if (p) { e.x = p.x; e.z = p.z; dx = px - e.x; dz = pz - e.z; d = Math.hypot(dx, dz) || 0.001; e.state = 'enter'; e.enter = spec.enter || 'rise'; e.st = 0; e.vx = e.vz = 0; if (e.enter === 'rise') e.y = -(def.h || def.size) * 0.95; else if (e.enter === 'sky') e.y = 46; act(e, 'enter'); }
     }
     e.dist = d;
     e.t += dt;
@@ -244,7 +247,7 @@ export const Bosses = {
     if (spec.enterAI) { const r = spec.enterAI(this, e, m, dt, c); if (r !== undefined) return r; }
     if (kind === 'rise') {          // 地面から はい出る
       const T = 2.2, k = min(1, e.st / T);
-      e.y = -e.size * 0.95 * (1 - k) * (1 - k);
+      e.y = -(e.def.h || e.size) * 0.95 * (1 - k) * (1 - k);
       if (Math.random() < dt * 14) {
         const a = R(0, TAU), r = e.r * R(0.6, 1.5);
         FX.smoke(e.x + cos(a) * r, 0.3, e.z + sin(a) * r, 1.2 + e.size * 0.05, 1.4, 0x5a4e40, cos(a) * 3, 2, sin(a) * 3, 0.6);
@@ -360,7 +363,7 @@ export const Bosses = {
     const kind = m.fallKind;
     if (!m.fell) {
       // たおれる先の予告(下じきになると 吹っとぶ)
-      if (kind === 'topple') Warn.rect(m.x0, m.z0, m.fdx, m.fdz, e.size * 0.95, max(4, e.r * 2.2), k, 0xff6a20);
+      if (kind === 'topple') Warn.rect(m.x0, m.z0, m.fdx, m.fdz, (e.def.h || e.size) * 0.95, max(4, e.r * 2.2), k, 0xff6a20);
       else Warn.circle(m.x0, m.z0, e.r * 2.2, k, 0xff6a20);
       // ふらつき → たおれる
       const wob = sin(m.deadT * 9) * 0.06 * (1 - k);
@@ -383,7 +386,7 @@ export const Bosses = {
       if (Math.random() < dt * 6) FX.burst({ x: e.x + R(-2, 2), y: e.size * R(0.3, 0.8) * (1 - kk), z: e.z + R(-2, 2), count: 6, color: 0x7a0606, speed: 4, up: 2, life: 0.8, size: 0.25 });
       if (k >= 1) {
         m.fell = true;
-        const L = kind === 'topple' ? e.size * 0.9 : 0, cx = m.x0 + m.fdx * L * 0.55, cz = m.z0 + m.fdz * L * 0.55;
+        const L = kind === 'topple' ? (e.def.h || e.size) * 0.9 : 0, cx = m.x0 + m.fdx * L * 0.55, cz = m.z0 + m.fdz * L * 0.55;
         if (kind === 'topple') line(this, e, m.x0, m.z0, m.fdx, m.fdz, L, max(4, e.r * 2.2), { dmg: 2500, force: 30, hero: 20, lift: 7, cause: 'bossfall', shake: 1.8 });
         else line(this, e, m.x0 - m.fdx * e.r, m.z0 - m.fdz * e.r, m.fdx, m.fdz, e.r * 2, e.r * 2.4, { dmg: 2500, force: 30, hero: 18, lift: 6, cause: 'bossfall', shake: 1.6 });
         const n = FX.q(40);
