@@ -36,7 +36,7 @@ export function hitHero(B, e, fx, fz, force, lift = 0, kind = 'hit', dirX = 0, d
   FX.burst({ x, y: 1.1, z, count: 22, color: 0xffd8a0, speed: 9, up: 4, life: 0.35, size: 0.12, grav: 4, drag: 3 });
   FX.burst({ x, y: 0.4, z, count: 12, color: 0x5a5048, speed: 5, up: 3, life: 0.8, size: 0.4, drag: 2 });
   if (FX.ring) FX.ring(x, z, 0.3, 3.2, 0.3, 0xff6a3a, 0.4, 2.5, 0.9);
-  Events.emit('heroHit', { x, z, force, boss: e && e.name, type: e && e.type, dirX, dirZ, kind, lift });
+  Events.emit('heroHit', { x, z, force, boss: e, name: e && e.name, type: e && e.type, dirX, dirZ, kind, lift });
   return true;
 }
 export function heroDist(B, x, z) { const P = B._player; return P ? Math.hypot(P.pos.x - x, P.pos.z - z) : 999; }
@@ -241,11 +241,46 @@ export function throwAt(B, e, kind, x, y, z, tx, tz, T, o = {}) {
 }
 
 export function resetProjectiles() {
+  WAVES.length = 0;
   for (const p of PROJ) if (p.mesh) { p.mesh.visible = false; p.mesh.userData.busy = false; }
   PROJ.length = 0;
 }
 
+// ---------------- 広がる衝撃波の輪(ジャンプで よけられる) ----------------
+const WAVES = [];
+const _wq = [];
+export function ringWave(B, e, x, z, o = {}) {
+  WAVES.push({ e, x, z, r: o.r0 ?? 2, v: o.speed ?? 18, max: o.max ?? 28, w: o.w ?? 2.2, dmg: o.dmg ?? 700, hero: o.hero ?? 20, col: o.col ?? 0xffa060, hit: false, t: 0 });
+}
+function stepWaves(B, dt) {
+  for (let i = WAVES.length - 1; i >= 0; i--) {
+    const w = WAVES[i];
+    const r0 = w.r; w.r += w.v * dt; w.t += dt;
+    if (w.r > w.max) { WAVES.splice(i, 1); continue; }
+    const k = 1 - w.r / w.max;
+    if (FX.ring) { FX.ring(w.x, w.z, w.r, w.r, -1, w.col, w.w * 0.8, 3, 0.9 * k + 0.1); FX.ring(w.x, w.z, w.r - w.w * 0.6, w.r - w.w * 0.6, -1, 0xffffff, w.w * 0.25, 2, 0.6 * k); }
+    if (Math.random() < 0.6) { const a = R(0, TAU); FX.smoke(w.x + cos(a) * w.r, 0.4, w.z + sin(a) * w.r, 1.2, 0.8, 0x6f6455, cos(a) * 4, 1.5, sin(a) * 4, 0.5); }
+    // 輪の帯の中の ゾンビ
+    B._Z.queryCircle(w.x, w.z, w.r + w.w, _wq);
+    const opt = { dirX: 0, dirZ: 0, force: 24, cause: 'quake' };
+    for (let j = 0; j < _wq.length; j++) {
+      const t = _wq[j]; if (!t.alive || t.boss) continue;
+      const dx = t.x - w.x, dz = t.z - w.z, d = Math.hypot(dx, dz) || 1;
+      if (d < r0 - w.w) continue;
+      opt.dirX = dx / d; opt.dirZ = dz / d;
+      B._Z.damage(t, w.dmg, opt);
+    }
+    _wq.length = 0;
+    const P = B._player;
+    if (P && !w.hit) {
+      const d = Math.hypot(P.pos.x - w.x, P.pos.z - w.z);
+      if (d < w.r + P.radius && d > r0 - w.w - P.radius && (P.pos.y || 0) < 1.2) { w.hit = true; hitHero(B, w.e, w.x, w.z, w.hero, 6, 'quake'); }
+    }
+  }
+}
+
 export function stepProjectiles(B, dt) {
+  stepWaves(B, dt);
   for (let i = PROJ.length - 1; i >= 0; i--) {
     const p = PROJ[i], o = p.o;
     p.t += dt;

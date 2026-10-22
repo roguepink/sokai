@@ -25,7 +25,7 @@ function heldRock(bone, y, s) {
 // 巨人タイラント
 // =====================================================================
 const tyrant = {
-  def: { name: '巨人タイラント', hp: 30000, speed: 3.6, r: 3.2, points: 3000, scale: 5.2, size: 13, tier: 1, S: 3.0, color: 0x8a6a6a },
+  def: { name: '巨人タイラント', title: '大地を砕く者', icon: '👹', hp: 30000, speed: 3.6, r: 3.2, points: 3000, scale: 5.2, size: 13, tier: 1, S: 3.0, color: 0x8a6a6a },
   stride: 0.75, feet: { w: 0.3, f: 0.1, s: 1 },
   build(m) {
     const skin = mat(m, { map: skinTex('#9a8a86', { stitches: 8, wounds: 16 }), color: 0xffffff });
@@ -252,7 +252,7 @@ import { canvasTex } from './boss-kit.js';
 function skinTexCustom(key, fn) { return canvasTex('c-' + key, 256, 256, fn); }
 
 const butcher = {
-  def: { name: '処刑人ブッチャー', hp: 28000, speed: 3.4, r: 3.0, points: 3000, scale: 4.4, size: 11, tier: 1, S: 3.4, color: 0x6a4a3a },
+  def: { name: '処刑人ブッチャー', title: '血まみれの処刑人', icon: '🔪', hp: 28000, speed: 3.4, r: 3.0, points: 3000, scale: 4.4, size: 11, tier: 1, S: 3.4, color: 0x6a4a3a },
   stride: 0.8, feet: { w: 0.3, f: 0.1, s: 0.9 },
   build(m) {
     const skin = mat(m, { map: skinTex('#a08478', { stitches: 5, wounds: 12 }), color: 0xffffff });
@@ -415,7 +415,7 @@ const LIST_B = [['chop', 0, 15, 3], ['sweep', 0, 12, 3], ['charge', 12, 60, 3], 
 // 異形アボミネーション(腕 6 本・頭 3 つ。怒ると 頭が光る)
 // =====================================================================
 const abomination = {
-  def: { name: '異形アボミネーション', hp: 27000, speed: 3.4, r: 4.0, points: 3000, scale: 3.4, size: 10, tier: 1, S: 3.4, color: 0x7a5a5a },
+  def: { name: '異形アボミネーション', title: '六本腕の悪夢', icon: '🧟', hp: 27000, speed: 3.4, r: 4.0, points: 3000, scale: 3.4, size: 10, tier: 1, S: 3.4, color: 0x7a5a5a },
   stride: 0.9, feet: { w: 0.9, f: -0.3, s: 0.7 }, fall: 'collapse', fallT: 1.3,
   build(m) {
     const flesh = mat(m, { map: skinTex('#a07a70', { boils: 34, wounds: 24, stitches: 3, rep: 2 }), color: 0xffffff, roughness: 0.5 });
@@ -574,7 +574,7 @@ const LIST_A = [['flurry', 0, 11, 3], ['body', 8, 40, 3], ['tentacle', 6, 26, 3]
 // 大這い屍クローラー(長さ 19m。8 本の手足)
 // =====================================================================
 const crawlerKing = {
-  def: { name: '大這い屍クローラー', hp: 24000, speed: 7.5, r: 3.6, points: 3000, scale: 2.4, size: 19, tier: 2, S: 3.2, color: 0x9a9080 },
+  def: { name: '大這い屍クローラー', title: '地を這う巨屍', icon: '🦂', hp: 24000, speed: 7.5, r: 3.6, points: 3000, scale: 2.4, size: 19, tier: 2, S: 3.2, color: 0x9a9080 },
   stride: 0.55, feet: { w: 1.6, f: -0.6, s: 0.6 }, turn: 3, fall: 'collapse', fallT: 1.2,
   build(m) {
     const skin = mat(m, { map: skinTex('#8e8676', { wounds: 18, stitches: 3, rep: 2 }), color: 0xffffff, roughness: 0.6 });

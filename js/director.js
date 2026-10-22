@@ -56,6 +56,9 @@ export const Director = {
   // 出来事を すぐ起こす(確認用: __game.Director.happen('airstrike'))
   happen(kind) { if (!Happenings._scene) Happenings.init(Engine.scene, this); return Happenings.start(kind, this._player || { pos: { x: 0, z: 0 } }); },
   bossTypes() { return BOSS_ORDER.slice(); },
+  // 次のボスまでの秒数 / 次の種類(画面係が使う。種類は 8 秒前に決まる。まだなら null)
+  get nextBossIn() { return Math.max(0, (this._pairT > 0 ? Math.min(this._pairT, this._nextBoss) : this._nextBoss) - this.time); },
+  get nextBossType() { return this._nextType; },
   // ボスを出す(体力は時間とともに強く。hpMul で調整)
   spawnBoss(type, x, z, hpMul = 1) {
     const def = BOSS_TYPES[type]; if (!def) return null;

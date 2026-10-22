@@ -22,6 +22,7 @@ import { Warn } from './boss-warn.js';
 import { R, sin, cos, max, min, abs, PI, TAU, clamp } from './boss-kit.js';
 import { act, roarBlast, step as footStep, quake, line, slam, stepProjectiles, resetProjectiles, initProjectiles, stepWrecks, resetWrecks, BOSS_CAUSES } from './boss-attacks.js';
 import { CLASSIC } from './boss-classic.js';
+import { stepLater } from './boss-giants.js';
 import { EXTRA } from './boss-extra.js';
 import { GIANTS } from './boss-giants.js';
 import { BEASTS } from './boss-beasts.js';
@@ -101,7 +102,7 @@ export const Bosses = {
     this._scene.add(m.root);
     e._M = m;
     const def = e.def;
-    e.size = def.size; e.bossTier = def.tier || 1;
+    e.size = def.size; e.bossTier = def.tier || 1; e.phaseHp = PHASE_AT; e.title = def.title || ''; e.icon = def.icon || '';
     e.state = 'enter'; e.st = 0; e.cool = 1.2; e.ph = 0; e.spd = 0; e.phase = 0; e.rage = 0; e.last = '';
     e.vy = 0; e.y = 0; e.kx = 0; e.kz = 0; e.spawnT = 0; e.lockFace = false; e.n = 0; e.hitDone = 0; e._stepS = 0;
     e.enter = spec.enter || 'rise';
@@ -269,10 +270,10 @@ export const Bosses = {
   _tint(m, e, dt) {
     const f = e.flash, fr = e.frozen > 0 ? 1 : 0, burn = e.burn > 0 ? 0.6 + 0.4 * sin(e.t * 20) : 0, sh = e.shock > 0 ? Math.random() : 0;
     const beat = e.phase > 0 ? (0.5 + 0.5 * sin(e.t * (5 + e.phase * 3))) * e.rage : 0;
-    const rr = beat * 0.08 * e.phase;
+    const rr = beat * 0.035 * e.phase;
     for (const mt of m.mats) {
       const b = mt.userData.baseE;
-      mt.emissive.setRGB(b.r + f * 0.45 + burn * 0.5 + sh * 0.2 + fr * 0.1 + rr, b.g + f * 0.4 + burn * 0.15 + sh * 0.45 + fr * 0.2, b.b + f * 0.35 + sh * 0.8 + fr * 0.35);
+      mt.emissive.setRGB(b.r + f * 0.12 + burn * 0.35 + sh * 0.2 + fr * 0.1 + rr, b.g + f * 0.1 + burn * 0.1 + sh * 0.45 + fr * 0.2, b.b + f * 0.09 + sh * 0.8 + fr * 0.35);
       if (fr || mt.userData.iced) { mt.color.copy(mt.userData.baseC).lerp(_ice, fr * 0.6); mt.userData.iced = fr > 0; }
     }
     for (const mt of m.glows) mt.emissiveIntensity = mt.userData.baseI * (1 + e.phase * 0.9 + beat * 1.2);
@@ -322,6 +323,7 @@ export const Bosses = {
   step(dt) {
     if (!this._compiled && ++this._frames > 20) this._precompile();
     stepProjectiles(this, dt);
+    stepLater(dt);
     stepWrecks(dt);
     for (let i = this._blasts.length - 1; i >= 0; i--) {
       const b = this._blasts[i];
