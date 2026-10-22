@@ -470,3 +470,175 @@ body:not(.pc) .pc-only { display: none; }
 }
 @media (orientation: portrait) { .wg-list { grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); } }
 .wg-item.long span { font-size: 9.5px; letter-spacing: -.03em; }
+
+/* ================= 第4弾: ボスの演出(ui-bossfx.js)と 体力バー ================= */
+/* 体力バー: 太く・形態の区切り・ひび・脅威度・倒すまでの時計 */
+.hud-boss { width: min(52vw, 460px); }
+.hud-boss.introing { visibility: hidden; }
+.boss-name { white-space: nowrap; }
+.boss-name b { overflow: hidden; text-overflow: ellipsis; }
+.boss-stars { font-style: normal; font-size: 11px; color: #ffb020; letter-spacing: -1px; }
+.boss-time { margin-left: auto; font-size: 12px; font-variant-numeric: tabular-nums; opacity: .9; }
+.boss-time.g1 { color: var(--gold); opacity: 1; } .boss-time.g2 { color: #ffa53a; opacity: 1; } .boss-time.g3 { color: #ffd8b0; }
+.boss-bar { height: 17px; border-radius: 4px; overflow: visible; }
+.boss-bar > i.boss-lag, .boss-bar > i.boss-fill { border-radius: 2px; }
+.boss-fill { background: linear-gradient(180deg, #ff9a8a 0%, #ff4a3a 30%, #c40018 75%, #8a0010 100%); }
+.hud-boss.ph2 .boss-fill { background: linear-gradient(180deg, #ffd08a 0%, #ff7a1a 35%, #d82a00 80%, #8a1000 100%); }
+.hud-boss.ph3 .boss-fill { background: linear-gradient(180deg, #ff9ad0 0%, #ff2a7a 35%, #a0003a 80%, #50001a 100%); }
+.hud-boss.ph2 .boss-bar { box-shadow: 0 0 14px rgba(255,120,20,.8); }
+.hud-boss.ph3 .boss-bar { box-shadow: 0 0 18px rgba(255,30,120,.9); animation: rageBar .5s ease-in-out infinite alternate; }
+@keyframes rageBar { to { box-shadow: 0 0 8px rgba(255,30,120,.4); } }
+.boss-segs { position: absolute; inset: 0; pointer-events: none; }
+.boss-segs i { position: absolute; top: -4px; bottom: -4px; width: 3px; margin-left: -1.5px; background: #fff; box-shadow: 0 0 3px #000, 0 0 0 1px rgba(0,0,0,.6); }
+.boss-segs i.broke { background: #ff3a3a; top: -6px; bottom: -6px; transform: rotate(14deg); opacity: .85; }
+.boss-crack { position: absolute; inset: -2px; opacity: 0; border-radius: 4px;
+  background: repeating-linear-gradient(115deg, transparent 0 9px, rgba(255,255,255,.95) 9px 11px, transparent 11px 23px), rgba(255,255,255,.55); }
+.boss-bar.crack { animation: shakeX .07s 6 linear; }
+.boss-bar.crack .boss-crack { animation: crackFlash .7s ease-out both; }
+@keyframes crackFlash { 0% { opacity: 1; } 100% { opacity: 0; } }
+.boss-phase { text-align: center; font-size: 12px; line-height: 1.2; color: #ff6a3a; height: 0; overflow: visible; letter-spacing: .1em; }
+.hud-boss.ph3 .boss-phase { color: #ff4aa0; }
+
+/* 演出の層(大きな文字の上) */
+.bs-layer { position: absolute; inset: 0; z-index: 14; pointer-events: none; overflow: hidden; font-weight: 900; text-shadow: var(--stroke); }
+.bs-layer.paused { visibility: hidden; }
+/* なぐられた: 来た向きが濃い 赤いふち + 色ずれ */
+.bs-hit { position: absolute; inset: 0; opacity: 0;
+  background: radial-gradient(circle at var(--hx, 50%) var(--hy, 50%), rgba(255,30,0,.7) 0%, rgba(255,0,0,.25) 30%, transparent 58%),
+              radial-gradient(ellipse at center, transparent 52%, rgba(170,0,0,.65) 100%); }
+.bs-chroma { position: absolute; inset: -8px; opacity: 0; box-shadow: inset 14px 0 46px rgba(255,0,80,.6), inset -14px 0 46px rgba(0,230,255,.5); }
+/* 怒り: 画面のふちが 赤く 3 回 脈打つ */
+.bs-rage { position: absolute; inset: 0; opacity: 0; background: radial-gradient(ellipse at center, transparent 40%, rgba(255,40,0,.6) 100%); }
+.bs-rage.on { animation: ragePulse .38s ease-in-out 3 both; }
+@keyframes ragePulse { 0%, 100% { opacity: 0; } 50% { opacity: 1; } }
+.banner.rage b { color: #ff4a1a; font-size: min(54px, 11vh, 9vw); text-shadow: var(--stroke), 0 0 26px rgba(255,60,0,1); }
+.banner.rage.on b { animation: shakeX .1s 8 linear; }
+.banner.rage small { font-size: 18px; color: #ffd0b0; }
+
+/* 登場: 警報の帯 */
+.bs-alert { position: absolute; left: 0; right: 0; top: calc(var(--sat) + 64px); height: 36px; display: flex; align-items: center; justify-content: center; opacity: 0;
+  background: repeating-linear-gradient(-45deg, rgba(210,0,0,.88) 0 18px, rgba(25,0,0,.88) 18px 36px); border-top: 2px solid #ff4a4a; border-bottom: 2px solid #ff4a4a;
+  box-shadow: 0 0 24px rgba(255,0,0,.7); }
+.bs-alert span { font-size: 21px; letter-spacing: .22em; color: #fff; background: rgba(0,0,0,.55); padding: 0 14px; border-radius: 4px; }
+.bs-alert.on { animation: alertIn 2.05s ease-out both; }
+.bs-alert.on span { animation: blink .18s steps(2) 9 alternate; }
+@keyframes alertIn { 0% { opacity: 1; transform: scaleY(0); } 7% { transform: scaleY(1.25); } 12%, 78% { opacity: 1; transform: scaleY(1); } 100% { opacity: 0; transform: scaleY(.3); } }
+/* 登場: 名札 */
+.bs-card { position: absolute; left: 50%; top: calc(var(--sat) + 106px); text-align: center; white-space: nowrap; opacity: 0; transform: translateX(-50%); line-height: 1.12; }
+.bs-card small { display: block; font-size: 15px; color: var(--gold); letter-spacing: .3em; }
+.bs-card b { display: block; font-size: min(46px, 10.5vh, 8.5vw, calc(84vw / var(--nlen, 8))); color: #ff3a3a; font-style: italic; text-shadow: var(--stroke), 0 0 26px rgba(255,0,0,.95); }
+.bs-card em { display: block; font-style: normal; font-size: 14px; color: #ffd8c8; }
+.bs-threat { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; margin-top: 3px; padding: 1px 10px; border-radius: 999px; background: rgba(0,0,0,.55); }
+.bs-threat .pips i { display: inline-block; width: 11px; height: 11px; margin: 0 1px; border-radius: 2px; border: 1.5px solid rgba(255,255,255,.6); vertical-align: -1px; transform: skewX(-15deg); }
+.bs-threat .pips i.on { background: #ff2a3a; border-color: #ffb0b0; box-shadow: 0 0 6px #ff2a3a; }
+.bs-threat small { font-size: 12px; color: #fff; opacity: .85; }
+.bs-card.t5 .bs-threat .pips i.on { background: #ff00a0; box-shadow: 0 0 8px #ff00a0; }
+.bs-card.on { animation: cardIn 1.75s .3s cubic-bezier(.2,1.2,.4,1) both; }
+@keyframes cardIn {
+  0% { opacity: 0; transform: translateX(-50%) scale(1.9); letter-spacing: .4em; }
+  14% { opacity: 1; transform: translateX(-50%) scale(.96); letter-spacing: 0; }
+  20%, 82% { opacity: 1; transform: translateX(-50%) scale(1); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-14px) scale(1.04); }
+}
+#hud::before, #hud::after { transition: height .35s ease; }
+#hud.bossintro::before, #hud.bossintro::after { animation: introBar 2.05s ease-in-out both; }
+@keyframes introBar { 0% { height: 0; } 14%, 82% { height: 7vh; } 100% { height: 0; } }
+#hud.bosscam::before, #hud.bosscam::after { height: 10vh; }
+
+/* 撃破: ハンコ「BOSS 撃破!!」 */
+.bs-stamp { position: absolute; left: 50%; top: calc(var(--sat) + 52px); text-align: center; white-space: nowrap; opacity: 0; transform: translateX(-50%); line-height: 1.05; }
+.bs-stamp b { display: block; font-size: min(64px, 15vh, 11vw); font-style: italic; color: #ffe14a; letter-spacing: .02em;
+  text-shadow: 0 3px 0 #a04a00, 3px 0 0 #000, -3px 0 0 #000, 0 -3px 0 #000, 0 6px 0 #000, 0 0 34px rgba(255,180,0,1); }
+.bs-stamp small { display: block; font-size: 16px; color: #fff; margin-top: 2px; }
+.bs-stamp em { position: absolute; right: -14px; top: -10px; font-style: normal; font-size: 17px; padding: 1px 10px; border-radius: 6px; color: #fff;
+  background: linear-gradient(180deg, #ff5a3a, #c0100a); border: 2px solid #ffe14a; transform: rotate(10deg) scale(0); text-shadow: 0 1px 0 #000; }
+.bs-stamp.on { animation: stampIn .55s .08s cubic-bezier(.2,1.6,.4,1) both; }
+.bs-stamp.on em { animation: tagIn .4s .6s cubic-bezier(.2,1.8,.4,1) both; }
+.bs-stamp.out { animation: stampOut .45s ease-in both; }
+@keyframes stampIn { 0% { opacity: 0; transform: translateX(-50%) scale(3.4) rotate(-14deg); } 55% { opacity: 1; transform: translateX(-50%) scale(.9) rotate(-3deg); } 75% { transform: translateX(-50%) scale(1.06) rotate(-3deg); } 100% { opacity: 1; transform: translateX(-50%) scale(1) rotate(-3deg); } }
+@keyframes tagIn { from { transform: rotate(10deg) scale(0); } to { transform: rotate(10deg) scale(1); } }
+@keyframes stampOut { from { opacity: 1; transform: translateX(-50%) scale(1) rotate(-3deg); } to { opacity: 0; transform: translateX(-50%) translateY(-24px) scale(1.12) rotate(-3deg); } }
+
+/* 撃破: ごほうびの内わけ(横画面 = 左 / 縦画面 = まんなか) */
+.bs-jack { position: absolute; left: calc(var(--sal) + 10px); top: calc(var(--sat) + 136px); min-width: 230px; max-width: 46vw; padding: 6px 11px 7px;
+  border-radius: 12px; background: rgba(14,8,2,.74); border: 2px solid #ffd23f; box-shadow: 0 0 22px rgba(255,190,30,.55); opacity: 0; transform: translateX(-24px);
+  transition: opacity .25s, transform .3s cubic-bezier(.2,1.4,.4,1); }
+.bs-jack.on { opacity: 1; transform: none; }
+.bs-jack.out { opacity: 0; transform: translateY(-16px); transition: opacity .45s, transform .45s; }
+.bs-jack ul { list-style: none; margin: 0; padding: 0; }
+.bs-jack li { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 14px; line-height: 1.38; white-space: nowrap; animation: liIn .3s cubic-bezier(.2,1.6,.4,1) both; }
+.bs-jack li b { color: var(--gold); font-variant-numeric: tabular-nums; }
+.bs-jack li small { font-size: 11px; opacity: .8; }
+.bs-jack li.hot b { color: #ff8a2a; font-size: 17px; }
+.bs-jack li.new span { color: #7dff9a; } .bs-jack li.new b { color: #7dff9a; }
+.bs-jack li.more span { color: #ffb0a0; }
+@keyframes liIn { 0% { opacity: 0; transform: translateX(-30px) scale(1.25); } 100% { opacity: 1; transform: none; } }
+.bs-total { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-top: 4px; padding-top: 3px; border-top: 1px solid rgba(255,210,63,.5); opacity: 0; transition: opacity .2s; }
+.bs-total span { font-size: 13px; letter-spacing: .16em; color: var(--gold); font-style: italic; }
+.bs-total b { font-size: 27px; color: #ffe14a; font-variant-numeric: tabular-nums; text-shadow: var(--stroke), 0 0 16px rgba(255,190,0,.9); }
+.bs-jack.rolling .bs-total, .bs-jack.done .bs-total { opacity: 1; }
+.bs-jack.done .bs-total b { animation: totalPop .5s cubic-bezier(.2,1.8,.4,1); }
+@keyframes totalPop { 0% { transform: scale(1.5); } 100% { transform: scale(1); } }
+
+/* 撃破: 衝撃波の輪 / お金・宝石 */
+.bs-nova { position: absolute; left: 50%; top: 50%; width: 100px; height: 100px; border-radius: 50%; opacity: 0;
+  border: 3px solid #ffe070; box-shadow: 0 0 18px #ffb020, inset 0 0 18px #ffd23f; }
+.bs-coins { position: absolute; inset: 0; }
+.bs-coin { position: absolute; left: 0; top: 0; width: 20px; height: 20px; margin: -10px 0 0 -10px; opacity: 0; will-change: transform, opacity; }
+.bs-coin.gold { border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fffbd0 0%, #ffd23f 38%, #d08a00 78%); box-shadow: 0 0 9px rgba(255,200,40,.95), inset 0 0 0 2px #e8a400; }
+.bs-coin.gem { width: 17px; height: 17px; margin: -8px 0 0 -8px; clip-path: polygon(50% 0, 100% 40%, 50% 100%, 0 40%); }
+.bs-coin.g1 { background: linear-gradient(160deg, #e8ffff, #40d8ff 45%, #0a6aa8); }
+.bs-coin.g2 { background: linear-gradient(160deg, #ffe8f6, #ff5ab8 45%, #a00a5a); }
+.bs-coin.g3 { background: linear-gradient(160deg, #f0ffe0, #6aff5a 45%, #108a20); }
+.hud-score.jp b { color: #ffe14a; text-shadow: var(--stroke), 0 0 22px rgba(255,200,0,1); }
+
+/* 次のボスまで */
+.bs-chip { position: absolute; left: 50%; top: calc(var(--sat) + 70px); transform: translateX(-50%); display: flex; align-items: center; gap: 5px; white-space: nowrap;
+  padding: 2px 12px 2px 8px; border-radius: 999px; background: rgba(0,0,0,.5); border: 1.5px solid rgba(255,110,110,.55); font-size: 13px; line-height: 1.3; }
+.bs-chip i { font-style: normal; font-size: 14px; }
+.bs-chip b { font-size: 16px; font-variant-numeric: tabular-nums; }
+.bs-chip em { font-style: normal; font-size: 10px; padding: 0 5px; border-radius: 4px; background: var(--gold); color: #3a2000; text-shadow: none; letter-spacing: .05em; }
+.bs-chip.on { animation: chipIn .4s cubic-bezier(.2,1.5,.4,1); }
+@keyframes chipIn { from { transform: translateX(-50%) scale(.4); opacity: 0; } }
+.bs-chip.soon { border-color: #ff3a3a; background: rgba(90,0,0,.6); }
+.bs-chip.soon b { color: #ff6a5a; animation: chipBeat .5s ease-in-out infinite alternate; display: inline-block; }
+@keyframes chipBeat { to { transform: scale(1.18); } }
+
+/* 結果: ボス図鑑のメダル */
+.res-dex { display: flex; flex-direction: column; align-items: center; gap: 3px; margin: 6px 0 2px; }
+.res-dex > small { font-size: 12px; font-weight: 800; opacity: .9; } .res-dex > small b { color: var(--gold); font-size: 15px; }
+.res-dex .medals { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px; max-width: 92vw; }
+.res-dex .medals i { width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; font-style: normal; font-size: 16px;
+  background: rgba(255,255,255,.07); border: 1.5px dashed rgba(255,255,255,.3); color: rgba(255,255,255,.4); }
+.res-dex .medals i.got { border: 2px solid var(--gold); background: radial-gradient(circle at 35% 30%, rgba(255,240,170,.5), rgba(160,100,0,.45)); color: #fff; }
+.res-dex .medals i.new { animation: medalNew .7s ease-in-out infinite alternate; }
+@keyframes medalNew { to { box-shadow: 0 0 14px rgba(255,210,63,1); transform: scale(1.12); } }
+
+@media (max-height: 430px) {
+  .boss-bar { height: 14px; }
+  .bs-alert { top: calc(var(--sat) + 58px); height: 30px; } .bs-alert span { font-size: 17px; }
+  .bs-card { top: calc(var(--sat) + 94px); } .bs-card small { font-size: 13px; } .bs-card b { font-size: min(36px, 7vw, calc(80vw / var(--nlen, 8))); } .bs-card em { font-size: 12px; }
+  .bs-stamp { top: calc(var(--sat) + 46px); } .bs-stamp b { font-size: min(48px, 8.5vw); } .bs-stamp small { font-size: 14px; } .bs-stamp em { font-size: 14px; }
+  .bs-jack { top: calc(var(--sat) + 130px); min-width: 210px; padding: 4px 9px 5px; }
+  .bs-jack li { font-size: 13px; line-height: 1.3; } .bs-jack li.hot b { font-size: 15px; } .bs-total b { font-size: 23px; }
+  .bs-chip { top: calc(var(--sat) + 62px); }
+  .banner.rage b { font-size: min(36px, 7vw); } .banner.rage small { font-size: 15px; }
+}
+@media (max-height: 380px) {
+  .boss-bar { height: 12px; }
+  .bs-jack { top: calc(var(--sat) + 120px); } .bs-jack li { font-size: 12px; line-height: 1.25; }
+}
+@media (orientation: portrait) {
+  .hud-boss { width: 84vw; }
+  .bs-alert { top: calc(var(--sat) + 150px); }
+  .bs-card { top: calc(var(--sat) + 196px); } .bs-card b { font-size: min(40px, 10vw, calc(90vw / var(--nlen, 8))); }
+  .bs-stamp { top: calc(var(--sat) + 150px); } .bs-stamp b { font-size: min(52px, 12.5vw); }
+  .bs-jack { left: 50%; top: calc(var(--sat) + 238px); max-width: 92vw; transform: translateX(-50%) translateY(14px); background: rgba(14,8,2,.62); padding: 3px 9px 4px; }
+  .bs-jack li { font-size: 12px; line-height: 1.28; } .bs-jack li.hot b { font-size: 14px; } .bs-total b { font-size: 22px; }
+  .bs-jack.on { transform: translateX(-50%); } .bs-jack.out { transform: translateX(-50%) translateY(-16px); }
+  .bs-chip { top: calc(var(--sat) + 196px); }
+}
+@media (min-width: 1100px) and (min-height: 600px) {
+  .bs-card b { font-size: min(60px, calc(80vw / var(--nlen, 8))); } .bs-stamp b { font-size: 84px; } .bs-jack { min-width: 290px; top: calc(var(--sat) + 180px); } .bs-jack li { font-size: 16px; }
+  .bs-chip { top: calc(var(--sat) + 88px); }
+}

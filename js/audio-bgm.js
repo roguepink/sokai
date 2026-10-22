@@ -4,6 +4,8 @@
 //   2: + 16分ハイハット + アルペジオ(ピコピコ)  3: + 速いアルペジオ + 歪んだベース + シンバル + タム
 // ボスがいる間は、暗いコード進行(E → F → E → D)に変わる。
 // 無双モード中(setFever(true)): 明るい長調 + 8分のキック・裏拍のシンセの和音・1 オクターブ上のアルペジオ(いちばん派手)。
+// 第4弾: ボス戦(mode 'boss')は 太鼓・半音でうごめく 16分のベース・不協和の和音を足して 激しく。
+//   setRage(0..2) = ボスの怒り(形態)。1: 太鼓が増える + 警報のような高い音 / 2: さらに 16分のスネア・速い警報
 const BPM = 150;
 const STEP = 60 / BPM / 4;                 // 16分音符 = 0.1 秒
 const LOOKAHEAD = 0.18;
@@ -41,7 +43,10 @@ export class Music {
     this.step = 0; this.bar = 0; this.next = 0; this.timer = null;
     this.volume = 1;
     this.fever = false; this.feverWant = false;
+    this.rage = 0;
   }
+
+  setRage(r) { this.rage = Math.max(0, Math.min(2, r | 0)); }
 
   setFever(f) { this.feverWant = !!f; }
 
@@ -85,7 +90,10 @@ export class Music {
       }
       if (this.step % 16 === 0) {
         // 小節の頭でもり上がり・曲調を切りかえる
-        if (this.wantMode !== this.mode) { this.mode = this.wantMode; this.bar = 0; }
+        if (this.wantMode !== this.mode) {
+          this.mode = this.wantMode; this.bar = 0;
+          if (this.mode === 'boss' && !this.muted) { this.crash(this.next, 1.2); this.tom(this.next, 140); this.tom(this.next + STEP * 2, 110); }
+        }
         this.level = this.want;
       }
       if (!this.muted) this._play(this.step, this.next);
@@ -121,6 +129,16 @@ export class Music {
       if (s % 2 === 0 && s % 4 !== 0) this.kick(t, 0.7);                        // 8分のキック
       if (s === 2 || s === 6 || s === 10 || s === 14) this.stab(t, [root + 24, root + 24 + third, root + 31]);   // 裏拍の和音
       if (s % 2 === 1) this.lead(t, hz(root + 36 + [0, 7, 12, 7][(s >> 1) % 4]), 0.03);
+    }
+    // --- ボス戦の上乗せ ---
+    if (this.mode === 'boss' && !this.fever) {
+      const R = this.rage;
+      if (s === 0 || s === 6 || s === 10 || (R >= 1 && (s === 3 || s === 13))) this.tom(t, s === 0 ? 120 : 92);       // 太鼓
+      if (s % 2 === 1) this.pulse(t, hz(root + 12 + ((s >> 1) % 2)), 0.045 + 0.01 * R);                              // 半音でうごめく
+      if (s === 14 && this.bar % 2 === 1) this.stab(t, [root + 12, root + 13, root + 18]);                           // 不協和の和音
+      if (R >= 1 && (s === 0 || s === 8)) this.lead(t, hz(root + 36 + (this.bar % 2 ? 1 : 0)) , 0.035);             // 警報のような高い音
+      if (R >= 2 && s % 2 === 0 && s % 4 !== 0) this.snare(t, 0.35);
+      if (R >= 2 && s % 4 === 2) this.lead(t, hz(root + 37), 0.03);
     }
     // --- アルペジオ ---
     if (L >= 2) {
@@ -192,6 +210,14 @@ export class Music {
     o.connect(lp); o2.connect(sg).connect(lp); lp.connect(g);
     g.connect(L >= 3 ? this.shaper : this.out);
     o.start(t); o2.start(t); o.stop(t + 0.16); o2.stop(t + 0.16);
+  }
+
+  // こもった 短い 矩形波(ボス戦の うごめくベース)
+  pulse(t, f, v) {
+    const c = this.ctx, o = c.createOscillator(); o.type = 'square'; o.frequency.value = f;
+    const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 900; lp.Q.value = 3;
+    const g = c.createGain(); this._env(g, t, 0.003, v, 0.07);
+    o.connect(lp).connect(g).connect(this.out); o.start(t); o.stop(t + 0.1);
   }
 
   lead(t, f, v) {

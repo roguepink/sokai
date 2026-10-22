@@ -12,6 +12,7 @@ import { Bosses } from './ui-boss.js';
 import { Music } from './audio-bgm.js';
 import { SOUNDS2, GAP2, LEN2, IMPORTANT2, bossRoar } from './audio-sfx2.js';
 import { SOUNDS3, GAP3, LEN3, Weather } from './audio-world.js';
+import { SOUNDS4, GAP4, LEN4, IMPORTANT4 } from './audio-boss.js';
 
 const MAX_VOICES = 36;
 // 同じ音を続けて鳴らすときの最短の間隔(秒)
@@ -87,7 +88,7 @@ export const Audio = {
       const s = { grab: 'bossgrab', throw: 'bossthrow', birth: 'birth', spit: 'spit', acidHit: 'sizzle', rev: 'rev', charge: 'carhorn' }[b && b.act];
       if (s) this.play(s);
     });
-    Events.on('bossDown', () => { if (this._state === 'play') { this.play('bossdeath'); this.vibrate([60, 40, 140]); } });
+    // 第4弾: ボスの登場・なぐられた・怒り・撃破の音は 演出係(ui-bossfx.js)が その瞬間に鳴らす(bossIntro・heroHit・bossPhase・bossKill …)
     Events.on('horde', () => this.play('horn'));
     Events.on('newRecord', () => { this.play('fanfare'); this.vibrate([30, 40, 30, 40, 90]); });
 
@@ -202,6 +203,13 @@ export const Audio = {
       this.music.setLevel(lv);
       this.music.setFever(fever);
       this.music.setMode(fever ? 'fever' : boss ? 'boss' : 'normal');
+      // ボスの怒り(形態)で ボスの曲が もっと激しく
+      let rage = 0;
+      if (boss) {
+        const e = Bosses.list[0].e, p = e.maxHp ? e.hp / e.maxHp : 1;
+        rage = e.phase > 0 ? Math.min(2, e.phase - 1) : p < 1 / 3 ? 2 : p < 2 / 3 ? 1 : 0;
+      }
+      if (this.music.setRage) this.music.setRage(rage);
     } else if (this.music && this._state === 'title') { this.music.setLevel(0); }
     try { Weather.update(this, this.muted ? 'paused' : this._state); } catch (e) { /* 音で止めない */ }
     if (playing && !this.muted) {
@@ -560,8 +568,9 @@ const SOUNDS = {
   },
 };
 
-Object.assign(SOUNDS, SOUNDS2, SOUNDS3);
-Object.assign(MIN_GAP, GAP2, GAP3);
-Object.assign(LEN, LEN2, LEN3);
+Object.assign(SOUNDS, SOUNDS2, SOUNDS3, SOUNDS4);
+Object.assign(MIN_GAP, GAP2, GAP3, GAP4);
+Object.assign(LEN, LEN2, LEN3, LEN4);
 for (const k of IMPORTANT2) IMPORTANT.add(k);
+for (const k of IMPORTANT4) IMPORTANT.add(k);
 Audio.SOUNDS = SOUNDS;   // 確認用(音の大きさを測るテストで使う)
