@@ -1,4 +1,4 @@
-// マップ係: 中に入れる大きな建物(モール・病院・警察署・スーパー・教会・倉庫・工場・体育館・ガソリンスタンド・家・山小屋)。
+// マップ係: 中に入れる大きな建物(モール・病院・警察署・スーパー・倉庫・工場・体育館・ガソリンスタンド・家・山小屋)。
 // 入口は広い(4m 以上)ので、ゾンビの大群がなだれこむ。中は部屋・仕切り・家具(当たり判定あり)。
 // 屋根は建物ごとのメッシュ。主人公が中に入ると World.update が消す(roofs)。
 import * as THREE from 'three';
@@ -174,7 +174,7 @@ export class Bld {
 }
 
 export function genBuildings(ctx) {
-  mall(ctx); hospital(ctx); police(ctx); supermarket(ctx); church(ctx); gasStation(ctx);
+  mall(ctx); hospital(ctx); police(ctx); supermarket(ctx); gasStation(ctx);
   warehouse(ctx); factory(ctx); gym(ctx);
 }
 
@@ -369,56 +369,7 @@ function supermarket(ctx) {
   ctx.prop('sedan', 64, 51, 0.1, { y: 0.15, col: [0.6, 0.1, 0.1] });
 }
 
-// ---------------- 教会 ----------------
-function church(ctx) {
-  const { M, rnd } = ctx;
-  const B = new Bld(ctx, { name: '教会', x0: -13, z0: -168, x1: 13, z1: -124, h: 9, y0: 0.15, skin: M.concrete, skinCol: [0.8, 0.76, 0.7], skinS: [6, 6], floor: M.pave, floorCol: [0.85, 0.78, 0.7], wallCol: [0.85, 0.8, 0.72], roofCol: [0.3, 0.3, 0.33] });
-  B.shell([{ side: 'S', at: 0, w: 6 }, { side: 'E', at: -140, w: 4 }, { side: 'W', at: -140, w: 4 }]);
-  // ステンドグラス(外と中の両面が光る)
-  const glass = [[2.4, 0.4, 0.3], [0.4, 0.8, 2.6], [2.4, 1.8, 0.3], [0.5, 2.0, 0.6], [1.8, 0.4, 2.0]];
-  let gi = 0;
-  for (let z = -163; z < -127; z += 6) {
-    if (Math.abs(z + 140) < 3) continue;
-    const c = glass[gi++ % glass.length];
-    for (const x of [-13.03, 13.03]) B.RB.box(M.glow, x - 0.05, 3.4, z - 0.9, x + 0.05, 7.4, z + 0.9, { col: c });
-    pool(ctx, -9.5, z, 3.2, [c[0] * 0.18, c[1] * 0.18, c[2] * 0.18], 0.23);
-    pool(ctx, 9.5, z, 3.2, [c[0] * 0.18, c[1] * 0.18, c[2] * 0.18], 0.23);
-  }
-  // 長いす(中央と両わきに通路)
-  for (let z = -156; z < -128; z += 2.3) { if (Math.abs(z + 140) < 2.6) continue; B.prop('pew', -6.6, z, 0); B.prop('pew', 6.6, z, 0); }
-  // 祭壇
-  ctx.B.box(M.woodFloor, -11, 0.15, -167.5, 11, 0.45, -160, { col: [0.6, 0.35, 0.25] });
-  B.prop('altar', 0, -164, 0, { y: 0.45 });
-  B.light(0, -163, 5, [0.5, 0.35, 0.15]);
-  for (const x of [-9, 9]) { ctx.B.box(M.glow, x - 0.1, 0.45, -166.5, x + 0.1, 1.7, -166.3, { col: [3, 1.8, 0.6] }); }
-  // 大きな十字架(北の壁)
-  B.RB.box(M.wood, -0.3, 3.2, -167.6, 0.3, 7.5, -167.3, { col: [0.5, 0.3, 0.18] }); B.RB.box(M.wood, -2, 5.5, -167.6, 2, 6.1, -167.3, { col: [0.5, 0.3, 0.18] });
-  ctx.B.box(M.wood, -0.3, 0.45, -167.6, 0.3, 3.2, -167.3, { col: [0.5, 0.3, 0.18] });
-  for (let z = -158; z < -128; z += 9) B.light(0, z, 4, [0.35, 0.28, 0.2]);
-  for (let k = 0; k < 8; k++) decal(ctx, [1, 2, 3, 6][k % 4], -11 + rnd() * 22, -160 + rnd() * 34, 1.6 + rnd() * 2, rnd() * 6, 0.22);
-  // 屋根(切妻)と鐘の塔(南側)
-  const top = B.gableRoof({ pitch: 0.75, col: [0.32, 0.3, 0.34] });
-  B.RB.box(M.concrete, -3.5, B.h, -130, 3.5, top + 6, -123, { col: [0.78, 0.74, 0.68] });
-  B.RB.box(M.glow, -1.2, top + 2.5, -123.1, 1.2, top + 4.5, -122.95, { col: [3, 2.5, 1.2] });
-  const spire = new THREE.ConeGeometry(4.6, 10, 4); _m.makeRotationY(Math.PI / 4); _m.setPosition(0, top + 11, -126.5);
-  B.RB.geom(M.plain, spire, _m, { col: [0.3, 0.28, 0.32] });
-  B.RB.box(M.plain, -0.2, top + 16, -126.7, 0.2, top + 20, -126.3, { col: [0.85, 0.7, 0.3] });
-  B.RB.box(M.plain, -1.2, top + 18, -126.7, 1.2, top + 18.5, -126.3, { col: [0.85, 0.7, 0.3] });
-  B.finish();
-  // 墓地(東と西)
-  for (const side of [-1, 1]) {
-    for (let x = 18; x < 32; x += 3.2) for (let z = -166; z < -122; z += 3.6) {
-      if (rnd() < 0.2) continue;
-      const px = side * x + (rnd() - 0.5) * 0.6, pz = z + (rnd() - 0.5) * 0.6, tilt = (rnd() - 0.5) * 0.3;
-      const v = 0.55 + rnd() * 0.2;
-      ctx.B.box(M.plain, px - 0.45, 0.15, pz - 0.12, px + 0.45, 1.0 + rnd() * 0.4, pz + 0.12, { col: [v, v, v * 0.95], rot: tilt });
-      ctx.solid(px - 0.45, pz - 0.15, px + 0.45, pz + 0.15, 1);
-      if (rnd() < 0.3) decal(ctx, 9, px, pz + 1, 1.4, rnd() * 6, 0.17);
-    }
-    placeTree(ctx, 'dead', side * 25, -144, 1.1, rnd() * 6);
-    placeTree(ctx, 'dead', side * 30, -128, 0.9, rnd() * 6);
-  }
-}
+// 教会は 第4弾で 寺町の「本堂」になった(world-dgen2.js の templeHall)
 
 // ---------------- ガソリンスタンド ----------------
 function gasStation(ctx) {

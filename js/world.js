@@ -3,6 +3,8 @@
 // 見た目づくりは world-*.js に分けている:
 //   world-tex.js  模様と材質 / world-build.js まとめ描きの道具 / world-props.js 小道具の形
 //   world-town.js 町 / world-interiors.js 中に入れる建物 / world-nature.js 森・公園・住宅地・工場地帯
+//   第4弾: 町は 地区に分かれる(world-district.js 地区の地図と空気 / world-dtex.js 壁と看板の絵 / world-dkit.js 建物の道具 /
+//          world-dgen.js 繁華街・中華街・下町・門 / world-dgen2.js 寺町・オフィス街・崩壊地区・中に入れる店)
 import * as THREE from 'three';
 import { CONFIG } from './config.js';
 import { seeded } from './util.js';
@@ -19,12 +21,15 @@ import { Life } from './world-life.js';
 import { defineProps2 } from './world-props2.js';
 import { outerZone, OUTER_NAMES, OUTER_GROUND, OUTER_MAP, OUT } from './world-outer.js';
 import { Events } from './events.js';
+import { makeDistrictMaterials } from './world-dtex.js';
+import { defineDistrictProps } from './world-dkit.js';
+import { District, districtAt, DNAME } from './world-district.js';
 
 const CELL = 8;           // ぶつかり判定の区画の大きさ(m)
 const NAV = 1;            // 道さがし地図の1マス(m)
 const CHUNK = 100;        // 見た目をまとめる区画(m)
 // 肩越し・一人称で 描く距離(m)。木は霧で かすむ 140m まで、草・小物は もっと近くだけ
-const CLOSE_VIS = { pine: 140, broad: 140, birch: 140, dead: 120, bush: 85, grass: 70, rock: 100, log: 90, grave: 100, cross: 100, hay: 110, corn: 110 };
+const CLOSE_VIS = { sakura: 140, pine: 140, broad: 140, birch: 140, dead: 120, bush: 85, grass: 70, rock: 100, log: 90, grave: 100, cross: 100, hay: 110, corn: 110 };
 const OCC = 2;            // 「もう何か置いた」地図の1マス(m)
 const MAP_PX = 1024;       // ミニマップの大きさ
 
@@ -47,8 +52,10 @@ export const World = {
     this.grid = Array.from({ length: n * n }, () => []);
     const t0 = performance.now();
     this.generate();
+    const t1 = performance.now();
     this.buildNav();
     this._buildComponents();
+    this._T && this._T.push(t1, performance.now());
     this.genMs = Math.round(performance.now() - t0);
   },
 
@@ -56,7 +63,9 @@ export const World = {
   generate() {
     const S = CONFIG.WORLD_SIZE, h = this.half;
     const q = Engine.quality;
-    const M = this.M = makeMaterials(Engine.renderer, q);
+    const _T = [performance.now()]; const _mk = () => _T.push(performance.now()); this._T = _T;
+    const M0 = {}; makeDistrictMaterials(M0, Engine.renderer, q); _mk();
+    const M = this.M = makeMaterials(Engine.renderer, q); _mk(); Object.assign(M, M0);
     const B = new Builder(CHUNK, h), I = new Instancer(CHUNK, h), CB = new Builder(CHUNK * 2, h), SB = new Builder(400, h);
     I.thin = q === 'low' ? 0.45 : q === 'mid' ? 0.8 : 1;
     // ミニマップ
@@ -92,12 +101,13 @@ export const World = {
     Brk.init(this);
     defineProps(ctx);
     defineProps2(ctx);
+    defineDistrictProps(ctx);
     Sky.init(this, M);
     if (q !== 'low') this._embers(q === 'high' ? 420 : 260);
-    this._ground(ctx, mx, k);
-    genTown(ctx);
-    genBuildings(ctx);
-    genNature(ctx);
+    _mk(); this._ground(ctx, mx, k); _mk();
+    genTown(ctx); _mk();
+    genBuildings(ctx); _mk();
+    genNature(ctx); _mk();
     // まわりの壁(マップの外へ出ない)
     this.addBox(-h - 2, -h - 2, h + 2, -h, { h: 4, mesh: false });
     this.addBox(-h - 2, h, h + 2, h + 2, { h: 4, mesh: false });
@@ -107,9 +117,10 @@ export const World = {
     I.finish(this.group);
     CB.finish(this.group, { cast: false, recv: false });
     SB.finish(this.group, { cast: false });
-    Brk.finish(this.group);
+    Brk.finish(this.group); _mk();
     this._sky = Sky;
     Life.init(this);
+    District.init(this);
     // 建物の印をミニマップの上に
     for (const b of this.buildings) {
       if (b.small) continue;
@@ -126,7 +137,7 @@ export const World = {
     for (let i = 0; i < n; i++) { pos[i * 3] = r(); pos[i * 3 + 1] = r(); pos[i * 3 + 2] = r(); seed[i] = r(); }
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     g.setAttribute('aSeed', new THREE.BufferAttribute(seed, 1));
-    const u = this._emberU = { uTime: { value: 0 }, uCenter: { value: new THREE.Vector3() }, uScale: { value: 50 } };
+    const u = this._emberU = { uTime: { value: 0 }, uCenter: { value: new THREE.Vector3() }, uScale: { value: 50 }, uAmt: { value: 1 } };
     const m = new THREE.ShaderMaterial({
       uniforms: u, transparent: true, depthWrite: false, fog: false,
       vertexShader: `uniform float uTime; uniform vec3 uCenter; uniform float uScale; attribute float aSeed; varying float vA; varying float vK;
@@ -144,14 +155,14 @@ export const World = {
           gl_PointSize = min((aSeed > 0.62 ? 2.6 : 3.4) * uScale / max(1.0, -mv.z), uScale * 0.1);
           vA = smoothstep(0.0, 2.0, p.y) * (1.0 - smoothstep(14.0, 22.0, p.y)) * (0.6 + 0.4 * sin(uTime * 6.0 + aSeed * 90.0)) * smoothstep(5.0, 10.0, -mv.z);
         }`,
-      fragmentShader: `varying float vA; varying float vK;
+      fragmentShader: `uniform float uAmt; varying float vA; varying float vK;
         void main() {
           float a = smoothstep(0.5, 0.1, length(gl_PointCoord - 0.5));
           vec3 c = vK > 0.62 ? vec3(3.2, 1.3, 0.35) : vec3(0.42, 0.4, 0.4);
-          gl_FragColor = vec4(c, a * vA * (vK > 0.62 ? 0.95 : 0.35));
+          gl_FragColor = vec4(c, min(1.0, a * vA * (vK > 0.62 ? 0.95 : 0.35) * uAmt));
         }`,
     });
-    const pts = new THREE.Points(g, m);
+    const pts = this._emberPts = new THREE.Points(g, m);
     pts.frustumCulled = false; pts.renderOrder = 5;
     this.group.add(pts);
   },
@@ -209,11 +220,15 @@ export const World = {
     if (z > T[3] && Math.abs(x) <= T[2] && z < 372) return 'park';
     return 'forest';
   },
+  // 町の中の地区: 'plaza' 中央広場 / 'neon' ネオン繁華街 / 'china' 中華街 / 'shita' 下町商店街 / 'temple' 寺町 / 'office' オフィス街 / 'ruins' 崩壊地区。町の外は null
+  districtAt(x, z) { return districtAt(x, z); },
+  get district() { return District.cur; },
   // 場所の名前(画面に出す用)
   zoneName(x, z) {
     const b = this.buildingAt(x, z);
     if (b && b.name) return b.name;
     const zn = this.zoneAt(x, z);
+    if (zn === 'town') { const d = districtAt(x, z); if (d) return DNAME[d]; }
     return OUTER_NAMES[zn] || { town: 'ダウンタウン', industrial: '工場地帯', suburb: '住宅街', park: '公園', forest: '森', lake: '湖' }[zn] || '';
   },
   // 上から見た地図(北が上、マップ全体)。UI のミニマップ用。1px = WORLD_SIZE/512 m
@@ -453,6 +468,8 @@ export const World = {
     Sky.update(dt, px, pz);
     Brk.update(dt, px, pz);
     Life.update(dt, px, pz);
+    District.update(dt, px, pz);
+    if (this._emberPts) this._emberPts.visible = this._emberU.uAmt.value > 0.02;
     if ((this._cullT -= dt) <= 0) { this._cullT = 0.15; this._cull(); }
   },
 

@@ -4,6 +4,9 @@ import * as THREE from 'three';
 import { cutout } from './world-tex.js';
 import { placeTree, placeGlass } from './world-props.js';
 import { Builder } from './world-build.js';
+import { districtAt, DSTYLE, EDGES, GRID } from './world-district.js';
+import { genPad, brokenOverpass } from './world-dgen2.js';
+import { genGates, dFurniture, vehicleFor, segDistrict, shitaArcade, dStreet } from './world-dgen.js';
 
 const LINES = [-178, -112, -40, 40, 112, 178];      // 道路の中心線(x 一定の南北の道 / z 一定の東西の道)
 const RW = 6;                                        // 道路の半分の幅(片側 2 車線)
@@ -35,11 +38,20 @@ export function genTown(ctx) {
   const R = (a, b) => a + rnd() * (b - a);
   const T = TOWN.ext;
 
-  // ---- 道路(町全体にアスファルト。区画の台がその上に乗る) ----
-  for (let z = T[1]; z < T[3]; z += 32) for (let x = T[0]; x < T[2]; x += 32) {
-    B.flat(M.asphalt, x + 16, 0.01, z + 16, 32, 32);
+  // ---- 道路(町全体。地区ごとに 道の材質と色が ちがう。地区の境目の道は ふつうのアスファルト) ----
+  for (let j = 0; j < 5; j++) for (let i = 0; i < 5; i++) {
+    const D = GRID[j][i], st = DSTYLE[D];
+    let xa = EDGES[i], xb = EDGES[i + 1], za = EDGES[j], zb = EDGES[j + 1];
+    const same = (ii, jj) => ii < 0 || jj < 0 || ii > 4 || jj > 4 || GRID[jj][ii] === D;
+    const mx0 = same(i - 1, j) ? 0 : RW, mx1 = same(i + 1, j) ? 0 : RW, mz0 = same(i, j - 1) ? 0 : RW, mz1 = same(i, j + 1) ? 0 : RW;
+    const lay = (x0, z0, x1, z1, mat, col) => {
+      for (let z = z0; z < z1 - 0.01; z += 40) for (let x = x0; x < x1 - 0.01; x += 40) { const x2 = Math.min(x1, x + 40), z2 = Math.min(z1, z + 40); B.flat(mat, (x + x2) / 2, 0.01, (z + z2) / 2, x2 - x, z2 - z, { col }); }
+    };
+    lay(xa + mx0, za + mz0, xb - mx1, zb - mz1, M[st.road[0]], st.road[1]);
+    if (mx0) lay(xa, za, xa + RW, zb, M.asphalt, null); if (mx1) lay(xb - RW, za, xb, zb, M.asphalt, null);
+    if (mz0) lay(xa + mx0, za, xb - mx1, za + RW, M.asphalt, null); if (mz1) lay(xa + mx0, zb - RW, xb - mx1, zb, M.asphalt, null);
+    ctx.mapRect(xa, za, xb, zb, st.map);
   }
-  ctx.mapRect(T[0], T[1], T[2], T[3], '#4a4a50');
 
   // ---- 区画の台(歩道) ----
   const padRect = (i, j) => {
@@ -76,14 +88,13 @@ export function genTown(ctx) {
       }
       continue;
     }
-    const mat = p.kind === 'plaza' ? M.pave : p.kind === 'parking' ? M.asphalt : p.kind === 'park' ? M.ground : M.sidewalk;
-    const col = p.kind === 'park' ? [0.42, 0.55, 0.28] : p.kind === 'plaza' ? [0.86, 0.88, 0.92] : null;
+    const D = districtAt((x0 + x1) / 2, (z0 + z1) / 2), ds = DSTYLE[D] || DSTYLE.plaza;
+    const mat = p.kind === 'plaza' ? M.pave : M[ds.pad[0]];
+    const col = p.kind === 'plaza' ? [0.86, 0.88, 0.92] : ds.pad[1];
     padBox(ctx, x0, z0, x1, z1, mat, col);
-    ctx.mapRect(x0, z0, x1, z1, p.kind === 'park' ? '#3f5a2c' : p.kind === 'plaza' ? '#8a8070' : '#77736c');
-    ctx.occupy(x0, z0, x1, z1);
+    ctx.mapRect(x0, z0, x1, z1, p.kind === 'plaza' ? '#8a8070' : ds.map);
+    p.D = D;
   }
-  // 道路も「使った」ことにする(木を生やさない)
-  ctx.occupy(T[0], T[1], T[2], T[3]);
 
   // ---- 道路の線・横断歩道 ----
   const mallSeg = (X, za, zb) => X === 112 && za <= -100 && zb >= -52;
@@ -92,6 +103,8 @@ export function genTown(ctx) {
     for (let k = 0; k < ends.length - 1; k++) {
       const za = ends[k] + (k === 0 ? 0 : RW), zb = ends[k + 1] - (k === ends.length - 2 ? 0 : RW);
       if (zb - za < 6 || mallSeg(X, za, zb)) continue;
+      const sd = segDistrict(X, za, zb, true);
+      if (sd && !DSTYLE[sd].lines) continue;
       roadMarks(ctx, X, za, zb, true, k > 0, k < ends.length - 2);
     }
   }
@@ -99,27 +112,34 @@ export function genTown(ctx) {
     for (let k = 0; k < ends.length - 1; k++) {
       const xa = ends[k] + (k === 0 ? 0 : RW), xb = ends[k + 1] - (k === ends.length - 2 ? 0 : RW);
       if (xb - xa < 6) continue;
-      if (Z === TOWN.overZ) { /* 高架の下も線は引く */ }
+      const sd = segDistrict(Z, xa, xb, false);
+      if (sd && !DSTYLE[sd].lines) continue;
       roadMarks(ctx, Z, xa, xb, false, k > 0, k < ends.length - 2);
     }
   }
-  for (const X of LINES) ctx.mapLine(X, T[1], X, T[3], 12, '#2c2c30');
-  for (const Z of LINES) ctx.mapLine(T[0], Z, T[2], Z, 12, '#2c2c30');
+  for (const X of LINES) ctx.mapLine(X, T[1], X, T[3], 12, 'rgba(30,30,34,0.55)');
+  for (const Z of LINES) ctx.mapLine(T[0], Z, T[2], Z, 12, 'rgba(30,30,34,0.55)');
 
   // ---- 区画ごとの中身 ----
   for (const p of pads) {
     if (p.kind === 'edge') continue;
     const [x0, z0, x1, z1] = p.r;
-    streetFurniture(ctx, p);
+    if (p.kind !== 'plaza' && genPad(ctx, p.i, p.j, x0, z0, x1, z1)) continue;
     if (p.kind === 'tower') towerBlock(ctx, x0, z0, x1, z1, p.i, p.j);
     else if (p.kind === 'plaza') plaza(ctx, x0, z0, x1, z1);
     else if (p.kind === 'parking') parking(ctx, x0, z0, x1, z1);
     else if (p.kind === 'park') pocketPark(ctx, x0, z0, x1, z1);
   }
 
-  // ---- 交差点の信号 ----
+  // 下町のアーケード(2 つの区画を つらぬく)・地区の入口の門。歩道の小物は そのあと(門・アーケードの入口をよける)
+  shitaArcade(ctx, [[PADS[0][0], PADS[0][1]], [PADS[1][0], PADS[1][1]]]);
+  genGates(ctx, LINES, RW);
+  for (const p of pads) if (p.kind !== 'edge') streetFurniture(ctx, p);
+
+  // ---- 交差点の信号(寺町・中華街の中には ない) ----
   for (const X of LINES) for (const Z of LINES) {
-    if (X === 112 && Z === -40 || X === 112 && Z === -112) { /* モールの角も信号はあり */ }
+    const dd = districtAt(X, Z);
+    if ((dd === 'temple' || dd === 'china') && districtAt(X - 8, Z - 8) === dd && districtAt(X + 8, Z + 8) === dd && districtAt(X + 8, Z - 8) === dd && districtAt(X - 8, Z + 8) === dd) continue;
     if (rnd() < 0.25) continue;
     ctx.prop('tlight', X - RW - 0.8, Z - RW - 0.8, -Math.PI / 2, {});   // 北西の角から南へ腕
     ctx.prop('tlight', X + RW + 0.8, Z + RW + 0.8, Math.PI / 2, {});    // 南東の角から北へ腕
@@ -130,6 +150,9 @@ export function genTown(ctx) {
 
   // ---- 高架道路(東西 z = 178、マップの端から端まで) ----
   overpass(ctx);
+  // 区画と道路を「使った」ことにする(森の木を生やさない)。区画の中身を置いたあとに(中身は isFree で すき間を さがす)
+  for (const p of pads) ctx.occupy(...p.r);
+  ctx.occupy(T[0], T[1], T[2], T[3]);
 }
 
 export function padBox(ctx, x0, z0, x1, z1, mat, col = null) {
@@ -171,12 +194,14 @@ function roadMarks(ctx, C, a, b, alongZ, crossA, crossB) {
 function streetFurniture(ctx, p) {
   const { rnd } = ctx;
   const [x0, z0, x1, z1] = p.r, Y = PAD_H;
+  const D = p.D && p.D !== 'plaza' ? p.D : null;
   const edge = (ax, az, bx, bz, nx, nz) => {      // 区画のへり(外向き n)
     const L = Math.hypot(bx - ax, bz - az), dx = (bx - ax) / L, dz = (bz - az) / L;
     const rot = Math.atan2(-nz, nx);               // 腕を道路へ向ける
     for (let s = 8; s < L - 6; s += 12) {
       const px = ax + dx * s + nx * -0.9, pz = az + dz * s + nz * -0.9;
       const k = Math.round(s / 12) % 3;
+      if (D) { dFurniture(ctx, D, px, pz, rot, k, nx, nz); if (rnd() < 0.2) decal(ctx, D === 'temple' ? 5 : rnd() < 0.5 ? 9 : 6, ax + dx * (s + 6), az + dz * (s + 6), 2.5, rnd() * 6, Y + 0.01, D === 'temple' ? [1.5, 0.85, 1.05] : null); continue; }
       if (k === 0) lamp(ctx, px, pz, rot, Y);
       else if (k === 1 && p.kind !== 'plaza' && p.kind !== 'parking') {
         ctx.prop('planter', px, pz, 0, { y: Y });
@@ -371,23 +396,28 @@ function streetStuff(ctx, R) {
   const nearPlaza = (s) => Math.abs(s.C) === 40 && Math.abs((s.a + s.b) / 2) < 50;
   for (const s of segs) {
     const L = s.b - s.a;
-    // 路肩の放置車(片側ずつ)
+    const D = segDistrict(s.C, s.a - 3, s.b + 3, s.z), vf = D && D !== 'plaza';
+    if (vf) dStreet(ctx, D, s);
+    // 路肩の放置車(片側ずつ)。地区ごとに 車の種類が ちがう(タクシー・軽トラ・人力車 …)
     for (const side of [-1, 1]) {
-      let v = s.a + 2 + rnd() * 6;
-      while (v < s.b - 6) {
-        if (rnd() < 0.42) {
-          const name = rnd() < 0.08 ? 'bus' : rnd() < 0.2 ? 'van' : 'sedan';
-          const len = name === 'bus' ? 11 : name === 'van' ? 5 : 4.4;
+      let v = s.a + (vf ? 5 : 2) + rnd() * 6;
+      while (v < s.b - (vf ? 5 : 6)) {
+        if (rnd() < (D === 'temple' ? 0.22 : D === 'ruins' ? 0.55 : 0.42)) {
+          let name = rnd() < 0.08 ? 'bus' : rnd() < 0.2 ? 'van' : 'sedan', len = name === 'bus' ? 11 : name === 'van' ? 5 : 4.4, col = null, isBurnt = rnd() < 0.25;
+          if (vf) [name, len, col, isBurnt] = vehicleFor(ctx, D);
           if (v + len > s.b - 2) break;
-          const isBurnt = rnd() < 0.25;
-          put(s, side * 4.4, v + len / 2, (side < 0 ? 0 : Math.PI) + (rnd() - 0.5) * 0.25, name, { col: isBurnt ? burnt : name === 'bus' ? [0.95, 0.75, 0.15] : cols[Math.floor(rnd() * cols.length)] });
+          if (D === 'ruins' && rnd() < 0.3) { const x = s.z ? s.C + side * 4.4 : v + len / 2, z = s.z ? v + len / 2 : s.C + side * 4.4; ctx.prop('rubble', x, z, rnd() * 6, { s: 1.4 }); decal(ctx, 7, x, z, 5, rnd() * 6, 0.025); v += len + 2; continue; }
+          put(s, side * 4.4, v + len / 2, (side < 0 ? 0 : Math.PI) + (rnd() - 0.5) * (vf && D !== 'ruins' ? 0.08 : 0.25), name, { col: col || (isBurnt ? burnt : name === 'bus' ? [0.95, 0.75, 0.15] : cols[Math.floor(rnd() * cols.length)]) });
           if (isBurnt) { const x = s.z ? s.C + side * 4.4 : v + len / 2, z = s.z ? v + len / 2 : s.C + side * 4.4; decal(ctx, 7, x, z, 6, rnd() * 6, 0.025); }
           v += len + 1.5;
         } else v += 5 + rnd() * 6;
       }
     }
+    if (D === 'ruins') {   // 道の穴(爆撃のあと)と 火
+      for (let k = 0; k < Math.floor(L / 30); k++) { const v = s.a + 6 + rnd() * (L - 12), u = (rnd() - 0.5) * 6, x = s.z ? s.C + u : v, z = s.z ? v : s.C + u; decal(ctx, 7, x, z, 7 + rnd() * 3, rnd() * 6, 0.026); decal(ctx, 3, x, z, 4, rnd() * 6, 0.027); for (let q = 0; q < 6; q++) { const a = q / 6 * 6.28; ctx.prop('rubble', x + Math.cos(a) * 3.6, z + Math.sin(a) * 3.6, rnd() * 6, { solid: false, s: 0.8 }); } if (rnd() < 0.5) ctx.W.addFire(x, 0.2, z, 0.8); }
+    }
     // 道のまん中の事故(ななめの車が 2 台)
-    if (rnd() < 0.35 && L > 30) {
+    if (D !== 'temple' && rnd() < 0.35 && L > 30) {
       const v = s.a + L * (0.3 + rnd() * 0.4);
       put(s, -0.8, v, 0.6 + rnd() * 0.4, 'sedan', { col: rnd() < 0.5 ? burnt : cols[Math.floor(rnd() * cols.length)] });
       put(s, 1.6, v + 4.2, -0.5 - rnd() * 0.5, rnd() < 0.3 ? 'van' : 'sedan', { col: cols[Math.floor(rnd() * cols.length)] });
@@ -397,7 +427,7 @@ function streetStuff(ctx, R) {
       if (rnd() < 0.6) { ctx.prop('fireBarrel', x - 3, z + 3, 0); pool(ctx, x - 3, z + 3, 5, [0.9, 0.45, 0.12]); }
     }
     // バリケード(広場の近くは検問)
-    if (nearPlaza(s) || rnd() < 0.2) {
+    if (D !== 'temple' && D !== 'china' && (nearPlaza(s) || rnd() < 0.2)) {
       const v = (s.a + s.b) / 2 + (rnd() - 0.5) * 10;
       put(s, -3.2, v, 0, rnd() < 0.5 ? 'barricade' : 'jersey', {});
       put(s, 3.2, v + 1.5, 0.1, rnd() < 0.5 ? 'barricade' : 'jersey', {});
@@ -427,17 +457,21 @@ function overpass(ctx) {
   const B0 = ctx.B, DB = new Builder(80, half);
   ctx.B = DB;
   const B = DB;
+  const GAP = [80, 120];       // 崩壊地区: ここは 高架が落ちている(world-dgen2.js の brokenOverpass)
+  const inGap = (x) => x >= GAP[0] && x < GAP[1];
   for (let x = -half; x < XE; x += 40) {
-    const xb = Math.min(XE, x + 40);
-    B.box(M.concrete, x, Y0, Z - W, xb, Y1, Z + W, { top: deckTop, col: conc, skip: (x > -half ? 'w' : '') + (xb < XE ? 'e' : '') });
-    B.box(M.concrete, x, Y0 - 0.6, Z - W + 1, xb, Y0, Z + W - 1, { col: [0.5, 0.48, 0.46], skip: 't' + (x > -half ? 'w' : '') + (xb < half ? 'e' : '') });
-    for (const s of [-1, 1]) B.box(M.concrete, x, Y1, s > 0 ? Z + W - 0.4 : Z - W, xb, Y1 + 1.0, s > 0 ? Z + W : Z - W + 0.4, { col: conc, skip: (x > -half ? 'w' : '') + (xb < XE ? 'e' : '') });
+    if (inGap(x)) continue;
+    const xb = Math.min(XE, x + 40), sw = x > -half && x !== GAP[1] ? 'w' : '', se = xb < XE && xb !== GAP[0] ? 'e' : '';
+    B.box(M.concrete, x, Y0, Z - W, xb, Y1, Z + W, { top: deckTop, col: conc, skip: sw + se });
+    B.box(M.concrete, x, Y0 - 0.6, Z - W + 1, xb, Y0, Z + W - 1, { col: [0.5, 0.48, 0.46], skip: 't' + sw + (xb < half && xb !== GAP[0] ? 'e' : '') });
+    for (const s of [-1, 1]) B.box(M.concrete, x, Y1, s > 0 ? Z + W - 0.4 : Z - W, xb, Y1 + 1.0, s > 0 ? Z + W : Z - W + 0.4, { col: conc, skip: sw + se });
     for (let k = 0; k < 40; k += 7) B.flat(M.paint, x + k + 2, Y1 + 0.01, Z, 3.5, 0.15, { col: [0.9, 0.9, 0.88] });
   }
-  for (let x = -half + 20; x < XE; x += 40) B.box(M.concrete, x - 1.4, Y0 - 1.6, Z - W + 1, x + 1.4, Y0, Z + W - 1, { col: [0.55, 0.53, 0.5], skip: '' });
+  for (let x = -half + 20; x < XE; x += 40) if (!inGap(x)) B.box(M.concrete, x - 1.4, Y0 - 1.6, Z - W + 1, x + 1.4, Y0, Z + W - 1, { col: [0.55, 0.53, 0.5], skip: '' });
   // 高架の上の事故車(当たり判定なし)
   const cols = [[0.7, 0.1, 0.1], [0.15, 0.25, 0.5], [0.85, 0.85, 0.85], [0.13, 0.11, 0.1]];
   for (let x = -half + 10; x < XE - 10; x += 14 + rnd() * 20) {
+    if (x > GAP[0] - 6 && x < GAP[1] + 6) continue;
     ctx.prop(rnd() < 0.15 ? 'bus' : 'sedan', x, Z + (rnd() - 0.5) * 9, (rnd() - 0.5) * 0.8, { y: Y1, solid: false, occupy: false, col: cols[Math.floor(rnd() * cols.length)] });
   }
   ctx.B = B0;
@@ -450,6 +484,7 @@ function overpass(ctx) {
   ctx.W.addFader([...clones.values()], (x, z) => Math.abs(z - Z) < W + 4, 0.12);
   // 柱(道のまん中。40m ごと)
   for (let x = -half + 20; x < XE; x += 40) {
+    if (inGap(x)) { B0.box(M.concrete, x - 1.1, 0, Z - 1.1, x + 1.1, 3.6, Z + 1.1, { col: [0.5, 0.46, 0.42] }); ctx.solid(x - 1.1, Z - 1.1, x + 1.1, Z + 1.1, 3.6); continue; }
     B0.box(M.concrete, x - 1.1, 0, Z - 1.1, x + 1.1, Y0 - 0.6, Z + 1.1, { col: conc });
     ctx.solid(x - 1.1, Z - 1.1, x + 1.1, Z + 1.1, Y0);
     ctx.prop('jersey', x - 4, Z, 0, {}); ctx.prop('jersey', x + 4, Z, 0, {});
@@ -464,5 +499,6 @@ function overpass(ctx) {
     ctx.occupy(x, Z - 8, x + 40, Z + 8);
   }
   ctx.mapRect(-half, Z - W, XE, Z + W, '#6a6862');
+  brokenOverpass(ctx, Z, W, Y0, Y1, GAP[0], GAP[1]);
   void THREE;
 }

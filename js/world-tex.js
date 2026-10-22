@@ -14,7 +14,7 @@ const ri = (a, b) => Math.floor(a + R() * (b - a + 1));
 function cnv(w, h = w) {
   const c = document.createElement('canvas');
   c.width = w; c.height = h;
-  return [c, c.getContext('2d')];
+  return [c, c.getContext('2d', { willReadFrequently: true })];
 }
 let ANISO = 4;
 function tex(c, { srgb = true, aniso = ANISO } = {}) {
@@ -27,12 +27,19 @@ function tex(c, { srgb = true, aniso = ANISO } = {}) {
 const rgb = (r, g, b, a = 1) => `rgba(${r | 0},${g | 0},${b | 0},${a})`;
 
 // 細かいザラザラ(ピクセルごとの ゆらぎ)
+// (乱数は ここだけの速い xorshift。起動を軽くする)
 function grain(x, w, h, amp, mono = true) {
-  const d = x.getImageData(0, 0, w, h), p = d.data;
+  const d = x.getImageData(0, 0, w, h), p = d.data, k = amp / 4294967296;
+  let s = ((R() * 4294967295) | 0) || 1;
   for (let i = 0; i < p.length; i += 4) {
-    const n = (R() - 0.5) * amp;
+    s ^= s << 13; s ^= s >>> 17; s ^= s << 5;
+    const n = (s >>> 0) * k - amp * 0.5;
     if (mono) { p[i] += n; p[i + 1] += n; p[i + 2] += n; }
-    else { p[i] += (R() - 0.5) * amp; p[i + 1] += (R() - 0.5) * amp; p[i + 2] += (R() - 0.5) * amp; }
+    else {
+      p[i] += n;
+      s ^= s << 13; s ^= s >>> 17; s ^= s << 5; p[i + 1] += (s >>> 0) * k - amp * 0.5;
+      s ^= s << 13; s ^= s >>> 17; s ^= s << 5; p[i + 2] += (s >>> 0) * k - amp * 0.5;
+    }
   }
   x.putImageData(d, 0, 0);
 }

@@ -309,7 +309,7 @@ export const Sky = {
     W.group.add(this.bolt);
     // 材質のもとの値(時間と天気で変える)
     this.base = {};
-    for (const k of ['office', 'apt', 'ribbon', 'shop']) if (M[k]) this.base[k] = M[k].emissiveIntensity;
+    for (const k of ['office', 'apt', 'ribbon', 'shop', 'facade']) if (M[k]) this.base[k] = M[k].emissiveIntensity;
     this.wetMats = ['asphalt', 'sidewalk', 'pave', 'floorC', 'ground', 'roof', 'car', 'concrete'].filter((k) => M[k]).map((k) => ({ m: M[k], r: M[k].roughness, c: M[k].color.clone(), dk: k === 'ground' ? 0.85 : k === 'car' ? 0.95 : 0.72, wr: k === 'ground' ? 0.7 : k === 'car' ? 0.2 : 0.32, me: M[k].metalness }));
     Events.on('viewChange', (e) => this.setView(e.mode));
     Events.on('start', () => { this.setTime(START_T); this.setWeather('clear', true, true); this._wTimer = 70; });
@@ -431,6 +431,9 @@ export const Sky = {
     const day = 1 - ln(12) * 0.9;     // 星が見えるほど 夜
     if (wx.fog + wx.snow > 0) { _c.setRGB(0.55, 0.57, 0.6).multiplyScalar(0.25 + 0.75 * day); U.uFog.value.lerp(_c, (wx.fog * 0.7 + wx.snow * 0.5)); U.uHor.value.lerp(_c, (wx.fog * 0.6 + wx.snow * 0.4)); }
     if (wx.ash > 0) { _c.setRGB(0.42, 0.3, 0.22).multiplyScalar(0.35 + 0.65 * day); U.uFog.value.lerp(_c, wx.ash * 0.7); U.uHor.value.lerp(_c, wx.ash * 0.6); U.uTop.value.lerp(_c, wx.ash * 0.4); }
+    // 地区ごとの空気の色(world-district.js が決める。少しだけ)
+    const dt_ = this.dTint;
+    if (dt_) { U.uFog.value.multiply(dt_.fog); U.uHor.value.lerp(_c.copy(U.uHor.value).multiply(dt_.fog), 0.5); }
     lc(7, U.uSunCol.value);
     U.uCloudCol.value.copy(U.uHor.value).lerp(U.uTop.value, 0.5).multiplyScalar(0.9 + 0.2 * day);
     if (ov > 0) U.uCloudCol.value.lerp(_c2.setRGB(0.3, 0.31, 0.34).multiplyScalar(0.3 + 0.7 * day), ov * 0.6);
@@ -452,6 +455,7 @@ export const Sky = {
       lc(4, Engine.hemi.color); lc(5, Engine.hemi.groundColor);
       grey(Engine.hemi.color, ov * 0.5);
       Engine.hemi.intensity = ln(6) * (1 - ov * 0.18) + flash * 2.6;
+      if (this.dTint) Engine.hemi.color.multiply(this.dTint.light);
       if (flash > 0) Engine.hemi.color.lerp(_c.setRGB(0.8, 0.85, 1), flash * 0.7);
     }
     if (Engine.sun) {
@@ -466,6 +470,7 @@ export const Sky = {
     const M = this.M, win = ln(9), glow = ln(10), pl = ln(11);
     for (const k in this.base) M[k].emissiveIntensity = this.base[k] * win;
     if (M.glow) M.glow.color.setScalar(glow * (1 - ov * 0.15) + 0.1 * ov);
+    if (M.sign) M.sign.color.setScalar(Math.max(0.92, glow * 1.15 + 0.1 * ov));
     if (M.pool) M.pool.color.setScalar(pl * (1 + ov * 0.3));
     if (M.flame) M.flame.color.setScalar(0.7 + nightK * 0.5);
     // ぬれた地面(つやが出て 少し暗い)
