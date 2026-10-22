@@ -52,10 +52,8 @@ export const World = {
     this.grid = Array.from({ length: n * n }, () => []);
     const t0 = performance.now();
     this.generate();
-    const t1 = performance.now();
     this.buildNav();
     this._buildComponents();
-    this._T && this._T.push(t1, performance.now());
     this.genMs = Math.round(performance.now() - t0);
   },
 
@@ -63,9 +61,8 @@ export const World = {
   generate() {
     const S = CONFIG.WORLD_SIZE, h = this.half;
     const q = Engine.quality;
-    const _T = [performance.now()]; const _mk = () => _T.push(performance.now()); this._T = _T;
-    const M0 = {}; makeDistrictMaterials(M0, Engine.renderer, q); _mk();
-    const M = this.M = makeMaterials(Engine.renderer, q); _mk(); Object.assign(M, M0);
+    const M = this.M = makeMaterials(Engine.renderer, q);
+    makeDistrictMaterials(M, Engine.renderer, q);
     const B = new Builder(CHUNK, h), I = new Instancer(CHUNK, h), CB = new Builder(CHUNK * 2, h), SB = new Builder(400, h);
     I.thin = q === 'low' ? 0.45 : q === 'mid' ? 0.8 : 1;
     // ミニマップ
@@ -104,10 +101,10 @@ export const World = {
     defineDistrictProps(ctx);
     Sky.init(this, M);
     if (q !== 'low') this._embers(q === 'high' ? 420 : 260);
-    _mk(); this._ground(ctx, mx, k); _mk();
-    genTown(ctx); _mk();
-    genBuildings(ctx); _mk();
-    genNature(ctx); _mk();
+    this._ground(ctx, mx, k);
+    genTown(ctx);
+    genBuildings(ctx);
+    genNature(ctx);
     // まわりの壁(マップの外へ出ない)
     this.addBox(-h - 2, -h - 2, h + 2, -h, { h: 4, mesh: false });
     this.addBox(-h - 2, h, h + 2, h + 2, { h: 4, mesh: false });
@@ -117,7 +114,7 @@ export const World = {
     I.finish(this.group);
     CB.finish(this.group, { cast: false, recv: false });
     SB.finish(this.group, { cast: false });
-    Brk.finish(this.group); _mk();
+    Brk.finish(this.group);
     this._sky = Sky;
     Life.init(this);
     District.init(this);

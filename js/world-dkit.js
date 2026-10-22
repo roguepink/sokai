@@ -258,13 +258,14 @@ export function neon(ctx, a, b, col, t = 0.09) { beam(ctx.B, ctx.M.glow, a, b, t
 // ---------- ちょうちん・灯籠 ----------
 let _lanternGeo = null, _capGeo = null;
 export function lantern(ctx, x, y, z, s = 1, col = [1.9, 0.28, 0.12]) {
-  if (!_lanternGeo) { _lanternGeo = new THREE.SphereGeometry(0.3, 8, 5); _lanternGeo.scale(1, 1.35, 1); _capGeo = new THREE.CylinderGeometry(0.17, 0.17, 0.1, 8); }
+  if (!_lanternGeo) { _lanternGeo = new THREE.SphereGeometry(0.3, 6, 4); _lanternGeo.scale(1, 1.35, 1); _capGeo = new THREE.CylinderGeometry(0.16, 0.16, 0.95, 5, 1, true); }
   _m.makeScale(s, s, s).setPosition(x, y, z); ctx.B.geom(ctx.M.glow, _lanternGeo, _m, { col });
-  for (const dy of [-0.42, 0.42]) { _m.makeScale(s, s, s).setPosition(x, y + dy * s, z); ctx.B.geom(ctx.M.plain, _capGeo, _m, { col: [0.08, 0.06, 0.05] }); }
+  if (s >= 1) { _m.makeScale(s, s, s).setPosition(x, y, z); ctx.B.geom(ctx.M.plain, _capGeo, _m, { col: [0.08, 0.06, 0.05] }); }
 }
 // ちょうちんの列(ひもで つなぐ)
 export function lanternString(ctx, a, b, sag, step = 1.8, col = null) {
-  const pts = sagLine(a, b, sag, 8);
+  step = Math.max(step, 2.1);
+  const pts = sagLine(a, b, sag, 5);
   for (let k = 0; k < pts.length - 1; k++) beam(ctx.B, ctx.M.plain, pts[k], pts[k + 1], 0.04, [0.12, 0.1, 0.08]);
   const L = Math.hypot(b[0] - a[0], b[2] - a[2]), n = Math.max(1, Math.floor(L / step));
   for (let k = 1; k < n; k++) {
