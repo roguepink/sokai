@@ -35,6 +35,8 @@ const HORDES = [
   { text: '巨大ゾンビの群れ!!', mix: { giant: 0.3, brute: 0.3, walker: 0.4 }, n: 0.45, from: 170 },
 ];
 
+const BOSS_HP = 1 / 3;
+
 export const Director = {
   time: 0,
   _acc: 0,
@@ -60,12 +62,13 @@ export const Director = {
   get nextBossIn() { return Math.max(0, (this._pairT > 0 ? Math.min(this._pairT, this._nextBoss) : this._nextBoss) - this.time); },
   get nextBossType() { return this._nextType; },
   // ボスを出す(体力は時間とともに強く。hpMul で調整)
+  // BOSS_HP: ボスの体力の全体の倍率(ノブさん 2026-10-24「多すぎるから今の 1/3 に」)
   spawnBoss(type, x, z, hpMul = 1) {
     const def = BOSS_TYPES[type]; if (!def) return null;
     const lap = Math.floor(this._bossIdx / BOSS_ORDER.length);
     const e = Zombies.spawn(type, x, z);
     if (e) {
-      e.hp = e.maxHp = Math.round(def.hp * Math.min(2, 1 + this.time / 600) * (1 + lap * 0.2) * hpMul);
+      e.hp = e.maxHp = Math.round(def.hp * BOSS_HP * Math.min(2, 1 + this.time / 600) * (1 + lap * 0.2) * hpMul);
       if (lap > 0) e.name = def.name + ' ' + ['', 'II', 'III', 'IV', 'V'][Math.min(4, lap)];
     }
     return e;
