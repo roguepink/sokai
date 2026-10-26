@@ -1,7 +1,7 @@
 // 武器係: 呼び出すもの — 攻撃ドローン(まわりを飛んで勝手に撃つ)・空爆の戦闘機・酸の水たまり。
 // どれも決まった数の入れ物を使い回す。見た目は InstancedMesh(まとめて 1 回で描く)+ 光の粒。
-import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import * as THREE from '../vendor/three/build/three.module.min.js';
+import { mergeGeometries } from '../vendor/three/addons/utils/BufferGeometryUtils.js';
 import { Zombies } from './zombies.js';
 import { World } from './world.js';
 import { FX } from './fx.js';

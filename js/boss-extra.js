@@ -2,7 +2,7 @@
 //   変異ゴリラ マッドコング(立つと 13m)… 車・バスを 投げる・両こぶし たたき・裏拳・胸をたたいて ほえる・大ジャンプ / 怒り: 突進・3 台 連続投げ
 //   女王ハイブ クイーン(13m)… 酸の玉・卵を投げて 小鬼が わく・かまの十字ぎり・足で つきさす / 怒り: 金切り声・酸の雨
 //   ゾンビ装甲車 デスローダー(長さ 16m)… 突進(ゾンビを ひく)・屋根の大砲・火炎放射 / 怒り: 地雷・回転ドリフト
-import * as THREE from 'three';
+import * as THREE from '../vendor/three/build/three.module.min.js';
 import { World } from './world.js';
 import { FX } from './fx.js';
 import { Engine } from './engine.js';

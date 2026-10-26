@@ -1,6 +1,6 @@
 // 武器係: 銃(押している間ずっと撃つ)・近くの敵は自動で剣・回転斬り(必殺技)・自動で狙う。
 // 武器の数字は weapon-defs.js、見た目は weapon-models.js、飛ぶ弾は weapon-proj.js、ダメージの道具は weapon-hit.js。
-import * as THREE from 'three';
+import * as THREE from '../vendor/three/build/three.module.min.js';
 import { Zombies } from './zombies.js';
 import { World } from './world.js';
 import { Player } from './player.js';

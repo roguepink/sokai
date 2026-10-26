@@ -11,7 +11,7 @@
 //   - e.size(だいたいの高さ m)/ e.bossTier(1〜3)を持つ(画面係・音係用)
 //   - 見下ろしで 大きいボスが近いときは カメラを少し引く(Engine.setZoom)。主人公の前に来ると 体が すける
 // イベント: bossSpawn/bossDeath {name,x,z,e} / bossAct {type, act, x, z, e} / bossPhase / bossFall / heroHit / giantStep
-import * as THREE from 'three';
+import * as THREE from '../vendor/three/build/three.module.min.js';
 import { World } from './world.js';
 import { FX } from './fx.js';
 import { Engine } from './engine.js';

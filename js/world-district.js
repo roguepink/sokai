@@ -4,7 +4,7 @@
 //  - 地区に入ると イベント districtEnter {id, name, theme}(1 回の出入りに 1 回)
 //  - 空気: 寺町 = 桜の花びら / 崩壊地区 = 火の粉と灰が多い・赤茶けた霧 / 繁華街 = 看板のちらつき・紫の霧(夜) など
 //    霧と空の光の色を 地区ごとに少し変える(Sky.dTint)。本物の光は ふやさない
-import * as THREE from 'three';
+import * as THREE from '../vendor/three/build/three.module.min.js';
 import { seeded } from './util.js';
 import { Events } from './events.js';
 import { Engine } from './engine.js';

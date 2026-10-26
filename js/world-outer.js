@@ -4,7 +4,7 @@
 //   東(x > 404): 港。x > 520 は海
 //   南(z > 400): 遊園地(西)と 墓地(東)
 //   西(x < -404): 農場
-import * as THREE from 'three';
+import * as THREE from '../vendor/three/build/three.module.min.js';
 import { road } from './world-zones.js';
 import { decal, pool, lamp, padBox } from './world-town.js';
 import { placeTree, placeFence } from './world-props.js';

@@ -1,7 +1,7 @@
 // マップ係: 空港(北西)と 軍の基地(北東)。川の北。
 //  空港: 滑走路(夜は光る)・誘導路・駐機場の旅客機・墜落した旅客機(燃えている)・ターミナル(中に入れる)・管制塔・格納庫(中に入れる)
 //  軍の基地: 塀と門・見はり塔(サーチライト)・戦車・ジープ・ヘリ・兵舎(中に入れる)・燃料タンクと弾薬(爆発する)・レーダー
-import * as THREE from 'three';
+import * as THREE from '../vendor/three/build/three.module.min.js';
 import { decal, pool, lamp } from './world-town.js';
 import { Bld } from './world-interiors.js';
 import { OUT } from './world-outer.js';

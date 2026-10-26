@@ -1,5 +1,5 @@
 // マップ係: 第2弾の新しい小道具の形(タンクローリー・プロパン・軍用車・戦車・ヘリ・旅客機・燃料タンク・弾薬箱・屋台・ボート・墓石・干し草・トラクター …)。
-import * as THREE from 'three';
+import * as THREE from '../vendor/three/build/three.module.min.js';
 import { makeGeo } from './world-build.js';
 import { PROPS } from './world-props.js';
 

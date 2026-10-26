@@ -3,7 +3,7 @@
 //   処刑人ブッチャー(11m)… 大なたの ふりおろし(長い帯)・なぎはらい・猛突進・かぎ投げ(主人公を引きよせる)/ 怒り: 2 連ぎり・回転ぎり
 //   異形アボミネーション(10m)… 6 本腕の連打・のしかかり・はうゾンビを産む・触手の 3 方向打ち・ゲロ / 怒り: 頭がふえて光る・連打が速い
 //   大這い屍クローラー(長さ 19m)… ジグザグに走る・飛びかかり・かみつき突進・しっぽ払い / 怒り: 背中から はうゾンビ・連続とびかかり
-import * as THREE from 'three';
+import * as THREE from '../vendor/three/build/three.module.min.js';
 import { FX } from './fx.js';
 import { Engine } from './engine.js';
 import { Gore } from './zombie-gore.js';

@@ -1,7 +1,7 @@
 // 武器係: 銃の見た目(three.js の形を組み合わせて作る。画像は使わない)。
 // 作るときの向き: 銃口は -z、上は +y、にぎる所が (0,0,0)。最後に手の向きに合わせて回す。
-import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import * as THREE from '../vendor/three/build/three.module.min.js';
+import { mergeGeometries } from '../vendor/three/addons/utils/BufferGeometryUtils.js';
 
 // 材質は 2 組: 世界に置く銃(主人公の手)と、一人称の手元の銃(別の光で描くので分ける)
 const MS = { world: {}, vm: {} };

@@ -1,7 +1,7 @@
 // キャラ係: ゾンビの体を描く。
 // 体(生きている・死体)は「体の記録」(使い回しの入れ物)に入っていて、関節の角度から 部位ごとの位置を計算し、
 // 部位ごとの InstancedMesh(全部で 9 つ)に まとめて書きこむ。画面の外は計算も描画もしない。遠いものは間引く。
-import * as THREE from 'three';
+import * as THREE from '../vendor/three/build/three.module.min.js';
 import { CONFIG } from './config.js';
 import { Engine } from './engine.js';
 import { buildAtlas, buildGeometries, makeZombieMaterial, makePartMesh, TILE } from './zombie-models.js';

@@ -1,7 +1,7 @@
 // マップ係: 中に入れる大きな建物(モール・病院・警察署・スーパー・倉庫・工場・体育館・ガソリンスタンド・家・山小屋)。
 // 入口は広い(4m 以上)ので、ゾンビの大群がなだれこむ。中は部屋・仕切り・家具(当たり判定あり)。
 // 屋根は建物ごとのメッシュ。主人公が中に入ると World.update が消す(roofs)。
-import * as THREE from 'three';
+import * as THREE from '../vendor/three/build/three.module.min.js';
 import { Builder } from './world-build.js';
 import { cutout } from './world-tex.js';
 import { PROPS, placeTree } from './world-props.js';

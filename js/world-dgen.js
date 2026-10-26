@@ -1,6 +1,6 @@
 // マップ係(第4弾・街並み): 地区ごとの区画の中身(その1)。ネオン繁華街・中華街・下町商店街・地区の入口の門・歩道の小物・道の車。
 // 寺町・オフィス街・崩壊地区は world-dgen2.js。
-import * as THREE from 'three';
+import * as THREE from '../vendor/three/build/three.module.min.js';
 import { fbuild, sode, wallSign, billboard, neon, lantern, lanternString, beam, sagLine, withMatrix, patch, hip, torii, gable, PAD_H, Builder } from './world-dkit.js';
 import { SG, signsOf, FT, signUV as signUVOf } from './world-dtex.js';
 import { DSTYLE, districtAt, cellOf, districtOfCell, EDGES } from './world-district.js';

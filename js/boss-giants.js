@@ -4,7 +4,7 @@
 //   首なし騎士(12m・巨大な骨の馬)… 槍の突撃(とても長い帯)・前足ふみつけ・燃えるドクロ投げ・槍の なぎはらい / 怒り: 走ったあとに 緑の火・ドクロ 3 連
 //   合体ゾンビ レギオン(15m)… 何百ものゾンビが くっついた巨体。撃つと ゾンビが はがれて落ちる(だんだん小さくなる)
 //                               のしかかり・腕の群れ・肉のかたまり投げ(ゾンビがわく)/ 怒り: ゾンビの波・体が はじける
-import * as THREE from 'three';
+import * as THREE from '../vendor/three/build/three.module.min.js';
 import { World } from './world.js';
 import { FX } from './fx.js';
 import { Engine } from './engine.js';

@@ -5,7 +5,7 @@
 //   world-town.js 町 / world-interiors.js 中に入れる建物 / world-nature.js 森・公園・住宅地・工場地帯
 //   第4弾: 町は 地区に分かれる(world-district.js 地区の地図と空気 / world-dtex.js 壁と看板の絵 / world-dkit.js 建物の道具 /
 //          world-dgen.js 繁華街・中華街・下町・門 / world-dgen2.js 寺町・オフィス街・崩壊地区・中に入れる店)
-import * as THREE from 'three';
+import * as THREE from '../vendor/three/build/three.module.min.js';
 import { CONFIG } from './config.js';
 import { seeded } from './util.js';
 import { Engine } from './engine.js';

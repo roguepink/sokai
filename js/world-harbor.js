@@ -1,5 +1,5 @@
 // マップ係: 港(東の海ぞい)。コンテナ置き場・巨大なクレーン・コンテナ船・港の倉庫(中に入れる)・燃料タンク群・桟橋・灯台・砂浜。
-import * as THREE from 'three';
+import * as THREE from '../vendor/three/build/three.module.min.js';
 import { road } from './world-zones.js';
 import { decal, pool, lamp } from './world-town.js';
 import { Bld } from './world-interiors.js';

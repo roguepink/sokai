@@ -2,7 +2,7 @@
 // すばやく 2 回押す(ダッシュ中にもう一度)=「ジャンプ叩きつけ」: 高く跳んで 地面に たたきつけ、まわりを まとめて吹きとばす。
 // 光の帯(走った跡)も ここで描く。Player.update から呼ばれる(Player.moves)。
 // イベント: dash {x,z,dirX,dirZ} / dashHit {x,z,hits,kills} / slam {x,z,radius,kills} / slamJump {x,z}
-import * as THREE from 'three';
+import * as THREE from '../vendor/three/build/three.module.min.js';
 import { CONFIG } from './config.js';
 import { World } from './world.js';
 import { Engine } from './engine.js';

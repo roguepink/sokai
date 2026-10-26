@@ -4,7 +4,7 @@
 //  - 入れ物(配列)は最初に作って使い回す。毎フレーム new しない
 //  - 点光源は最初に決まった数だけ作り、明るさだけ変えて使い回す(数を変えると固まるため)
 // 色は 0xRRGGBB。明るさ k を 1 より大きくすると、画面効果(光のにじみ)で輝く。
-import * as THREE from 'three';
+import * as THREE from '../vendor/three/build/three.module.min.js';
 import { Engine } from './engine.js';
 import { Events } from './events.js';
 import * as SH from './fx-shaders.js';

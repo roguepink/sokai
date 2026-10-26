@@ -7,13 +7,71 @@
   "scope": "./",
   "id": "./?app=sokai-1",
   "display": "standalone",
-  "display_override": ["fullscreen", "standalone"],
+  "display_override": [
+    "fullscreen",
+    "standalone"
+  ],
   "orientation": "landscape",
   "background_color": "#120808",
   "theme_color": "#120808",
   "icons": [
-    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "shots/1.jpg",
+      "sizes": "779x360",
+      "type": "image/jpeg",
+      "form_factor": "wide",
+      "label": "町でゾンビの大群と戦う"
+    },
+    {
+      "src": "shots/2.jpg",
+      "sizes": "779x360",
+      "type": "image/jpeg",
+      "form_factor": "wide",
+      "label": "肩越し視点"
+    },
+    {
+      "src": "shots/3.jpg",
+      "sizes": "779x360",
+      "type": "image/jpeg",
+      "form_factor": "wide",
+      "label": "ボス撃破!"
+    },
+    {
+      "src": "shots/4.jpg",
+      "sizes": "779x360",
+      "type": "image/jpeg",
+      "form_factor": "wide",
+      "label": "一人称視点"
+    },
+    {
+      "src": "shots/5.jpg",
+      "sizes": "779x360",
+      "type": "image/jpeg",
+      "form_factor": "wide",
+      "label": "夜の雷雨"
+    }
+  ],
+  "categories": [
+    "games"
   ]
 }

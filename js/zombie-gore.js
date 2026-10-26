@@ -4,7 +4,7 @@
 //   回転斬り = 外へ大きく飛ばされる / ショットガン = 後ろへ吹っとぶ / 火 = 燃えながら くずれる / 凍る = こなごなに砕ける
 // - ばらばらの部位(頭・腕・脚)が飛んで はねて 転がる / 肉片・氷のかけら / 地面の血だまり
 // すべて 決まった数の入れ物を使い回す(倒すたびに new しない)。
-import * as THREE from 'three';
+import * as THREE from '../vendor/three/build/three.module.min.js';
 import { World } from './world.js';
 import { FX } from './fx.js';
 import { Engine } from './engine.js';

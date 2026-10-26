@@ -1,6 +1,6 @@
 // マップ係: ダウンタウン(碁盤の目の道路・歩道・高いビル・広場・道の小物)と、高架道路。
 // 中に入れる大きな建物(モール・病院 …)は world-interiors.js。ここでは その区画をあけておく。
-import * as THREE from 'three';
+import * as THREE from '../vendor/three/build/three.module.min.js';
 import { cutout } from './world-tex.js';
 import { placeTree, placeGlass } from './world-props.js';
 import { Builder } from './world-build.js';

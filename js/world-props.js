@@ -1,6 +1,6 @@
 // マップ係: 小道具の形(車・街灯・ドラム缶・土のう・家具・木 …)と、置く道具。
 // 小道具は Builder でまとめ描き(区画ごとに 1 回で描ける)。木・岩はたくさんなので InstancedMesh。
-import * as THREE from 'three';
+import * as THREE from '../vendor/three/build/three.module.min.js';
 import { makeGeo, col3 } from './world-build.js';
 import { seeded } from './util.js';
 import { Brk, KINDS } from './world-break.js';

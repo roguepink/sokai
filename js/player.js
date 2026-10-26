@@ -1,6 +1,6 @@
 // 主人公: 見た目・移動・向き・動き(剣をふる・回転斬り・撃った反動)。体力は無限(死なない)。
 // 見た目: 黒い戦闘スーツ + 赤い装甲 + 光るバイザーのヘルメット + 赤いマフラー。左手に光る剣、右手に銃(武器係が持たせる)。
-import * as THREE from 'three';
+import * as THREE from '../vendor/three/build/three.module.min.js';
 import { CONFIG } from './config.js';
 import { World } from './world.js';
 import { Engine } from './engine.js';

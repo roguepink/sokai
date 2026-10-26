@@ -3,7 +3,7 @@
 //  - 看板: sode(壁から突き出た縦の看板)/ wallSign(壁に貼る)/ billboard(屋上の広告)/ neon(光る管)
 //  - patch: 4 すみの点で決まる面に マスを並べる(屋根・塔)。withMatrix: 傾いた建物など(作ってから まとめて動かす)
 //  - 新しい小道具(タクシー・スクーター・自転車・軽トラ・人力車・自販機・灯籠・電柱・狛犬)と 桜の木
-import * as THREE from 'three';
+import * as THREE from '../vendor/three/build/three.module.min.js';
 import { Builder, makeGeo } from './world-build.js';
 import { PROPS } from './world-props.js';
 import { tileUV, signUV } from './world-dtex.js';

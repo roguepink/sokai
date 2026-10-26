@@ -2,7 +2,7 @@
 //  - 観覧車・ジェットコースター・メリーゴーランド・フリーフォール・風車・レーダー・灯台の光・見はり塔のサーチライト・管制塔の赤い灯
 //  - ときどき: ヘリが上を飛ぶ(夜はサーチライト)/ カラスの群れ(近づく・爆発で にげる)/ 遠くの爆発 / 電線の火花 / パトカーの赤と青
 //  - 近くの物だけ動かす(遠い物は止めておく)
-import * as THREE from 'three';
+import * as THREE from '../vendor/three/build/three.module.min.js';
 import { Engine } from './engine.js';
 import { Events } from './events.js';
 import { makeGeo } from './world-build.js';

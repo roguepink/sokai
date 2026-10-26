@@ -4,7 +4,7 @@
 // - 手元の武器は 世界の座標に置く(カメラと同じ位置・向きの小さな舞台)。なので 銃口の位置から弾を飛ばせる
 // - 歩くと上下にゆれる / 向きを変えると少し遅れてついてくる / 撃つと反動で はねる / 銃口の火 / 剣の光の弧 / 回転斬り
 // 毎フレーム new しない。光の数は変えない(2 + 銃口の光 1)。
-import * as THREE from 'three';
+import * as THREE from '../vendor/three/build/three.module.min.js';
 import { Engine } from './engine.js';
 import { Player } from './player.js';
 import { WEAPONS } from './weapon-defs.js';

@@ -1,5 +1,5 @@
 // マップ係: 住宅街(西)と 工場地帯(東)。
-import * as THREE from 'three';
+import * as THREE from '../vendor/three/build/three.module.min.js';
 import { placeTree, placeFence } from './world-props.js';
 import { house } from './world-interiors.js';
 import { decal, pool, lamp, tower } from './world-town.js';

@@ -1,5 +1,5 @@
 // マップ係: 森(北と外まわり)・湖・山小屋・キャンプ場・公園(南)・学校。住宅街と工場地帯は world-zones.js。
-import * as THREE from 'three';
+import * as THREE from '../vendor/three/build/three.module.min.js';
 import { placeTree } from './world-props.js';
 import { cabin } from './world-interiors.js';
 import { decal, pool, lamp, tower, TOWN } from './world-town.js';

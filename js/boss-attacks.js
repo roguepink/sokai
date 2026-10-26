@@ -1,7 +1,7 @@
 // キャラ係: ボスの攻撃の道具。地面たたき(衝撃波)・帯・扇・足音・咆哮・光線、投げる物(岩・車・バス・火の玉・ミサイル・酸・糸・卵 …)。
 // 主人公に当たると Player.knock で吹っとばし、イベント heroHit {x,z,force,boss,dirX,dirZ,kind} を出す。
 // まわりのゾンビ・こわせる物も まきこむ(ボス自身・ほかのボスには当たらない cause を使う = BOSS_CAUSES)。
-import * as THREE from 'three';
+import * as THREE from '../vendor/three/build/three.module.min.js';
 import { World } from './world.js';
 import { FX } from './fx.js';
 import { Engine } from './engine.js';

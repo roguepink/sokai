@@ -1,7 +1,7 @@
 // キャラ係: ボスの攻撃の「予告」(地面の赤い印)。円・帯(まっすぐ)・扇。
 // 1 ステップごとに出しなおす(出し続けている間だけ見える)。p = 0..1 の ため具合(中が満ちていき、1 で攻撃が来る)。
 // 1 つの InstancedMesh で全部を描く(描く回数 1)。
-import * as THREE from 'three';
+import * as THREE from '../vendor/three/build/three.module.min.js';
 
 const MAX = 64;
 const VS = /* glsl */`

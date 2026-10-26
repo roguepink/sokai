@@ -2,7 +2,7 @@
 //  Builder  … 動かない形(箱・板・円柱など)を「区画 × 材質」ごとに 1 つのメッシュへまとめる(描く回数を減らす)
 //  Instancer … 同じ形をたくさん(木・車・街灯…)を「区画 × 種類」ごとに InstancedMesh にする
 // どちらも区画(チャンク)ごとに分けるので、画面の外の区画は描かれない(視錐台カリング)。
-import * as THREE from 'three';
+import * as THREE from '../vendor/three/build/three.module.min.js';
 
 const _c = new THREE.Color();
 const _v = new THREE.Vector3();

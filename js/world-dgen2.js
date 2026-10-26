@@ -1,6 +1,6 @@
 // マップ係(第4弾・街並み): 地区ごとの区画の中身(その2)。寺町・オフィス街・崩壊地区と、中に入れる店(パチンコ店・中華料理店)。
 // 区画の番号(i = 西→東, j = 北→南)ごとに genPad が 作る物を決める。
-import * as THREE from 'three';
+import * as THREE from '../vendor/three/build/three.module.min.js';
 import { fbuild, faces, patch, hip, gable, torii, sode, wallSign, billboard, neon, lantern, withMatrix, quad4, beam, PAD_H } from './world-dkit.js';
 import { SG, signsOf, tileUV, signUV as signUVOf } from './world-dtex.js';
 import { DSTYLE } from './world-district.js';

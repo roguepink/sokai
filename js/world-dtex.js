@@ -2,7 +2,7 @@
 //  - FAC(壁と屋根): 1024×1024 を 8×8 マス(1 マス = 窓 1 つ分の壁 / 店先 1 軒 / 屋根の瓦)。光る窓は emissive の絵
 //  - SGN(看板): 縦の看板 32 枚・横の看板 16 枚・大きな広告 8 枚。日本語の文字(店の名前はすべて架空)
 // 材質は 2 つだけ(M.facade / M.sign)。どの地区の建物も同じ材質なので、描く回数が ふえない。
-import * as THREE from 'three';
+import * as THREE from '../vendor/three/build/three.module.min.js';
 import { seeded } from './util.js';
 import { cutout, CUT } from './world-tex.js';
 

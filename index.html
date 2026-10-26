@@ -91,15 +91,17 @@
   </div>
 </div>
 
-<script type="importmap">
-{ "imports": { "three": "./vendor/three/build/three.module.min.js", "three/addons/": "./vendor/three/addons/" } }
-</script>
 <script>
   // 起動に失敗したときの案内(古いブラウザなど)
   window.addEventListener('error', function (e) {
     var l = document.getElementById('loading'), t = document.getElementById('loadText');
     if (l && t && !l.classList.contains('hidden')) t.textContent = 'うまく起動できませんでした。ブラウザを新しくするか、Chrome / Safari で開いてください。';
   });
+  // 古い iPhone(iOS 16.4 より前)では 3D の部品が読めず 起動しない。15 秒たっても始まらなければ 案内を出す
+  setTimeout(function () {
+    var l = document.getElementById('loading'), t = document.getElementById('loadText');
+    if (!window.__game && l && t && !l.classList.contains('hidden')) t.innerHTML = 'このスマホでは 3D が動きませんでした。<br>iPhone は「設定 → 一般 → ソフトウェアアップデート」で 新しくすると遊べます(iOS 16.4 以上)。';
+  }, 15000);
   // オフライン用: 一度開いたら、読みこんだファイルを全部 覚えてもらう(sw.js)
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || /[#&]sw\b/.test(location.hash))) {   // #sw = 手元で確認するとき
     navigator.serviceWorker.register('sw.js').catch(function () {});
@@ -114,6 +116,19 @@
     });
   }
 </script>
+<script>
+  // はじめの画面(Google Play 風: インストールして遊ぶ / このまま遊ぶ)。install.js が出す
+  window.INSTALL_GATE = {
+    id: 'sokai', name: '爽快ゾンビ無双', icon: 'icon-192.png', color: '#ff5a1f',
+    tagline: '3Dの ゾンビ無双アクション',
+    badges: ['無料', '広告なし', '登録なし', 'スマホは横向き'],
+    shots: ['shots/1.jpg', 'shots/2.jpg', 'shots/3.jpg', 'shots/4.jpg', 'shots/5.jpg'],
+    desc: '最初から最強で、絶対に死なない主人公になって、押しよせるゾンビの大群をなぎ倒し続ける3Dアクション。撃つボタンを押している間は、どの武器も撃ちっぱなし。終わりはなく、飽きるまで遊べます。',
+    points: ['31種類の武器が 最初から全部使える', '巨大ボス16体・倒すと JACKPOT', '町・森・港・遊園地まで広がるマップ。見下ろし・肩越し・一人称の3つの視点'],
+    playLabel: '▶ このまま遊ぶ'
+  };
+</script>
+<script src="install.js"></script>
 <script type="module" src="js/main.js"></script>
 </body>
 </html>

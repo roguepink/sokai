@@ -2,7 +2,7 @@
 // 画角のパンチ(爆発・回転斬り・叩きつけ・ダッシュ)/ カメラのかたむき / 視点ごとの画面ゆれ / 撃った反動 /
 // タイトルの見本プレイで ときどき出す「映画のような低い角度」の見せ場。
 // Engine.updateCamera から呼ばれる。見下ろし(top)のカメラは engine.js のまま。
-import * as THREE from 'three';
+import * as THREE from '../vendor/three/build/three.module.min.js';
 import { CONFIG } from './config.js';
 import { World } from './world.js';
 import { Events } from './events.js';

@@ -1,6 +1,6 @@
 import {
 	Color
-} from 'three';
+} from '../../build/three.module.min.js';
 import { Pass } from './Pass.js';
 
 /**

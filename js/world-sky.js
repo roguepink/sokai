@@ -4,7 +4,7 @@
 //  - 時間: World.timeOfDay 0..1(0 = 昼 / 0.25 = 夕方 / 0.5 = 真夜中 / 0.75 = 夜明け)。1 周 CYCLE 秒
 //  - 光の数は変えない。太陽(夜は月の光)と空の光の 色と明るさだけ変える。街灯・窓・ネオンは光る色の強さで
 //  - 変わったらイベント worldChange {timeOfDay, weather, text, phase}
-import * as THREE from 'three';
+import * as THREE from '../vendor/three/build/three.module.min.js';
 import { Engine } from './engine.js';
 import { Events } from './events.js';
 import { seeded } from './util.js';

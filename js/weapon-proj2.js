@@ -1,8 +1,8 @@
 // 武器係: 第2弾の 飛んでいく物 — 丸ノコ(壁ではね返る)・爆発ボウガンの矢(刺さって爆発)・戦車砲の弾・
 // 空爆の爆弾・隕石・酸のかたまり・手裏剣(追いかける)・竜巻(吸いこんで 空へ放り投げる)。
 // 入れ物は weapon-proj.js の Proj と共通(Proj.spawn で作り、ここで動かす)。見た目は InstancedMesh + 光の粒。
-import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import * as THREE from '../vendor/three/build/three.module.min.js';
+import { mergeGeometries } from '../vendor/three/addons/utils/BufferGeometryUtils.js';
 import { Zombies } from './zombies.js';
 import { World } from './world.js';
 import { FX } from './fx.js';

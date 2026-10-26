@@ -5,9 +5,9 @@
    - ゲームを直しただけなら VERSION は そのままでいい
    - FILES(覚えるファイル)を足したり消したりしたら VERSION を 1つ上げる(古い覚えを 一斉に捨てる)
    - FILES に書き忘れたファイルも、ページが「読みこんだもの一覧」を送ってくるので覚えられる(index.html) */
-const VERSION = 'sokai-v4';
+const VERSION = 'sokai-v5';
 const FILES = [
-  './', 'index.html', 'manifest.webmanifest', 'css/style.css', 'css/view.css',
+  './', 'index.html', 'install.js', 'shots/1.jpg', 'shots/2.jpg', 'shots/3.jpg', 'shots/4.jpg', 'shots/5.jpg', 'manifest.webmanifest', 'css/style.css', 'css/view.css',
   'icon-192.png', 'icon-512.png', 'maskable-512.png', 'apple-touch-icon.png',
   'js/audio-bgm.js', 'js/audio-sfx2.js', 'js/audio-world.js', 'js/audio.js', 'js/boss-extra.js', 'js/boss.js',
   'js/config.js', 'js/director.js', 'js/engine.js', 'js/events.js', 'js/fx-shaders.js', 'js/fx.js',

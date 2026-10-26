@@ -5,7 +5,7 @@
 //   kind: 'supply' 'supplyOpen' 'supplyLost' 'golden' 'goldenDown' 'goldenEscape' 'march' 'airstrike' 'airstrikeDone'
 //         'bossrush' 'tsunami' 'skyfall' 'challenge' 'challengeClear' 'challengeFail' 'discover'
 // 画面係は Happenings.markers(ミニマップの印)と Happenings.challenge(チャレンジの残り)を見る。
-import * as THREE from 'three';
+import * as THREE from '../vendor/three/build/three.module.min.js';
 import { Zombies } from './zombies.js';
 import { World } from './world.js';
 import { Events } from './events.js';

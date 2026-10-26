@@ -4,8 +4,8 @@
 // - 1 体ずつ 色・模様・光り方を変えるためのシェーダーの追加
 // 絵の 1 マスの中: 横 = 体のまわり(左端 = 背中, 真ん中 = 正面), 縦 = 上が部位の上。
 // 透明度(alpha)は「色のつけ方」: 0 = 肌の色をかける, 0.5 = 絵の色そのまま, 1 = 服の色をかける。
-import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import * as THREE from '../vendor/three/build/three.module.min.js';
+import { mergeGeometries } from '../vendor/three/addons/utils/BufferGeometryUtils.js';
 import { seeded } from './util.js';
 
 const T = 128;            // 1 マスの大きさ(px)

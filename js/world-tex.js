@@ -1,7 +1,7 @@
 // マップ係: canvas で描く模様(テクスチャ)と、マップで使う材質(マテリアル)。
 // 画像ファイルは使わない。起動時に1回だけ描く。
 // 「透かし」(cutout): 主人公と カメラの間にある 壁・ビル・木 を、主人公のまわりだけ 丸く 透かして見せる。
-import * as THREE from 'three';
+import * as THREE from '../vendor/three/build/three.module.min.js';
 import { seeded } from './util.js';
 
 // 透かしの中心(主人公の位置)と 半径(画面上の大きさ。tan 単位)。World.update が毎フレーム入れる

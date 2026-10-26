@@ -4,8 +4,8 @@
 // 使い方(各ボスの build で):
 //   const R = new Rig(m); const hips = R.bone(null, 0, 2, 0); R.add(hips, geo, mat, x, y, z, rx, ry, rz, sx, sy, sz); … R.finish();
 //   設計の大きさ(人 1 体ぶん くらい)で作り、m.S(拡大率)で 怪獣の大きさにする。
-import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import * as THREE from '../vendor/three/build/three.module.min.js';
+import { mergeGeometries } from '../vendor/three/addons/utils/BufferGeometryUtils.js';
 import { lathe, sstep } from './zombie-models.js';
 
 export { lathe, sstep };

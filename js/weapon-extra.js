@@ -1,6 +1,6 @@
 // 武器係: 第2弾の武器の「撃ち方」。weapons.js の _fire / _stream から呼ばれる。
 // W = Weapons(狙い・銃口などの道具を持っている)、w = 武器の数字(フィーバー中は強くした写し)
-import * as THREE from 'three';
+import * as THREE from '../vendor/three/build/three.module.min.js';
 import { Zombies } from './zombies.js';
 import { World } from './world.js';
 import { FX } from './fx.js';

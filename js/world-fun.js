@@ -1,6 +1,6 @@
 // マップ係: 遊園地(南西)。観覧車・ジェットコースター・メリーゴーランド・フリーフォール・ゴーカート場・サーカスのテント・屋台。
 // 動く物(観覧車・コースター・メリーゴーランド・フリーフォール)は ここで形を作り、world-life.js が動かす。
-import * as THREE from 'three';
+import * as THREE from '../vendor/three/build/three.module.min.js';
 import { makeGeo } from './world-build.js';
 import { decal, pool, lamp } from './world-town.js';
 import { OUT } from './world-outer.js';

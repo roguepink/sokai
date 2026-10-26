@@ -1,7 +1,7 @@
 // 武器係: 飛んでいく弾(手榴弾・グレネード・ロケット・ミサイル・プラズマ・ブラックホール)。
 // 入れ物は最初に作って使い回す。見た目は InstancedMesh(同じ形をまとめて描く)+ 光の粒。
-import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import * as THREE from '../vendor/three/build/three.module.min.js';
+import { mergeGeometries } from '../vendor/three/addons/utils/BufferGeometryUtils.js';
 import { Zombies } from './zombies.js';
 import { World } from './world.js';
 import { FX } from './fx.js';

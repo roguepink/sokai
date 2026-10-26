@@ -4,7 +4,7 @@
 //   女郎ぐも(足 18m)… 糸の玉(ゾンビが からまって 止まる)・大ジャンプ・足の連続つき・子ぐもゾンビ / 怒り: 毒の霧・糸の嵐
 //   メカ屍(14m)… ミサイルの雨・光線・ガトリング・ジェットで飛んで ふみつけ・爪 / 怒り: ミサイル倍・電気の衝撃波
 //   暴走ゾンビ列車(長さ 50m)… 画面を横切って 突っこんでくる(長い帯の予告)・大きく回って また来る・客車から ゾンビ / 怒り: 大砲・燃える線路
-import * as THREE from 'three';
+import * as THREE from '../vendor/three/build/three.module.min.js';
 import { World } from './world.js';
 import { FX } from './fx.js';
 import { Engine } from './engine.js';

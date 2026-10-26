@@ -3,7 +3,7 @@
 //  - World.damage(x, z, r, amount, {cause}) で 8m マスの地図から近い物だけ さがす(弾のたびに呼んでも軽い)
 //  - 爆発する物は FX.explosion・Zombies.damageCircle を呼び、イベント propExplode {x,z,radius,kind}。となりの物に 少しおくれて 燃え移る(連鎖)
 //  - こわれた車は 黒こげの残骸になって燃える(ぶつかり判定は そのまま)。小さい物は消えて、通れるようになる(道さがし地図も直す)
-import * as THREE from 'three';
+import * as THREE from '../vendor/three/build/three.module.min.js';
 import { Engine } from './engine.js';
 import { Events } from './events.js';
 

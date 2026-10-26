@@ -2,7 +2,7 @@
 // - 見た目: 部位ごとの InstancedMesh(zombie-render.js / zombie-models.js)、動き: zombie-anim.js
 // - 倒れ方・血・ばらばら: zombie-gore.js、道さがし: zombie-flow.js、ボス: boss.js
 // 約束(API)は CLAUDE.md のとおり。list / spawn / count / queryCircle / nearest / raycast / damage / damageCircle / TYPES / reset
-import * as THREE from 'three';
+import * as THREE from '../vendor/three/build/three.module.min.js';
 import { CONFIG } from './config.js';
 import { World } from './world.js';
 import { Events } from './events.js';
