@@ -8,6 +8,10 @@
  *     badges:['無料','広告なし','登録なし'], color:'#ff5a1f', onPlay: function(){} };</script>
  *   <script src="install.js"></script>
  *
+ * - 英語のアプリは lang:'en' を足す(はじめの画面の文字・案内が英語になる)。書かなければ 日本語(今までどおり)
+ * - shield:true を足すと、はじめの画面・案内にふれても うしろのアプリに伝えない(「このまま…」のボタンだけは伝える)。
+ *   画面のどこにふれても反応するアプリ(一灯・ひとくべ など「ふれると灯る」もの)用。書かなければ 今までどおり
+ * - laterLabel:'あとで(このまま見る)' で、案内の「あとで(このまま遊ぶ)」の文字を変えられる(見るアプリ・使うアプリ用)
  * - ホーム画面から開いたとき(インストール済み)は 出さない
  * - アドレスに #play / #auto / #noinstall があるときも出さない(確認用)
  * - Android の Chrome: 本物のインストール画面を出す(1回押すだけ)
@@ -29,6 +33,7 @@
     (window.matchMedia && window.matchMedia('(display-mode: fullscreen)').matches) || navigator.standalone === true;
   var hash = location.hash || '';
   var deferred = null;
+  var EN = C.lang === 'en';   // 英語のアプリ(2026-10-26 one candle のために足した。日本語のときは今までと同じ)
 
   // Chrome が「インストールできます」と知らせてきたら、取っておく(ボタンを押したときに出す)
   window.addEventListener('beforeinstallprompt', function (e) {
@@ -39,6 +44,17 @@
 
   function hidden() { try { return localStorage.getItem(KEY) === '1'; } catch (e) { return false; } }
   if (standalone || /play|auto|noinstall/.test(hash) || hidden()) return;
+
+  // shield: はじめの画面・案内にふれても、うしろのアプリ(window で pointerup などを見ているもの)に伝えない。
+  // 「このまま…」のボタン(igPlay / igHelpPlay)だけは伝える → そのタップで アプリが始まり、iPhone でも音を出せる
+  if (C.shield) {
+    ['pointerdown', 'pointerup', 'click', 'touchstart', 'touchend', 'mousedown', 'mouseup'].forEach(function (t) {
+      document.addEventListener(t, function (e) {
+        var el = e.target;
+        if (el && el.closest && el.closest('#igGate, #igHelp') && !el.closest('#igPlay, #igHelpPlay')) e.stopPropagation();
+      });
+    });
+  }
 
   // ---------- 見た目 ----------
   var col = C.color || '#ff2e88';
@@ -91,22 +107,23 @@
 
   function build() {
     var st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
-    var g = document.createElement('div'); g.id = 'igGate'; g.setAttribute('role', 'dialog'); g.setAttribute('aria-label', (C.name || '') + ' のはじめの画面');
+    var g = document.createElement('div'); g.id = 'igGate'; g.setAttribute('role', 'dialog'); g.setAttribute('aria-label', EN ? (C.name || '') + ' start screen' : (C.name || '') + ' のはじめの画面');
+    if (EN) g.setAttribute('lang', 'en');
     var shots = (C.shots || []).map(function (s) { return '<img src="' + esc(s) + '" alt="" loading="lazy">'; }).join('');
-    var badges = (C.badges || ['無料', '広告なし', '登録なし']).map(function (b) { return '<span>' + esc(b) + '</span>'; }).join('');
+    var badges = (C.badges || (EN ? ['Free', 'No ads', 'No sign-up'] : ['無料', '広告なし', '登録なし'])).map(function (b) { return '<span>' + esc(b) + '</span>'; }).join('');
     var pts = (C.points || []).map(function (p) { return '<li>' + esc(p) + '</li>'; }).join('');
     g.innerHTML = '<div class="ig-wrap">' +
       '<div class="ig-head"><img class="ig-icon" src="' + esc(C.icon || 'icon-192.png') + '" alt="">' +
       '<div><h1 class="ig-name">' + esc(C.name || document.title) + '</h1><p class="ig-dev">ROGUE PINK</p>' +
       (C.tagline ? '<p class="ig-tag">' + esc(C.tagline) + '</p>' : '') + '</div></div>' +
       '<div class="ig-badges">' + badges + '</div>' +
-      '<div class="ig-btns"><button id="igInstall" class="ig-btn ig-main" type="button">📲 インストール</button>' +
-      '<button id="igPlay" class="ig-btn ig-sub" type="button">' + esc(C.playLabel || '▶ このまま遊ぶ') + '</button></div>' +
-      '<p class="ig-note">インストールすると、ホーム画面から すぐ開けて、電波がなくても使えます(無料・数MB)</p>' +
+      '<div class="ig-btns"><button id="igInstall" class="ig-btn ig-main" type="button">' + (EN ? '📲 Install' : '📲 インストール') + '</button>' +
+      '<button id="igPlay" class="ig-btn ig-sub" type="button">' + esc(C.playLabel || (EN ? '▶ Play now' : '▶ このまま遊ぶ')) + '</button></div>' +
+      '<p class="ig-note">' + (EN ? 'Install it to open it from your home screen in one tap, even offline (free, a few MB).' : 'インストールすると、ホーム画面から すぐ開けて、電波がなくても使えます(無料・数MB)') + '</p>' +
       (shots ? '<div class="ig-shots">' + shots + '</div>' : '') +
       (C.desc ? '<p class="ig-desc">' + esc(C.desc) + '</p>' : '') +
       (pts ? '<ul class="ig-points">' + pts + '</ul>' : '') +
-      '<div class="ig-foot"><button id="igHide" type="button">次から この画面を出さない</button></div>' +
+      '<div class="ig-foot"><button id="igHide" type="button">' + (EN ? "Don't show this again" : '次から この画面を出さない') + '</button></div>' +
       '</div>';
     document.body.appendChild(g);
     document.getElementById('igPlay').onclick = function () { close(); };
@@ -148,6 +165,7 @@
 
   function help(inApp) {
     var steps, title = 'ホーム画面に入れる方法', arrow = '';
+    if (EN) return helpEn(inApp);
     if (inApp) {
       title = 'まず ブラウザで開きます';
       steps = isLine ? ['下の「<b>ブラウザで開く</b>」を押す(' + (isIOS ? 'Safari' : 'Chrome') + ' で開きます)', '開いたら、もう一度「📲 インストール」を押す']
@@ -166,8 +184,39 @@
     var h = document.createElement('div'); h.id = 'igHelp';
     h.innerHTML = '<div class="ig-card"><h3>' + title + '</h3>' +
       steps.map(function (s, i) { return '<div class="ig-step"><span class="ig-num">' + (i + 1) + '</span><span>' + s + '</span></div>'; }).join('') +
-      '<div class="ig-btns"><button id="igHelpPlay" class="ig-btn ig-sub" type="button">あとで(このまま遊ぶ)</button>' +
+      '<div class="ig-btns"><button id="igHelpPlay" class="ig-btn ig-sub" type="button">' + esc(C.laterLabel || 'あとで(このまま遊ぶ)') + '</button>' +
       (inApp && isLine ? '<button id="igOpenOut" class="ig-btn ig-main" type="button">ブラウザで開く</button>' : '<button id="igHelpOk" class="ig-btn ig-main" type="button">わかった</button>') +
+      '</div></div>' + arrow;
+    var old = document.getElementById('igHelp'); if (old) old.parentNode.removeChild(old);
+    document.body.appendChild(h);
+    var ok = document.getElementById('igHelpOk'); if (ok) ok.onclick = function () { h.parentNode.removeChild(h); };
+    var out = document.getElementById('igOpenOut'); if (out) out.onclick = function () { openOutside(); };
+    document.getElementById('igHelpPlay').onclick = function () { close(); };
+  }
+
+  // 英語の案内(lang:'en' のときだけ。中身は help と同じ)
+  function helpEn(inApp) {
+    var steps, title = 'Add to your home screen', arrow = '';
+    if (inApp) {
+      title = 'First, open it in your browser';
+      steps = isLine ? ['Tap "<b>Open in browser</b>" below (it opens in ' + (isIOS ? 'Safari' : 'Chrome') + ')', 'Then tap "📲 Install" again']
+        : isIOS
+        ? ['Tap <b>…</b> or <b>⤴</b> at the bottom (or top) right', 'Tap "<b>Open in Safari</b>"', 'Then tap "📲 Install" again']
+        : ['Tap <b>︙</b> at the top right', 'Choose "<b>Open in…</b>" → <b>Chrome</b>', 'Then tap "📲 Install" again'];
+    } else if (isIOS) {
+      steps = ['Tap the ' + SHARE_SVG + ' <b>Share</b> button ' + (isIPad ? 'at the top' : 'at the bottom') + ' (or look inside "<b>…</b>")', 'Scroll down a little and tap "' + PLUS_SVG + ' <b>Add to Home Screen</b>"', 'Tap "<b>Add</b>" at the top right'];
+      arrow = isIPad ? '<div class="ig-arrow top">⬆️</div>' : '<div class="ig-arrow">⬇️</div>';
+    } else if (isAndroid) {
+      steps = ['Tap <b>︙</b> (menu) at the top right', 'Tap "<b>Install app</b>" or "<b>Add to Home screen</b>"', 'Tap "<b>Install</b>"'];
+      arrow = '<div class="ig-arrow top">⬆️</div>';
+    } else {
+      steps = ['Click the <b>install</b> icon (a screen with ＋) at the right end of the address bar', 'If it is not there, choose "<b>Install app</b>" from the menu', 'Click "<b>Install</b>"'];
+    }
+    var h = document.createElement('div'); h.id = 'igHelp'; h.setAttribute('lang', 'en');
+    h.innerHTML = '<div class="ig-card"><h3>' + title + '</h3>' +
+      steps.map(function (s, i) { return '<div class="ig-step"><span class="ig-num">' + (i + 1) + '</span><span>' + s + '</span></div>'; }).join('') +
+      '<div class="ig-btns"><button id="igHelpPlay" class="ig-btn ig-sub" type="button">' + esc(C.laterLabel || 'Not now') + '</button>' +
+      (inApp && isLine ? '<button id="igOpenOut" class="ig-btn ig-main" type="button">Open in browser</button>' : '<button id="igHelpOk" class="ig-btn ig-main" type="button">Got it</button>') +
       '</div></div>' + arrow;
     var old = document.getElementById('igHelp'); if (old) old.parentNode.removeChild(old);
     document.body.appendChild(h);
@@ -179,7 +228,9 @@
   function showDone() {
     var g = document.getElementById('igGate'); if (!g) return;
     var h = document.createElement('div'); h.id = 'igHelp';
-    h.innerHTML = '<div class="ig-card"><h3>✅ ホーム画面に入りました</h3><div class="ig-step">次からは、ホーム画面の アイコンから開けます。</div>' +
+    h.innerHTML = EN ? '<div class="ig-card" lang="en"><h3>✅ Added to your home screen</h3><div class="ig-step">Next time, open it from the icon on your home screen.</div>' +
+      '<div class="ig-btns"><button id="igHelpOk" class="ig-btn ig-main" type="button">' + esc(C.playLabel || '▶ Play') + '</button></div></div>' :
+      '<div class="ig-card"><h3>✅ ホーム画面に入りました</h3><div class="ig-step">次からは、ホーム画面の アイコンから開けます。</div>' +
       '<div class="ig-btns"><button id="igHelpOk" class="ig-btn ig-main" type="button">' + esc(C.playLabel || '▶ 遊ぶ') + '</button></div></div>';
     document.body.appendChild(h);
     document.getElementById('igHelpOk').onclick = function () { close(); };
