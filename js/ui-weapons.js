@@ -14,7 +14,7 @@ export const WeaponGrid = {
     el.className = 'overlay weapon-grid hidden';
     el.innerHTML = `<div class="wg-head"><h2>武器をえらぶ <small>${WEAPONS.length}種類</small></h2><button type="button" class="wg-close" aria-label="閉じる">✕</button></div>
       <div class="wg-list"></div>
-      <p class="wg-note pc-only">数字キー 1〜0。同じ数字を もう一度 押すと 11〜・21〜 / Q・R・ホイールで となり / T で この画面</p>`;
+      <p class="wg-note pc-only">数字キー 1〜0。同じ数字を もう一度 押すと 11〜・21〜 / スペース・Q・R・ホイールで となり / T で この画面</p>`;
     const list = el.querySelector('.wg-list');
     WEAPONS.forEach((w, i) => {
       const b = document.createElement('button');

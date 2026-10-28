@@ -1,5 +1,5 @@
 // 操作係: 左のスティック(移動)・右のボタン(撃つ=押している間ずっと)・回転斬り・武器の切りかえ。
-// スマホ(タッチ)と PC(キーボード WASD/矢印 + マウス/スペース)の両方。
+// スマホ(タッチ)と PC(キーボード WASD/矢印 + マウス)の両方。PC のスペースは 武器を順番に切りかえる(ノブさん 2026-10-28)。
 // アドレスに #auto をつけると、自動で動いて撃つ(確認用・タイトル画面の見本)。
 import { HASH } from './util.js';
 
@@ -198,6 +198,9 @@ export const Input = {
     root.addEventListener('pointerdown', (e) => {
       if (e.pointerType === 'mouse' && e.button === 0 && !(e.target.closest && e.target.closest('button'))) this._mouseDown = true;
     });
+    // PC: 右クリック = ダッシュ(すばやく2回で 叩きつけ)。いちばんよく使う大技なので マウスだけで出せるように(ノブさん 2026-10-28)
+    addEventListener('mousedown', (e) => { if (e.button === 2 && this.enabled !== false) { this.dash = true; e.preventDefault(); } });
+    addEventListener('contextmenu', (e) => { if (!(e.target.closest && e.target.closest('input, textarea'))) e.preventDefault(); });
     addEventListener('keydown', (e) => {
       if (e.repeat) return;
       const k = e.key.toLowerCase();
@@ -211,7 +214,7 @@ export const Input = {
       if (k === 'r' || k === 'tab') { this.weaponDelta = 1; e.preventDefault(); }
       if (k === 't') this.weaponGrid = true;
       if (/^[0-9]$/.test(k)) { this.weaponSelect = k === '0' ? 9 : +k - 1; this.digitPress = true; }
-      if (k === ' ') e.preventDefault();
+      if (k === ' ') { this.weaponDelta = 1; e.preventDefault(); }   // スペース = 次の武器(撃つのは クリック / J)
     });
     addEventListener('keyup', (e) => this._keys.delete(e.key.toLowerCase()));
     addEventListener('blur', () => { this._keys.clear(); this.releaseAll(); });
@@ -235,7 +238,7 @@ export const Input = {
       if (l < 0.15) { this.move.x = 0; this.move.z = 0; }
       else { const m = Math.min(1, (l - 0.15) / 0.75) / l; this.move.x = sx * m; this.move.z = sy * m; }
     }
-    this.fire = this._fireTouch !== null || this._firePointer !== null || k.has(' ') || k.has('j') || (this._mouseDown && !this.touchUsed);
+    this.fire = this._fireTouch !== null || this._firePointer !== null || k.has('j') || (this._mouseDown && !this.touchUsed);
     // 画面の はしまで なぞった指: そこで止めていても 同じ向きに回りつづける(撃つボタンは 右はしに近いので)
     if (this._t) for (const f of this._t.values()) {
       if (f.role === 'stick' || !f.drag) continue;

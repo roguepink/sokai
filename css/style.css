@@ -270,7 +270,7 @@ button.big:active { transform: translateY(4px); box-shadow: 0 2px 0 #8a2a00; }
 /* PC(マウスとキーボード): 武器の ◀▶ はかくして(ホイール・Q/R・数字キー)、ボタンにキーを書く */
 body.pc #controls .btn-prev, body.pc #controls .btn-next { display: none; }
 body.pc #controls .btn::after { position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); font-size: 11px; white-space: nowrap; opacity: .8; text-shadow: var(--stroke); }
-body.pc .btn-fire::after { content: 'スペース / クリック'; }
+body.pc .btn-fire::after { content: 'クリック / J'; }
 body.pc .btn-spin::after { content: 'Shift / E'; }
 body.pc #hud .weapon-name { bottom: calc(var(--sab) + 172px); }
 
@@ -653,3 +653,5 @@ body:not(.pc) .pc-only { display: none; }
   .bs-card b { font-size: min(60px, calc(80vw / var(--nlen, 8))); } .bs-stamp b { font-size: 84px; } .bs-jack { min-width: 290px; top: calc(var(--sat) + 180px); } .bs-jack li { font-size: 16px; }
   .bs-chip { top: calc(var(--sat) + 88px); }
 }
+/* PC: スペースで 次の武器(2026-10-28 ノブさん) */
+body.pc #hud .weapon-name::after { content: 'スペースで 次の武器'; display: block; font-size: 11px; font-weight: 700; opacity: .75; text-align: right; }
