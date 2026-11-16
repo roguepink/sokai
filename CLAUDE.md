@@ -56,6 +56,21 @@
 - Input: タッチは指ごとに役目(スティック/撃つ/右側)を `changedTouches` で追う。撃つボタンを押したまま左右になぞると向きが変わる(上下は固定)。`turn` `consumeTurn()` `assistScale()` `releaseAll()`
 - 自動で向く(autoTurn2)は はじめオフ。チェーンソーは刃に当たった敵だけ(`weaponSfx` grind / sawCut)
 
+### 第5弾(2026-11-17 ノブさんの依頼)
+「3D感をもう少し強く / ウエスタンな街並みを足す / 主人公と武器の UI を整えてきれいに / 最強のボスをもう1体 — 恐竜の形の超巨大怪獣(ゴジラそのものではないオリジナル)。ふつうのボスの約5倍」
+- 作業は枝 `round5`。**main = 公開**なので、見せて OK をもらうまで main に入れない
+- 係とファイル(ほかの係のファイルは直さない。頼みごとは報告に書く)
+  - **立体感の係**: `engine.js` `view-camera.js` `config.js`(CAMERA・RENDER)`world-tex.js` `world-sky.js`(光の強さ・色だけ。SPANS/tOfU は触らない)`zombie-models.js` `zombie-render.js` `fx-shaders.js`
+  - **街並みの係(ウエスタン)**: `world.js` `world-town.js` `world-district.js` `world-dgen*.js` `world-dkit.js` `world-dtex.js` `world-zones.js` `world-props*.js` と新しい `world-western*.js`
+  - **主人公と武器 UI の係**: `player.js`(見た目)`hero-moves.js` `ui.js` `ui-weapons.js` `ui-fx.js` `ui-minimap.js` `view-hud.js` `css/style.css` `css/view.css` `weapon-defs.js`(icon だけ)`weapon-models.js`(読むだけ。直すなら報告)
+  - **大怪獣の係**: `boss*.js`(新しい `boss-kaiju.js`)`director.js` `zombies.js` `zombie-gore.js` `audio-boss.js` `ui-bossfx.js` `ui-bossdex.js`
+- 約束
+  - 新しい地区の id は `western`(名前は日本語。`World.districtAt` / `zoneName` / `districtEnter` に出す)。スタートの広場から歩いて行ける所に、入口の門と看板
+  - 大怪獣のボスの id は `kaiju`。`def.title` `def.icon` `e.size`(高さ m)`e.bossTier`(いちばん上)を入れる。名前はオリジナル(ゴジラ・ガメラなど 実在の作品の名前・見た目・鳴き声を使わない)
+  - 視点・カメラの API(`setZoom` `focusOn` `fovKick` `setViewMode` など)は なくさない。足すのは自由
+  - 新しい js を足したら 報告に書く(まとめる人が `sw.js` の FILES に足して VERSION を上げる)。**importmap は使わない**(three は `../vendor/three/build/three.module.min.js` を直接 import)
+  - スマホで重くしない(ノブさんのスマホは前に熱くなった)。描く回数・三角の数を 今より増やしすぎない。`tools/playtest_cpu.py --cpu 4` で確かめる
+
 ## 公開のしかた
 - `main` が GitHub Pages で公開中(https://roguepink.github.io/sokai/)。**`main` に入れる = 公開**。大きな更新は別の枝(例 `round2`)でまとめて、ノブさんに見せて OK をもらってから `main` へ
 
