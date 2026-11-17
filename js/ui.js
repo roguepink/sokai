@@ -687,7 +687,7 @@ export const UI = {
     const cr = this._chRect;                              // 左上のチャレンジの札
     if (cr && x < cr.right + 30 && y < cr.bottom + 30) { if (uy < -0.5) x = cr.right + 30; else y = cr.bottom + 30; }
     if (x > W - 330 && y < 70) y = 70;
-    const BW = W > H ? 392 : 330, BH = W > H ? 236 : 340;   // 右下のボタン(撃つ・回転斬り・ダッシュ・武器の切りかえ)の場所
+    const BW = W > H ? 392 : 330, BH = W > H ? 264 : 340;   // 右下のボタン(撃つ・回転斬り・ダッシュ・武器の切りかえ)の場所
     if (x > W - BW && y > H - BH) { if (ux > 0.5 && uy < 0.5) y = H - BH; else x = W - BW; }
     if (W > H && x > W - 200 && y > 50 && y <= H - BH + 1) x = W - 200;   // 右の コンボ・武器の名前 にかぶらない
     // まんなかの大きな文字に かぶらない(横へ よける)
