@@ -20,6 +20,7 @@ export const CONFIG = {
     DIST: 12.6,             // プレイヤーからの距離
     PITCH: 0.82,            // 見下ろす角度(ラジアン。0 = 水平, 1.57 = 真上)
     INSIDE_DIST: 8.6,       // 建物の中では寄る
+    TALL_PITCH: 0.12,       // たて長の画面(スマホを立てて持つ)では 少し 上から
     INSIDE_PITCH: 0.1,      // 建物の中では 少し 上から(手前の壁で かくれにくく)
     STREET_PITCH: 0.36,     // 高い建物にはさまれた道では ここまで 真上に寄せる(前と同じ 1.18 くらい)
     FOV: 58,
@@ -51,7 +52,8 @@ export const CONFIG = {
 
   RENDER: {
     SHADOW_SIZE: 2048,
-    SHADOW_AREA: 40,        // 影を計算するプレイヤー周りの広さ
+    SHADOW_AREA: 40,        // 影を計算するプレイヤー周りの広さ(肩越し・一人称)
+    TOP_SHADOW_AREA: 30,    // 同じく 見下ろしのとき(カメラを引くと 自動で広がる)
     FOG_NEAR: 40,
     FOG_FAR: 140,
     // 第5弾(立体感)

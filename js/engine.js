@@ -292,14 +292,19 @@ export const Engine = {
     const zr = close ? 1 : this.camDist / C.DIST, stepOf = (z) => (z > 2.6 ? 3 : z > 1.75 ? 2 : z > 1.25 ? 1.45 : 1);
     let sc = this._shSc || 1;
     if (stepOf(zr) > sc) sc = stepOf(zr); else if (stepOf(zr / 0.9) < sc) sc = stepOf(zr / 0.9);
-    const ldist = 90 * Math.max(1, this.farBoost);
-    if (sc !== this._shSc || ldist !== this._shDist) {
-      this._shSc = sc; this._shDist = ldist;
-      const A = RD.SHADOW_AREA * sc, sc_ = sun.shadow.camera;
-      sc_.left = -A; sc_.right = A; sc_.top = A; sc_.bottom = -A; sc_.far = ldist + 110;
+    const ldist = (close ? 90 : 66 * Math.max(1, sc * 0.8)) * Math.max(1, this.farBoost);      // 光を置く距離(見下ろしは 近く = 影の地図に入る物が へる)
+    // 見下ろしは 画面に入る地面が せまいので 影の広さを TOP_SHADOW_AREA に(光を寝かせた分 影の地図に入る物が ふえるのを 打ち消す。影も 細かくなる)
+    const S = (close ? RD.SHADOW_AREA : RD.TOP_SHADOW_AREA) * sc;
+    if (S !== this._shS || ldist !== this._shDist) {
+      this._shS = S; this._shDist = ldist; this._shSc = sc;
+      const sc_ = sun.shadow.camera;
+      sc_.left = -S; sc_.right = S; sc_.top = S; sc_.bottom = -S; sc_.far = ldist + (close ? 110 : 70 * sc);
       sc_.updateProjectionMatrix();
+      this._viewT = Math.max(this._viewT || 0, 2);      // 広さが変わった直後は 影を すぐ 描きなおす
     }
-    const S = RD.SHADOW_AREA * sc, texel = (2 * S) / sun.shadow.mapSize.x;
+    this._shSc = sc;
+    if (!close) cz -= 7 * sc;      // 見下ろしは 画面の奥(北)のほうが 広く見えるので、影の中心を 少し奥へ
+    const texel = (2 * S) / sun.shadow.mapSize.x;
     _rt.set(-_ld.z, 0, _ld.x).normalize();               // 光から見た 横
     _up.crossVectors(_ld, _rt);                           // 光から見た 縦
     _c.set(cx, 0, cz);
@@ -320,7 +325,8 @@ export const Engine = {
       if (this.camYaw) this.camYaw = 0;             // スティックの向き = 画面の向き にするため、すぐもどす
       // 高い建物にはさまれた道では、真上に近い角度にして 壁で主人公がかくれないように(main が street を 0..1 で入れる)
       this._street = damp(this._street || 0, inside ? 0 : this.street, 2.5, realDt);
-      this.camPitch = damp(this.camPitch, C.PITCH + (inside ? C.INSIDE_PITCH : 0) + C.STREET_PITCH * this._street, 4, realDt);
+      const tall = innerWidth < innerHeight ? C.TALL_PITCH : 0;      // たて長の画面は 少し 上から(奥が 入りすぎて 重くならないように)
+      this.camPitch = damp(this.camPitch, Math.min(1.25, C.PITCH + tall + (inside ? C.INSIDE_PITCH : 0) + C.STREET_PITCH * this._street), 4, realDt);
     }
     // ボスを見せる(focusOn): 中心を寄せる・引く・少し低い角度
     const fw = demo ? 0 : this.focus.w, F = this.focus;

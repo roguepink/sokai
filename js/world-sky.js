@@ -481,8 +481,10 @@ export const Sky = {
     for (const w of this.wetMats) { w.m.roughness = w.r + (w.wr - w.r) * wet; w.m.color.copy(w.c).multiplyScalar(1 + (w.dk - 1) * wet); w.m.metalness = w.me + 0.12 * wet; }
     // 霧の距離(視点と天気で変える)
     const v = this._view, q = Engine.quality;
-    const far0 = v === 'top' ? 140 : (q === 'high' ? 290 : q === 'mid' ? 230 : 175) * this.viewDistMul;
-    const near0 = v === 'top' ? 40 : 45;
+    // 第5弾: 見下ろしは カメラを寝かせた分 遠くまで画面に入るので、霧を 近くした(前は 40〜140m)。画面の上のほう(奥)が 青白く かすんで 奥行きが出る。
+    //   描く物の数も 前と同じくらいに おさまる(霧の先は 描かない)
+    const far0 = v === 'top' ? 92 : (q === 'high' ? 290 : q === 'mid' ? 230 : 175) * this.viewDistMul;
+    const near0 = v === 'top' ? 24 : 45;
     const fm = Math.max(0.28, 1 - wx.rain * 0.2 - wx.storm * 0.32 - wx.fog * 0.62 - wx.snow * 0.3 - wx.ash * 0.4) * (1 - nightK * 0.12);
     this.fogMul = fm;
     // 第5弾: カメラを大きく引いたとき(ボス)は 霧も 遠くへ(Engine.fogScale。肩越し・一人称は Engine.farBoost だけ)。上限 350m(空のドームの中)
@@ -493,7 +495,7 @@ export const Sky = {
       const hz = _c.copy(U.uHor.value).lerp(U.uFog.value, 0.35).multiplyScalar(1.15);
       hz.r *= 0.96; hz.b *= 1.06;
       if (Engine.hemi) { hz.r += Engine.hemi.color.r * 0.07 * nightK; hz.g += Engine.hemi.color.g * 0.07 * nightK; hz.b += Engine.hemi.color.b * 0.07 * nightK; }
-      const wxK = 1 + wx.fog * 2.2 + wx.rain * 0.5 + wx.storm * 0.7 + wx.snow * 0.8 + wx.ash * 1.0;
+      const wxK = 1 + wx.fog * 1.5 + wx.rain * 0.5 + wx.storm * 0.7 + wx.snow * 0.8 + wx.ash * 1.0;
       const dens = (v === 'top' ? 0.011 : 0.0042) * (1 - 0.4 * nightK) * wxK;
       Air.set(dens, hz.r, hz.g, hz.b, v === 'top' ? 0.5 : 0.62);
       // ふちの光 = 空の光 + 太陽(月)の光。夜は 少し強く(暗い中で ゾンビの りんかくが 分かる)
