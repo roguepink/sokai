@@ -7,9 +7,9 @@ import * as THREE from '../vendor/three/build/three.module.min.js';
 import { seeded } from './util.js';
 import { Engine } from './engine.js';
 import { WEST, inWest, District } from './world-district.js';
-import { WT, WS } from './world-westex.js';
+import { WT, WS, wSignUV } from './world-westex.js';
 import { wbuild, WBld, boardwalk, wfloor, wpatch, wwall, wbox, wsign, wgable, falseFront, porch, mesa, train, WOODC, DARKW } from './world-westkit.js';
-import { beam, PAD_H } from './world-dkit.js';
+import { beam, quad4, PAD_H } from './world-dkit.js';
 import { pool } from './world-town.js';
 import { placeTree, placeFence } from './world-props.js';
 import { makeGeo } from './world-build.js';
@@ -32,6 +32,11 @@ function guide(ctx, x, z, s = 1) {
   ctx.B.box(M.glow, x - 0.1, Y + 3.3 * s, z - 0.1, x + 0.1, Y + 3.55 * s, z + 0.1, { col: LAN });
   pool(ctx, x, z + 1, 3, [0.3, 0.18, 0.06], Y + 0.03);
   ctx.solid(x - 0.15, z - 0.15, x + 0.15, z + 0.15, 3);
+}
+// 地面に置いた 道しるべの板(見下ろしで読める。字の上が 北)
+function groundSign(ctx, cx, cz, w, y) {
+  const h = w / 4, uv = wSignUV(WS['↑ ウエスタン通り']);
+  quad4(ctx.B.bucket(ctx.M.west, cx, cz), [cx - w / 2, y, cz + h / 2], [cx + w / 2, y, cz + h / 2], [cx + w / 2, y, cz - h / 2], [cx - w / 2, y, cz - h / 2], uv, [1.1, 1.1, 1.1]);
 }
 // 入口の門(丸太の柱・町の名前・牛の頭の骨)
 function gate(ctx, cx, z) {
@@ -102,12 +107,13 @@ function sheriff(ctx) {
   S.shell([{ side: 'E', at: -214, w: 4 }, { side: 'W', at: -211.5, w: 3.6 }]);
   // 牢(鉄ごうし。2 部屋。戸は あいている)
   const zc = -217.6, iron = [0.2, 0.2, 0.22];
-  for (let x = 19.1; x < 29.9; x += 0.3) { if ((x > 21.2 && x < 22.9) || (x > 26.7 && x < 28.4)) continue; B.box(M.plain, x - 0.035, Y, zc - 0.035, x + 0.035, Y + 3.0, zc + 0.035, { col: iron }); }
+  for (let x = 19.1; x < 29.9; x += 0.3) { if ((x > 19.6 && x < 22.4) || (x > 26.6 && x < 29.4)) continue; B.box(M.plain, x - 0.035, Y, zc - 0.035, x + 0.035, Y + 3.0, zc + 0.035, { col: iron }); }
   for (const y of [0.25, 1.5, 3.0]) B.box(M.plain, 18.9, Y + y, zc - 0.05, 29.9, Y + y + 0.07, zc + 0.05, { col: iron, skip: '' });
-  for (const [a, b] of [[18.9, 21.2], [22.9, 26.7], [28.4, 29.9]]) ctx.solid(a, zc - 0.1, b, zc + 0.1, 3.2, S.b);
+  for (const [a, b] of [[18.9, 19.6], [22.4, 26.6], [29.4, 29.9]]) ctx.solid(a, zc - 0.1, b, zc + 0.1, 3.2, S.b);
+  for (const [x, r] of [[19.6, -1], [26.6, -1]]) B.box(M.plain, x - 0.035, Y, zc, x + 0.035, Y + 3.0, zc + 2.6, { col: iron, rot: r * 0.5 });   // あいた戸
   for (let z = -221.4; z < zc; z += 0.3) B.box(M.plain, 24.4 - 0.035, Y, z - 0.035, 24.4 + 0.035, Y + 3.0, z + 0.035, { col: iron });
   ctx.solid(24.3, -221.5, 24.5, zc, 3.2, S.b);
-  for (const x of [20.2, 28.6]) B.box(M.plain, x - 0.45, Y, -221.3, x + 0.45, Y + 0.45, -219.4, { col: [0.5, 0.45, 0.36] });
+  for (const x of [23.6, 25.2]) B.box(M.plain, x - 0.4, Y, -221.3, x + 0.4, Y + 0.45, -219.4, { col: [0.5, 0.45, 0.36] });
   // 机・たな・はり紙
   S.prop('desk', 26.4, -210.6, Math.PI, {}); S.prop('cabinet', 19.6, -209.2, 0, {}); S.prop('wbarrel', 29.4, -209.2, 0, { col: [0.5, 0.34, 0.22] });
   wwall(ctx, B.bucket(M.west, 24.4, -215), 18.93, -217.2, 1, 0, 3.2, Y + 0.5, Y + 3.0, WT.wanted, [1, 1, 1], 3.2);
@@ -123,7 +129,7 @@ function sheriff(ctx) {
 function church(ctx) {
   const { M } = ctx, x0 = 99, x1 = 113, z0 = -284.6, z1 = -264.6, h = 5.6, col = [1.34, 1.32, 1.27], cx = 106;
   const S = new WBld(ctx, { name: '教会', x0, z0, x1, z1, h, y0: Y, bay: 3.4, front: 'S',
-    rows: [[0, 20, [WT.clap, WT.arch]]], frontRows: [[0, 20, [WT.clap, WT.clap, WT.churchDoor]]],
+    rows: [[0, 20, [WT.clap, WT.arch]]], frontRows: [[0, 20, [WT.clap]]],
     skinCol: col, floor: M.woodFloor, floorCol: [0.72, 0.58, 0.44], wall: M.plaster, wallCol: [0.92, 0.88, 0.8], small: true });
   S.shell([{ side: 'S', at: cx, w: 4 }, { side: 'E', at: -276, w: 3.6 }]);
   for (let z = -268.4; z > -279.5; z -= 2.5) { S.prop('pew', cx - 3.9, z, 0, { s: 0.8 }); S.prop('pew', cx + 3.9, z, 0, { s: 0.8 }); }
@@ -157,6 +163,7 @@ export function genWestern(ctx) {
   ctx.occupy(33, W.z0, 47, W.z1); ctx.occupy(47, CZ - 6, 170, CZ + 6);
   gate(ctx, MX, -203);
   for (const [x, z, s] of [[23.6, -33, 1.5], [47.4, -47.4, 1], [47.4, -119.4, 1], [47.4, -184.6, 1.2]]) guide(ctx, x, z, s);
+  groundSign(ctx, 11, -29.6, 9, Y + 0.02); groundSign(ctx, 43, -72, 5.2, 0.034); groundSign(ctx, 43, -150, 5.2, 0.034);
   // 板張りの歩道
   boardwalk(ctx, 30.4, -292, 33, -206); boardwalk(ctx, 47, -243.4, 49.6, -206); boardwalk(ctx, 47, -294, 49.6, -258);
   boardwalk(ctx, 49.6, -260.6, 168.4, -258); boardwalk(ctx, 49.6, -246, 112, -243.4); boardwalk(ctx, 168.4, -268, 184.6, -238);
