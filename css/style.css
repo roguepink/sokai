@@ -508,6 +508,9 @@ body.pc .hud-combo { top: calc(var(--sat) + var(--top) + var(--sq) + 34px); }
   #hud.close .banner b, #hud.close .banner small { display: inline-block; vertical-align: baseline; }
   #hud.close .banner small { margin-left: .6em; }
 }
+/* 肩越し・一人称: 主人公(手元の武器)が まんなかの下に いるので、武器が変わった表示は 左下へ よける */
+@media (orientation: landscape) { #hud.close .wpop { left: 29%; top: 62%; } }
+@media (orientation: portrait) { #hud.close .wpop { top: 31%; } }
 /* はばの せまい横画面(小さい iPhone): 1 行だと 左の倒した数・右のコンボに とどくので、2 行に もどす */
 @media (orientation: landscape) and (max-width: 740px) {
   #hud.close .banner small { display: block; margin-left: 0; }
@@ -551,8 +554,9 @@ body:not(.pc) .pc-only { display: none; }
   .weapon-grid { gap: 4px; padding-top: calc(var(--sat) + 6px); }
   .wg-head { min-height: 34px; } .wg-head h2 { font-size: 18px; }
   .wg-close { width: 36px; height: 36px; top: -2px; }
-  .wg-list { gap: 4px; }
-  .wg-item { min-height: 74px; padding: 2px 3px 4px; font-size: 12px; } .wg-item .wi { width: 44px; height: 44px; font-size: 26px; }
+  .wg-list { gap: 4px; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); }
+  .wg-item { min-height: 76px; padding: 0 2px 4px; font-size: 12px; } .wg-item .wi { width: 50px; height: 50px; margin-bottom: -4px; font-size: 26px; }
+  .weapon-grid { padding-left: calc(var(--sal) + 12px); padding-right: calc(var(--sar) + 12px); }
 }
 @media (orientation: portrait) { .wg-list { grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); } .wg-head { padding: 0 46px; } }
 

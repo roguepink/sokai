@@ -24,7 +24,7 @@ export const CAT_ORDER = ['gun', 'blast', 'energy', 'melee', 'summon'];
 const RIM = { gun: 0xffc860, blast: 0xff7a48, energy: 0x66d8ff, melee: 0x9aff7a, summon: 0xc79aff };
 
 // 見る向き(ラジアン): yaw = 銃口を 手前へ回す / pitch = 上から のぞく / roll = 銃口を 右上へ かたむける / zoom = 大きさ
-const VIEW = { yaw: 0.42, pitch: 0.3, roll: 0.5, zoom: 1 };
+const VIEW = { yaw: 0.4, pitch: 0.3, roll: 0.68, zoom: 1 };
 const VIEWS = {
   pistols: { yaw: 0.8, pitch: 0.35, roll: 0.35 },
   grenade: { yaw: 0.5, pitch: 0.2, roll: 0.25, zoom: 0.82 },
@@ -77,13 +77,13 @@ void main() {
   vec3 L = normalize(vec3(-0.5, 0.78, 0.6));
   float nl = dot(n, L);
   float wrap = max(nl, 0.0) * 0.72 + 0.28 * (nl * 0.5 + 0.5);
-  vec3 base = uColor * 1.6 + 0.05;
-  vec3 c = base * (0.3 + 0.82 * wrap);
+  vec3 base = uColor * 1.5 + 0.085;
+  vec3 c = base * (0.32 + 0.82 * wrap);
   vec3 H = normalize(L + vec3(0.0, 0.0, 1.0));
   float sp = pow(max(dot(n, H), 0.0), mix(14.0, 40.0, uMetal)) * mix(0.18, 0.75, uMetal);
   c += sp * (0.45 + base);
   float fr = pow(1.0 - max(n.z, 0.0), 2.2);
-  c += uRim * fr * (0.2 + 0.25 * uMetal);
+  c += uRim * fr * (0.3 + 0.3 * uMetal);
   c += uEmis;
   gl_FragColor = vec4(pow(min(c, vec3(1.0)), vec3(0.4545)), 1.0);
 }`;
