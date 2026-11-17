@@ -1,4 +1,4 @@
-// マップ係(第5弾・西部の町): 町の北の出口(x = 40 の道)を出てすぐの「ウエスタン通り(RUSTY SPUR)」。
+// マップ係(第5弾・西部の町): 町の北の出口(x = 40 の道)を出てすぐの「ウエスタン通り(SKULLDUST)」。
 //  - 場所: x = -6 〜 206、z = -294 〜 -196(world-district.js の WEST)。中央広場から 北へ 約 200m
 //  - 大通り(南北・x = 40)と 駅前通り(東西・z = -252)。木の門 → 保安官事務所・銀行・雑貨屋 … → 酒場・宿屋・教会・馬小屋 → 駅と蒸気機関車
 //  - 中に入れる: 酒場(サルーン)・保安官事務所(牢)・教会。まわりは 赤い岩山(メサ)・サボテン・転がる草
@@ -54,7 +54,7 @@ function gate(ctx, cx, z) {
   beam(B, M.plain, [cx - hw - 1.4, 7.7, z], [cx + hw + 1.4, 7.7, z], 0.5, WOODC);
   beam(B, M.plain, [cx - hw, 5.05, z], [cx + hw, 5.05, z], 0.3, DARKW);
   B.box(M.plain, cx - 5.4, 5.25, z - 0.1, cx + 5.4, 7.4, z + 0.1, { col: DARKW, skip: '' });
-  for (const sg of [1, -1]) { wsign(ctx, cx, 5.4, z, 0, sg, 8.4, 2.1 * 0.88, WS['RUSTY SPUR'], [1.12, 1.12, 1.12], 0.12); wsign(ctx, cx, 3.85, z, 0, sg, 4.4, 1.1, WS['ウエスタン通り'], [1.12, 1.12, 1.12], 0.08); }
+  for (const sg of [1, -1]) { wsign(ctx, cx, 5.4, z, 0, sg, 8.4, 2.1 * 0.88, WS['SKULLDUST'], [1.12, 1.12, 1.12], 0.12); wsign(ctx, cx, 3.85, z, 0, sg, 4.4, 1.1, WS['ウエスタン通り'], [1.12, 1.12, 1.12], 0.08); }
   B.box(M.plain, cx - 2.3, 3.8, z - 0.06, cx + 2.3, 5.0, z + 0.06, { col: DARKW, skip: '' });
   ctx.prop('skull', cx, z, -Math.PI / 2, { y: 7.95, s: 2.3, solid: false, occupy: false });
 }
@@ -221,8 +221,8 @@ export function genWestern(ctx) {
   wsign(ctx, 167.4, 1.3, -279.6, 0, 1, 2.4, 0.6, WS['DANGER  T N T'], [1.05, 1.05, 1.05], 0.02); B.box(M.plain, 167.3, 0, -279.7, 167.5, 1.9, -279.62, { col: WOODC });
 
   // 駅と 蒸気機関車
-  wbuild(ctx, [171, -264, 181, -248], Wn, { col: [0.98, 0.84, 0.58], ground: [WT.clapWin, WT.door, WT.clapWin, WT.clapWin, WT.door], sign: WS['RUSTY SPUR STATION'], top: 'rect', fh: 2.1, porch: 'flat', D: 2.4, blade: false, roofTile: WT.tin });
-  wsign(ctx, 176, 2.3, -248, 0, 1, 7.2, 1.8, WS['RUSTY SPUR STATION'], [1.05, 1.05, 1.05], 0.07);
+  wbuild(ctx, [171, -264, 181, -248], Wn, { col: [0.98, 0.84, 0.58], ground: [WT.clapWin, WT.door, WT.clapWin, WT.clapWin, WT.door], sign: WS['SKULLDUST STATION'], top: 'rect', fh: 2.1, porch: 'flat', D: 2.4, blade: false, roofTile: WT.tin });
+  wsign(ctx, 176, 2.3, -248, 0, 1, 7.2, 1.8, WS['SKULLDUST STATION'], [1.05, 1.05, 1.05], 0.07);
   { const bk = B.bucket(M.west, 183, -256);   // ホームの屋根
     wpatch(bk, [181, 3.5, -246.5], [184.8, 3.2, -246.5], [181, 3.5, -265.5], [184.8, 3.2, -265.5], 1, 5, WT.tin, [1, 1, 1]);
     wpatch(bk, [184.8, 3.16, -246.5], [181, 3.46, -246.5], [184.8, 3.16, -265.5], [181, 3.46, -265.5], 1, 5, WT.board, [0.45, 0.4, 0.36]);

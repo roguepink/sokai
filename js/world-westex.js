@@ -1,7 +1,7 @@
 // マップ係(第5弾・西部の町): 西部劇の町の 壁・屋根・地面・看板の模様を 1 枚の「まとめ絵」に描く。
 //  - 1024×1024。上の 5 段(128px × 8 列 = 40 マス)が 壁・屋根・地面・室内、下の 6 段(256×64 が 4 列 = 24 枚)が 看板
 //  - 材質は 1 つだけ(M.west)。西部の町の建物・歩道・道・岩山は ぜんぶ この材質 = 描く回数が ふえない
-//  - 看板の字は 架空の店の名前(英語の西部風の書体 + 小さい日本語)。町の名前は「RUSTY SPUR(ウエスタン通り)」
+//  - 看板の字は 架空の店の名前(英語の西部風の書体 + 小さい日本語)。町の名前は「SKULLDUST(ウエスタン通り)」
 import * as THREE from '../vendor/three/build/three.module.min.js';
 import { seeded } from './util.js';
 import { cutout } from './world-tex.js';
@@ -30,7 +30,7 @@ const SIGNS = [
   ['SALOON', '酒場', 'red'], ['SHERIFF', '保安官', 'black'], ['BANK', '銀行', 'green'], ['GENERAL STORE', '雑貨', 'cream'],
   ['HOTEL', '宿', 'blue'], ['BLACKSMITH', '鍛冶屋', 'black'], ['LIVERY STABLE', '馬屋', 'cream'], ['UNDERTAKER', '葬儀屋', 'black'],
   ['BARBER', '床屋', 'cream'], ['TELEGRAPH', '電信', 'green'], ['GUNSMITH', '鉄砲屋', 'red'], ['ASSAY OFFICE', '金の鑑定', 'mustard'],
-  ['DOCTOR', '医者', 'cream'], ['BOOT HILL', '墓場', 'gray'], ['RUSTY SPUR STATION', '駅', 'cream'], ['RUSTY SPUR', '', 'gate'],
+  ['DOCTOR', '医者', 'cream'], ['BOOT HILL', '墓場', 'gray'], ['SKULLDUST STATION', '駅', 'cream'], ['SKULLDUST', '', 'gate'],
   ['ウエスタン通り', '', 'jp'], ['↑ ウエスタン通り', '', 'arrow'], ['DANGER  T N T', '火薬', 'danger'], ['GOLD MINE', '金鉱', 'mustard'],
   ['FEED & GRAIN', 'えさ屋', 'green'], ['JAIL', '牢', 'gray'], ['WANTED', 'おたずね者', 'cream'], ['CHAPEL', '教会', 'blue'],
 ];
