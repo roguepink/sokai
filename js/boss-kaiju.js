@@ -165,7 +165,8 @@ const kaiju = {
   special: true,            // ふつうの順番には 入らない(出現係が 特別に出す)
   noStand: true, passHero: true, vehicle: true, noCollide: true, noFar: true, noFreeze: true,
   enter: 'walkin', fall: 'topple', fallT: 3.8, fallW: 34, fallAmt: 1.0, zoomDead: true, burstAt: 1.6,
-  phaseAt: [0.6, 0.3], roarT: 2.5, roarAt: 0.95, roarR: 72,
+  phaseAt: [0.6, 0.3], roarT: 2.5, roarAt: 0.95,
+  onRoar(B, e, m) { howl(B, e, 72, 34); },
 
   build(m) {
     const skin = mat(m, { map: skinTex('#8f8b84', { wounds: 34, veins: 90, vein: 'rgba(70,34,84,0.6)', boils: 7, boilC: '#b0a274', drips: 28, rep: 5 }), color: 0xffffff, roughness: 0.8 });
@@ -173,7 +174,8 @@ const kaiju = {
     const bone = mat(m, { map: boneTex(), color: 0xffffff, roughness: 0.5, shadow: false });
     const dark = mat(m, { map: skinTex('#5c1c1e', { wounds: 14, veins: 40, vein: 'rgba(20,0,0,0.6)', rep: 2 }), color: 0xffffff, roughness: 0.55, shadow: false });
     const glow = mat(m, { color: 0x1c3a06, emissive: GREEN, emissiveIntensity: 1.8, glow: true, roughness: 0.4 });
-    for (const mt of m.mats) weakFog(mt, 0.5);
+    // すかすときは ざらざら(alphaHash)でなく なめらかに(体が 画面いっぱいに なるので)。ふだんは こさ 1 = ふつうの見た目
+    for (const mt of m.mats) { weakFog(mt, 0.5); mt.alphaHash = false; mt.transparent = true; mt.depthWrite = true; }
 
     const G = new Rig(m);
     // ---- こし ----
@@ -200,6 +202,11 @@ const kaiju = {
     for (let i = 0; i < 7; i++) G.add(i < 3 ? spine : chest, blob(0.26, 0.2, i, 8, 6), bone, 0, i < 3 ? 0.4 + i * 0.6 : 0.1 + (i - 3) * 0.48, 1.32 - (i > 4 ? (i - 4) * 0.25 : 0));
     G.add(spine, sph(1.5, 10, 6, PI * 0.2, PI * 0.6, PI * 0.25, PI * 0.5), dark, 0, 0.9, 0.0, 0, 0, 0, 1.02, 1.0, 0.95);
     for (let i = 0; i < 9; i++) { const a = R(0.4, 2.7) * (i % 2 ? 1 : -1); G.add(i % 3 ? chest : spine, sph(R(0.1, 0.2), 7, 5), glow, sin(a) * 1.72, R(0.2, 1.5), cos(a) * 1.4); }   // 光る できもの
+    // 取りこまれた ゾンビの かたまり(肩・わき腹・背中に こぶ。手を のばす ゾンビつき)
+    for (const [bn, x, y, z, r] of [[chest, -1.75, 1.35, -0.1, 0.62], [chest, 1.5, 0.3, 0.75, 0.55], [spine, -1.45, 0.9, 0.5, 0.6], [spine, 1.5, 1.5, -0.35, 0.5], [chest, 0.2, 1.75, 0.75, 0.5]]) {
+      G.add(bn, blob(r, 0.22, x * 3 + y, 12, 8), flesh, x, y, z);
+      for (let k = 0; k < 4; k++) { const a = R(0, TAU), b = R(-0.3, 0.9); G.add(bn, miniGeo(), flesh, x + sin(a) * cos(b) * r, y + sin(b) * r, z + cos(a) * cos(b) * r, R(-0.5, 0.5), a + PI, R(-0.6, 0.6), 2.1); }
+    }
     // ---- 前足(長い・かぎ爪 3 本) ----
     const arms = {}, fores = {}, hands = {};
     for (const sx of [-1, 1]) {
@@ -301,7 +308,7 @@ const kaiju = {
 
     // ---- 地面の影(やわらかい丸を ならべる)と 足あと ----
     const pg = new THREE.PlaneGeometry(1, 1); pg.rotateX(-PI / 2);
-    const sub = (map) => new THREE.MeshBasicMaterial({ map, blending: THREE.SubtractiveBlending, premultipliedAlpha: true, transparent: true, depthWrite: false, fog: false, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+    const sub = (map) => new THREE.MeshBasicMaterial({ map, blending: THREE.SubtractiveBlending, premultipliedAlpha: true, transparent: true, depthWrite: false, fog: false, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
     m.shade = new THREE.InstancedMesh(pg, sub(softTex()), 16);
     m.prints = new THREE.InstancedMesh(pg, sub(printTex()), 10);
     for (const im of [m.shade, m.prints]) {
@@ -532,7 +539,8 @@ const kaiju = {
       e.vx += (ox / od * sp - e.vx) * min(1, dt * 1.2); e.vz += (oz / od * sp - e.vz) * min(1, dt * 1.2);
       turnTo(e, Math.atan2(c.dx, -c.dz), dt, 0.5 * sm);
       if (e.cool <= 0 && m.feet[0].planted && m.feet[1].planted) {
-        const a = pick(e, c.d, LIST);
+        const a = e.force || pick(e, c.d, LIST);      // e.force = 技の名前(確認用: 次に その技を出す)
+        e.force = null;
         if (a) {
           begin(e, a);
           if (a === 'stomp' || a === 'stomp3') { e.state = 'stomp'; e.n2 = a === 'stomp3' ? 3 + e.phase - 1 : 1; e.last = a; startStomp(m, e, c); }
@@ -557,8 +565,9 @@ const kaiju = {
         e.hitDone = 1; F.x = e.tx; F.z = e.tz; F.y = 0; F.planted = true; F.manual = false; F.landT = e.t; F.yaw = e.face;
         m.dip += 0.35;
         footFx(B, m, e, F, 1.8);
-        slam(B, e, e.tx, e.tz, 15, { dmg: 3200, hero: 30, lift: 11, big: true, cause: 'stomp', shake: 2, world: 3000, force: 40 });
-        ringWave(B, e, e.tx, e.tz, { r0: 10, speed: 24, max: 46 + e.phase * 8, w: 2.6, dmg: 900, hero: 20 });
+        slam(B, e, e.tx, e.tz, 15, { dmg: 0, hero: 30, lift: 11, big: true, cause: 'stomp', shake: 2, world: 3000, force: 0 });
+        e.kb = 18; mow(B, e, e.tx, e.tz, 15, 3200, 40, 'stomp');
+        ringWave(B, e, e.tx, e.tz, { r0: 10, speed: 24, max: 46 + e.phase * 8, w: 2.6, dmg: 0, hero: 20 });
         act(e, 'stompLand', e.tx, e.tz);
       }
       if (st > T2 + 0.65 / sm && m.feet[1 - e.foot].planted) {
@@ -573,6 +582,7 @@ const kaiju = {
       const sx = rx * e.side, sz = rz * e.side;
       if (st < T1) Warn.cone(e.x, e.z, sx, sz, 98, PI / 2, st / T0, 0x9a2208);
       // しっぽの 角度: ため(反対へ 少し)→ 後ろから 横を通って 前まで
+      if (st < dt * 1.5) e.kb = 20;
       e.sweepK = st < T0 ? -0.12 * ease(st / T0) : -0.12 + 1.12 * ease(min(1, (st - T0) / (T1 - T0)));
       m.sw = st < T1 + 0.5 ? min(1, st / 0.5) : max(0, 1 - (st - T1 - 0.5) / 0.6);
       if (st > T0 && st < T1 + 0.1) tailHit(B, m, e, dt);
@@ -584,7 +594,7 @@ const kaiju = {
       const two = St === 'breath2', T0 = e.T0 = 1.5 / sm, T1 = two ? 4.4 : 2.8;
       brake(2.5);
       if (e.n === 0) {
-        e.n = 1;
+        e.n = 1; e.kb = 24;
         const px = -c.dz, pz = c.dx, half = two ? 46 : 32, s = Math.random() < 0.5 ? 1 : -1;
         e.bx0 = c.px - px * half * s + c.dx * 3; e.bz0 = c.pz - pz * half * s + c.dz * 3; e.bx1 = c.px + px * half * s + c.dx * 3; e.bz1 = c.pz + pz * half * s + c.dz * 3;
         // 2 回目(怒り): 首をふって 手前を もどる
@@ -621,7 +631,8 @@ const kaiju = {
       if (st < T1) Warn.circle(e.tx, e.tz, 12, st / T1);
       if (st > T1 && !e.hitDone) {
         e.hitDone = 1;
-        slam(B, e, e.tx, e.tz, 12, { dmg: 3000, hero: 28, lift: 10, big: true, cause: 'bite', shake: 1.8, world: 2500, force: 34 });
+        slam(B, e, e.tx, e.tz, 12, { dmg: 0, hero: 28, lift: 10, big: true, cause: 'bite', shake: 1.8, world: 2500, force: 0 });
+        e.kb = 14; mow(B, e, e.tx, e.tz, 12, 3000, 34, 'bite');
         Gore.splat(e.tx, e.tz, 9, 0, 0, 1, 0x3a0303, 0.8);
         act(e, 'bite', e.tx, e.tz);
       }
@@ -641,7 +652,8 @@ const kaiju = {
         if (st < t1 + 0.12) Warn.circle(x, z, 11, st / (t1 + 0.12));
         else if (e.hitDone === i) {
           e.hitDone = i + 1;
-          slam(B, e, x, z, 11, { dmg: 2600, hero: 26, lift: 9, big: true, cause: 'claw', shake: 1.6, world: 2500, force: 34 });
+          slam(B, e, x, z, 11, { dmg: 0, hero: 26, lift: 9, big: true, cause: 'claw', shake: 1.6, world: 2500, force: 0 });
+          e.kb = 10; mow(B, e, x, z, 11, 2600, 34, 'claw');
           for (let k = 0; k < 3; k++) FX.decal(x + fx * (k - 1) * 5 + rx * (k - 1) * 2, z + fz * (k - 1) * 5 + rz * (k - 1) * 2, 5, 'scorch', 25);
           act(e, 'claw', x, z);
         }
@@ -657,7 +669,7 @@ const kaiju = {
       else if (!e.hitDone) {
         e.hitDone = 1;
         act(e, 'howl');
-        howl(B, e, 80);
+        howl(B, e, 80, 40);
       }
       if (st > T0 + 0.2 && st < T0 + 1.2 && FX.ring && (e.n += dt) > 0.22) { e.n = 0; FX.ring(e.x, e.z, 8, 80, 0.6, 0xfff0c0, 2, 1.6, 0.5); }
       if (st > T0 + 1.7) done(e, 1.2, c);
@@ -692,8 +704,8 @@ const kaiju = {
         const n = Math.floor((st - T0) / 0.45);
         if (e.n <= n && e.n < 3) {
           e.n++;
-          if (e.n === 1) { act(e, 'nova'); B._Z.damageCircle(e.x, e.z, 62, 1600, { force: 40, cause: 'boss', falloff: true }); if (heroIn(B, e.x, e.z, 30)) hitHero(B, e, e.x, e.z, 26, 9, 'nova'); FX.flash(e.x, 30, e.z, GREEN, 800, 140, 0.7); quake(B, e.x, e.z, 2, 160); }
-          ringWave(B, e, e.x, e.z, { r0: 14, speed: 30, max: 78, w: 3, dmg: 1000, hero: 22, col: GREEN });
+          if (e.n === 1) { act(e, 'nova'); e.kb = 20; mow(B, e, e.x, e.z, 62, 1600, 40, 'boss'); if (heroIn(B, e.x, e.z, 30)) hitHero(B, e, e.x, e.z, 26, 9, 'nova'); FX.flash(e.x, 30, e.z, GREEN, 800, 140, 0.7); quake(B, e.x, e.z, 2, 160); }
+          ringWave(B, e, e.x, e.z, { r0: 14, speed: 30, max: 78, w: 3, dmg: 0, hero: 22, col: GREEN });
           for (let i = 0; i < 5; i++) { const a = R(0, TAU), r = R(14, 56), x = e.x + cos(a) * r, z = e.z + sin(a) * r; FX.explosion(x, z, 7, 'acid'); if (World.damage) try { World.damage(x, z, 8, 2000, { cause: 'explosion' }); } catch (err) {} }
         }
       }
@@ -774,7 +786,7 @@ function footFx(B, m, e, F, s) {
   const d = heroDist(B, x, z);
   if (s <= 1) {
     quake(B, x, z, 0.75, 150);
-    B._Z.damageCircle(x, z, FOOT_R + 2, 3000, { force: 30, cause: 'stomp', falloff: false });
+    B._Z.damageCircle(x, z, FOOT_R, 3000, { force: 30, cause: 'stomp', falloff: false });
     if (World.damage) try { World.damage(x, z, FOOT_R + 2, 2500, { cause: 'explosion' }); } catch (err) {}
     if (heroIn(B, x, z, FOOT_R)) hitHero(B, e, x, z, 16, 6, 'stomp');
   }
@@ -783,7 +795,7 @@ function footFx(B, m, e, F, s) {
 function addPrint(m, x, z, yaw, size) {
   const i = m.printN++ % 10;
   _q.setFromAxisAngle(_yAxis, -yaw);
-  m.prints.setMatrixAt(i, _m4.compose(_p3.set(x, 0.07 + i * 0.002, z), _q, _s3.set(size, 1, size)));
+  m.prints.setMatrixAt(i, _m4.compose(_p3.set(x, 0.13 + i * 0.002, z), _q, _s3.set(size, 1, size)));
   m.prints.instanceMatrix.needsUpdate = true;
   m.printL[i] = 24;
 }
@@ -843,7 +855,7 @@ function tailHit(B, m, e, dt) {
   const one = (x, y, z, r, i) => {
     if (y - r > 6) return;
     if ((e.n + i) % 3 === 0) {
-      B._Z.damageCircle(x, z, r + 2, 2200, { force: 46, cause: 'sweep', falloff: false });
+      mow(B, e, x, z, r + 2, 2200, 46, 'sweep');
       if ((e.n + i) % 6 === 0 && World.damage) try { World.damage(x, z, r + 2, 2500, { cause: 'explosion' }); } catch (err) {}
       if (Math.random() < 0.6) FX.smoke(x + R(-3, 3), 1, z + R(-3, 3), R(2.5, 4), R(0.8, 1.4), 0x6f6455, R(-6, 6), R(2, 6), R(-6, 6), 0.5);
     }
@@ -914,8 +926,8 @@ function bodyStep(B, m, e, dt) {
   for (let i = m.burns.length - 3; i >= 0; i -= 3) {
     const b = m.burns;
     if ((b[i + 2] -= dt) <= 0) { b.splice(i, 3); continue; }
-    if (Math.random() < dt * 5) FX.flame(b[i] + R(-4, 4), 0.5, b[i + 1] + R(-4, 4), R(-1, 1), R(3, 6), R(-1, 1), R(1.4, 2.4), R(0.5, 0.8), HOT, COOL, 2, 0.9);
-    if (Math.random() < dt * 2) { B._Z.damageCircle(b[i], b[i + 1], 5.5, 260, { force: 4, cause: 'breath' }); if (heroIn(B, b[i], b[i + 1], 3.5)) hitHero(B, e, b[i], b[i + 1], 10, 3, 'breath'); }
+    if (Math.random() < dt * 5) FX.flame(b[i] + R(-4, 4), 0.5, b[i + 1] + R(-4, 4), R(-1, 1), R(3, 6), R(-1, 1), R(1.4, 2.4), R(0.5, 0.8), HOT, COOL, 1.3, 0.85);
+    if (Math.random() < dt * 2) { if (heroIn(B, b[i], b[i + 1], 3.5)) hitHero(B, e, b[i], b[i + 1], 10, 3, 'breath'); }
   }
   // ゾンビの雨の 落ちる所(小さな 赤い丸)
   if (m.rainP) for (let i = m.rainP.length - 3; i >= 0; i -= 3) {
@@ -935,21 +947,19 @@ function breathTick(B, m, e, M, gx, gz, dt) {
     // これから 進む先(0.4 秒ぶん)が カメラの近くを 通るなら 出さない
     const cx = cam.x - x, cy = cam.y - y, cz = cam.z - z, t = clamp(cx * ux + cy * uy + cz * uz, 0, V * 0.42);
     if ((cx - ux * t) ** 2 + (cy - uy * t) ** 2 + (cz - uz * t) ** 2 < (top ? 22 : 9) ** 2) continue;
-    FX.flame(x, y, z, ux * V, uy * V, uz * V, 3 + u * 6, 0.42, HOT, COOL, 2.2, 1.2);
+    FX.flame(x, y, z, ux * V, uy * V, uz * V, 3 + u * 5, 0.42, HOT, COOL, top ? 1.2 : 1.7, 1.0);
   }
   if (!top && Math.random() < 0.5) FX.smoke(M.x + vx * 0.5 + R(-5, 5), M.y + vy * 0.5 + 4, M.z + vz * 0.5 + R(-5, 5), 5, 1.4, 0x2a3a1c, ux * 20, 4, uz * 20, 0.45);
   if (!top) { FX.glow(M.x + ux * 4, M.y + uy * 4, M.z + uz * 4, 11, GREEN, 3); FX.glow(M.x + ux * 4, M.y + uy * 4, M.z + uz * 4, 5, 0xffffff, 3); }
   // 地面: 広がる 緑の炎・土けむり・骨の つぶて
-  for (let i = 0; i < FX.q(3); i++) { const a = R(0, TAU), s = R(8, 22); FX.flame(gx + R(-4, 4), 0.8, gz + R(-4, 4), cos(a) * s, R(3, 10), sin(a) * s, R(3.5, 6), R(0.5, 0.9), HOT, COOL); }
-  FX.glow(gx, 1.5, gz, 9, GREEN, 1.6);
+  for (let i = 0; i < FX.q(2); i++) { const a = R(0, TAU), s = R(8, 20); FX.flame(gx + R(-4, 4), 0.8, gz + R(-4, 4), cos(a) * s, R(3, 9), sin(a) * s, R(2.4, 4.2), R(0.5, 0.8), HOT, COOL, 1.3, 0.9); }
+  FX.glow(gx, 1.5, gz, 6, GREEN, 1.1);
   if (Math.random() < 0.4) FX.debris(gx, 1, gz, 3, 16, BONE2, 0.45, 1.6);
   if (Math.random() < 0.3) FX.smoke(gx, 1, gz, 4, 1.8, 0x2a2a20, R(-3, 3), 5, R(-3, 3), 0.5);
   if ((e.bt = (e.bt || 0) + dt) > 0.1) {
     e.bt = 0;
-    B._Z.damageCircle(gx, gz, 8, 900, { force: 12, cause: 'breath', falloff: false });
-    for (const t of B._Z.queryCircle(gx, gz, 8, _near)) if (t.alive && !t.boss) { t.burn = max(t.burn, 3); t.burnDps = max(t.burnDps, 70); }
-    _near.length = 0;
-    FX.decal(gx, gz, 6, 'scorch', 26);
+    mow(B, e, gx, gz, 8, 900, 12, 'breath');
+    if ((e.bn | 0) % 2 === 0) FX.decal(gx, gz, 4.5, 'scorch', 22);
     if (World.damage) try { World.damage(gx, gz, 8, 1600, { cause: 'fire' }); } catch (err) {}
     if (m.burns.length < 60 && (e.bn = (e.bn || 0) + 1) % 3 === 0) m.burns.push(gx, gz, R(3, 4.5));
     quake(B, gx, gz, 0.5, 60);
@@ -957,21 +967,36 @@ function breathTick(B, m, e, M, gx, gz, dt) {
   if (heroIn(B, gx, gz, 6.5)) hitHero(B, e, gx, gz, 18, 5, 'breath');
 }
 
+// 技に まきこまれた ゾンビ: 倒すのは e.kb 体まで(1 つの技で 何百体も 倒れて 点数が はね上がらないように)。のこりは 吹っとんで ころぶ
+const _mo = { dirX: 0, dirZ: 0, force: 0, cause: '' };
+function mow(B, e, x, z, r, dmg, force, cause) {
+  const L = B._Z.queryCircle(x, z, r, _near);
+  for (let i = 0; i < L.length; i++) {
+    const t = L[i]; if (!t.alive || t.boss) continue;
+    const dx = t.x - x, dz = t.z - z, d = Math.hypot(dx, dz) || 1;
+    if (e.kb > 0) {
+      _mo.dirX = dx / d; _mo.dirZ = dz / d; _mo.force = force; _mo.cause = cause;
+      if (B._Z.damage(t, dmg, _mo)) e.kb--;
+      else if (cause === 'breath') { t.burn = max(t.burn, 3); t.burnDps = max(t.burnDps, 70); }
+    } else { t.stun = max(t.stun, 1.6); t.kx += dx / d * force * 0.6; t.kz += dz / d * force * 0.6; t.flinch = 1; t.flash = 1; }
+  }
+  _near.length = 0;
+}
+
 // ほえ声: まわりの ゾンビが 全部 ころぶ(しばらく 動けない)・主人公は 吹っとぶ
-function howl(B, e, r) {
+function howl(B, e, r, heroR = r) {
   const x = e.x, z = e.z, L = B._Z.queryCircle(x, z, r, _near);
   for (let i = 0; i < L.length; i++) {
     const t = L[i]; if (!t.alive || t.boss) continue;
     const dx = t.x - x, dz = t.z - z, d = Math.hypot(dx, dz) || 1;
-    t.stun = max(t.stun, 2.4); t.kx += dx / d * 16; t.kz += dz / d * 16; t.flinch = 1;
+    t.stun = max(t.stun, 2.4); t.kx += dx / d * 16; t.kz += dz / d * 16; t.flinch = 1; t.flash = 1;
   }
   _near.length = 0;
-  B._Z.damageCircle(x, z, r, 40, { force: 10, cause: 'roar', falloff: false });
   if (FX.ring) { FX.ring(x, z, 6, r * 1.1, 0.8, 0xffe0b0, 3, 2, 0.8); FX.ring(x, z, 3, r * 0.7, 0.6, 0xffffff, 1.5, 1.6, 0.5); }
   quake(B, x, z, 1.7, 170);
   Engine.fovKick && Engine.fovKick(12);
   const P = B._player;
-  if (P && heroDist(B, x, z) < r && (P.pos.y || 0) < 3.5) hitHero(B, e, x, z, 18, 5, 'roar');
+  if (P && heroDist(B, x, z) < heroR && (P.pos.y || 0) < 3.5) hitHero(B, e, x, z, 18, 5, 'roar');
 }
 
 // ---------------------------------------------------------------
@@ -992,7 +1017,7 @@ function shadeStep(m, e, dt, dead) {
   const put = (x, y, z, w, l, yaw, v) => {
     const h = min(y, 30);
     _q.setFromAxisAngle(_yAxis, -yaw);
-    im.setMatrixAt(n, _m4.compose(_p3.set(x + ox * h, 0.06 + n * 0.0015, z + oz * h), _q, _s3.set(w, 1, l)));
+    im.setMatrixAt(n, _m4.compose(_p3.set(x + ox * h, 0.1 + n * 0.0015, z + oz * h), _q, _s3.set(w, 1, l)));
     im.setColorAt(n, _col.setRGB(v * k, v * k, v * k)); n++;
   };
   const f = e.face, fx = sin(f), fz = -cos(f), hip = m.j.pelvis.position.y * S;

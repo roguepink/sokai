@@ -251,7 +251,7 @@ export const Bosses = {
     Events.emit('bossPhase', { e, phase: e.phase, x: e.x, z: e.z, name: e.name, type: e.type });
   },
   _roar(e, m, spec, dt, c) {
-    if (e.st > (spec.roarAt || 0.35) && !e.hitDone) { e.hitDone = 1; roarBlast(this, e, spec.roarR || 10 + e.size * 0.6, true); }
+    if (e.st > (spec.roarAt || 0.35) && !e.hitDone) { e.hitDone = 1; if (spec.onRoar) spec.onRoar(this, e, m); else roarBlast(this, e, 10 + e.size * 0.6, true); }
     if (e.st > 0.4 && e.st < 1.3 && Math.random() < dt * 8) quake(this, e.x, e.z, 0.4);
     if (e.st > (spec.roarT || 1.5)) { e.state = 'walk'; e.st = 0; e.hitDone = 0; e.cool = 0.3; }
     return 0;

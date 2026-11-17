@@ -115,11 +115,11 @@ export const SOUNDS4 = {
   },
   kaijuRoar(A, t) {
     A.nz(t, { dur: 0.6, gain: 0.1, a: 0.5, type: 'bandpass', f0: 300, f1: 900, q: 1 });      // 息を すいこむ
-    kaijuVoice(A, t + 0.75, 2.2, 0.3, 47);
+    kaijuVoice(A, t + 0.75, 2.2, 0.21, 47);
     A.duckMusic(0.3, 2.8);
   },
   kaijuHowl(A, t) {
-    kaijuVoice(A, t, 1.5, 0.3, 58, 0.45);
+    kaijuVoice(A, t, 1.5, 0.2, 58, 0.45);
     A.nz(t, { dur: 0.9, gain: 0.3, a: 0.02, type: 'bandpass', f0: 1800, f1: 300, q: 0.8, verb: 0.5 });   // 空気が ふるえる
     A.duckMusic(0.3, 1.6);
   },
@@ -135,7 +135,7 @@ export const SOUNDS4 = {
     A.tn(t + 0.3, { dur: 0.8, gain: 0.3, a: 0.3, f0: 40, f1: 60 });
   },
   kaijuDeath(A, t) {
-    kaijuVoice(A, t + 0.3, 2.8, 0.3, 52, 0.32);
+    kaijuVoice(A, t + 0.3, 2.8, 0.2, 52, 0.32);
     A.duckMusic(0.3, 3.2);
   },
 
