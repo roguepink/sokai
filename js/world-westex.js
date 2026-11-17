@@ -260,7 +260,7 @@ function atlas() {
     if (sub) text(x, '― ' + sub + ' ―', 128, 51, 12, JP, rgb(...fg));
     if (st === 'gate') { for (const sx of [20, 236]) { x.fillStyle = rgb(...fg); x.beginPath(); for (let k = 0; k < 10; k++) { const a = k / 10 * 6.283 - 1.571, r2 = k % 2 ? 4 : 10; x.lineTo(sx + Math.cos(a) * r2, 32 + Math.sin(a) * r2); } x.fill(); } }
     // 夜は ランタンの明かりで うっすら読める
-    E.globalAlpha = st === 'arrow' || st === 'gate' || st === 'jp' ? 0.5 : 0.24; E.drawImage(c, X0, Y0, 256, 64, 0, 0, 256, 64); E.globalAlpha = 1;
+    E.globalAlpha = st === 'gate' || st === 'jp' ? 0.45 : st === 'arrow' ? 0.3 : 0.24; E.drawImage(c, X0, Y0, 256, 64, 0, 0, 256, 64); E.globalAlpha = 1;
     X.restore(); E.restore();
   });
   return [c, ce];

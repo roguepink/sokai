@@ -20,7 +20,7 @@ export const GRID = [
   ['china', 'china', 'ruins', 'ruins', 'ruins'],
 ];
 // 西部の町(町の北の出口を出てすぐ。ダウンタウンのマスの外)。キャンプ場の所は のぞく
-export const WEST = { x0: -6, z0: -294, x1: 206, z1: -196 };
+export const WEST = { x0: -6, z0: -294, x1: 206, z1: -192 };
 export function inWest(x, z) { return x >= WEST.x0 && x <= WEST.x1 && z >= WEST.z0 && z <= WEST.z1 && (x > 17 || z > -262 || (x * x + (z + 280) * (z + 280)) > 17 * 17); }
 export const DNAME = { western: 'ウエスタン通り', plaza: '中央広場', neon: 'ネオン繁華街', china: '中華街', shita: '下町商店街', temple: '寺町', office: 'オフィス街', ruins: '崩壊地区' };
 // 地区の色: map = ミニマップの地面 / bmap = ミニマップの建物 / road = 道の材質と色 / pad = 歩道の材質と色

@@ -173,7 +173,7 @@ function pier(ctx, x0, x1, z0, z1) {
 // ---------------- 外へのびる道 ----------------
 function roads(ctx) {
   const O = OUT, { z0, z1 } = O.river;
-  road(ctx, z1 + 3, -294, 40, 6, false); road(ctx, -196, -192, 40, 6, false, { dash: false });   // 町の北 →(西部の町の土の道)→ 橋 → 空港
+  road(ctx, z1 + 3, -294, 40, 6, false);   // 町の北 →(西部の町の土の道)→ 橋 → 空港
   road(ctx, -478, z0 - 3, 40, 6, false);
   road(ctx, z1 + 3, -150, -330, 4.5, false);        // 住宅街 → 橋 → 空港の西
   road(ctx, -478, z0 - 3, -330, 4.5, false);

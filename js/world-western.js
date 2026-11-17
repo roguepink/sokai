@@ -36,7 +36,7 @@ function guide(ctx, x, z, s = 1) {
 // 地面に置いた 道しるべの板(見下ろしで読める。字の上が 北)
 function groundSign(ctx, cx, cz, w, y) {
   const h = w / 4, uv = wSignUV(WS['↑ ウエスタン通り']);
-  quad4(ctx.B.bucket(ctx.M.west, cx, cz), [cx - w / 2, y, cz + h / 2], [cx + w / 2, y, cz + h / 2], [cx + w / 2, y, cz - h / 2], [cx - w / 2, y, cz - h / 2], uv, [1.1, 1.1, 1.1]);
+  quad4(ctx.B.bucket(ctx.M.west, cx, cz), [cx - w / 2, y, cz + h / 2], [cx + w / 2, y, cz + h / 2], [cx + w / 2, y, cz - h / 2], [cx - w / 2, y, cz - h / 2], uv, [0.8, 0.8, 0.8]);
 }
 // 入口の門(丸太の柱・町の名前・牛の頭の骨)
 function gate(ctx, cx, z) {
@@ -127,7 +127,7 @@ function sheriff(ctx) {
   S.finish();
 }
 function church(ctx) {
-  const { M } = ctx, x0 = 99, x1 = 113, z0 = -284.6, z1 = -264.6, h = 5.6, col = [1.34, 1.32, 1.27], cx = 106;
+  const { M } = ctx, x0 = 99, x1 = 113, z0 = -284.6, z1 = -264.6, h = 5.6, col = [1.04, 1.17, 1.38], cx = 106;   // 白い板張り
   const S = new WBld(ctx, { name: '教会', x0, z0, x1, z1, h, y0: Y, bay: 3.4, front: 'S',
     rows: [[0, 20, [WT.clap, WT.arch]]], frontRows: [[0, 20, [WT.clap]]],
     skinCol: col, floor: M.woodFloor, floorCol: [0.72, 0.58, 0.44], wall: M.plaster, wallCol: [0.92, 0.88, 0.8], small: true });
@@ -137,7 +137,7 @@ function church(ctx) {
   S.light(cx, -272, 5, [0.5, 0.36, 0.16]); S.light(cx, -280.5, 4, [0.5, 0.36, 0.16]);
   S.onRoof(() => {
     const B = ctx.B;
-    wgable(ctx, B.bucket(M.west, cx, -274), x0, z0, x1, z1, h, false, WT.shingle, [0.72, 0.68, 0.7], 4.4, 0.5, [1.0, 0.98, 0.94]);
+    wgable(ctx, B.bucket(M.west, cx, -274), x0, z0, x1, z1, h, false, WT.shingle, [0.72, 0.68, 0.7], 4.4, 0.5, [0.8, 0.86, 0.96]);
     // 鐘の塔(正面の上)
     wbox(ctx, cx - 2, h - 0.2, z1 - 4.2, cx + 2, h + 5.2, z1 - 0.2, WT.clap, col, WT.shingle, 4);
     for (const [nx, nz] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) B.box(M.plain, cx + nx * 2.02 - (nz ? 0.8 : 0.02), h + 3.0, z1 - 2.2 + nz * 2.02 - (nx ? 0.8 : 0.02), cx + nx * 2.02 + (nz ? 0.8 : 0.02), h + 4.6, z1 - 2.2 + nz * 2.02 + (nx ? 0.8 : 0.02), { col: [0.06, 0.05, 0.05], skip: '' });
@@ -183,7 +183,7 @@ export function genWestern(ctx) {
   // 東の列(西向き)
   wbuild(ctx, [49.6, -219, 60.6, -208], Wn, { col: [0.62, 0.56, 0.52], side: WT.board, ground: [WT.barn, WT.board, WT.barn], sign: WS.BLACKSMITH, top: 'rect', porch: 'flat', awnTile: WT.tin });
   wbuild(ctx, [49.6, -231, 59.6, -221], Wn, { col: [0.92, 0.56, 0.46], side: WT.board, ground: [WT.barn, WT.clapWin, WT.door], sign: WS['FEED & GRAIN'], top: 'peak' });
-  wbuild(ctx, [49.6, -243.4, 58.6, -233], Wn, { col: [1.26, 1.22, 1.14], ground: [WT.clapWin, WT.door, WT.clapLit], sign: WS.DOCTOR, top: 'step' });
+  wbuild(ctx, [49.6, -243.4, 58.6, -233], Wn, { col: [1.08, 1.22, 1.44], ground: [WT.clapWin, WT.door, WT.clapLit], sign: WS.DOCTOR, top: 'step' });
   wbuild(ctx, [49.6, -293.4, 59.6, -285], Wn, { col: [1.0, 0.86, 0.6], ground: [WT.door, WT.clapWin, WT.clapWin], sign: WS['ASSAY OFFICE'], top: 'rect' });
   // 鍛冶屋の炉と かなとこ
   B.box(M.plain, 53.4, 0, -207.2, 55.2, 1.0, -205.8, { col: [0.36, 0.33, 0.32] }); B.box(M.glow, 53.7, 1.0, -206.9, 54.9, 1.06, -206.1, { col: [3, 1.0, 0.25] });
@@ -344,13 +344,13 @@ export const West = {
             p.xz = mod(p.xz - uCenter.xz + B.xz * 0.5, B.xz) + uCenter.xz - B.xz * 0.5;
             vec4 mv = modelViewMatrix * vec4(p, 1.0);
             gl_Position = projectionMatrix * mv;
-            gl_PointSize = min((3.0 + aSeed * 7.0) * uScale / max(1.0, -mv.z), uScale * 0.22);
+            gl_PointSize = min((5.0 + aSeed * 12.0) * uScale / max(1.0, -mv.z), uScale * 0.3);
             vA = smoothstep(0.0, 0.6, p.y) * (1.0 - smoothstep(5.0, 8.0, p.y)) * smoothstep(3.0, 8.0, -mv.z) * (0.4 + 0.6 * aSeed);
           }`,
         fragmentShader: `uniform float uAmt; uniform float uDay; varying float vA;
           void main() {
             float a = smoothstep(0.5, 0.0, length(gl_PointCoord - 0.5));
-            gl_FragColor = vec4(vec3(0.9, 0.7, 0.48) * mix(0.3, 1.0, uDay), a * vA * uAmt * 0.34);
+            gl_FragColor = vec4(vec3(0.56, 0.4, 0.25) * mix(0.3, 1.0, uDay), a * vA * uAmt * 0.3);
           }`,
       });
       const pts = this.pts = new THREE.Points(bg, m);
