@@ -66,7 +66,7 @@ export const World = {
     const q = Engine.quality;
     const M = this.M = makeMaterials(Engine.renderer, q);
     makeDistrictMaterials(M, Engine.renderer, q);
-    makeWestMaterials(M, Engine.renderer, q);
+    let tw = performance.now(); makeWestMaterials(M, Engine.renderer, q); this.westMs = performance.now() - tw;   // westMs = 西部の町に かかった時間(確認用)
     const B = new Builder(CHUNK, h), I = new Instancer(CHUNK, h), CB = new Builder(CHUNK * 2, h), SB = new Builder(400, h);
     I.thin = q === 'low' ? 0.45 : q === 'mid' ? 0.8 : 1;
     // ミニマップ
@@ -103,13 +103,15 @@ export const World = {
     defineProps(ctx);
     defineProps2(ctx);
     defineDistrictProps(ctx);
-    defineWestProps(ctx);
+    tw = performance.now(); defineWestProps(ctx); this.westMs += performance.now() - tw;
     Sky.init(this, M);
     if (q !== 'low') this._embers(q === 'high' ? 420 : 260);
     this._ground(ctx, mx, k);
     genTown(ctx);
     // 西部の町(乱数は 別にする = ほかの場所の並びを 変えない)
+    tw = performance.now();
     { const r0 = ctx.rnd; ctx.rnd = seeded(1881); genWestern(ctx); ctx.rnd = r0; }
+    this.westMs = Math.round(this.westMs + performance.now() - tw);
     genBuildings(ctx);
     genNature(ctx);
     // まわりの壁(マップの外へ出ない)
