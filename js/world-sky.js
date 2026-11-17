@@ -8,6 +8,7 @@ import * as THREE from '../vendor/three/build/three.module.min.js';
 import { Engine } from './engine.js';
 import { Events } from './events.js';
 import { seeded } from './util.js';
+import { Air } from './depth-air.js';
 
 export const CYCLE = 420;               // 1 日の長さ(秒)
 // 昼と夜の割合(ノブさん 2026-10-23「A案」): 時計(u, 一定の速さで進む)を 見た目の時間(t)に読みかえる。
@@ -40,16 +41,18 @@ const W_TEXT = { clear: '空が晴れた', rain: '雨が降ってきた', storm:
 // 夜の明るさ: スマホの画面で 見下ろしでも敵が見えるよう 少し明るめ(テスト係A2)
 // 時間ごとの色(t, 空の上, 地平線, 霧, 空の光(上), 空の光(下), 空の光の強さ, 太陽の色, 太陽の強さ, 窓, 街灯, 光だまり, 星)
 const KEYS = [
-  [0.00, 0x3f6ea8, 0xb9c4cc, 0x8e959c, 0xd4dcee, 0x5b5248, 1.55, 0xfff1de, 2.9, 0.15, 0.55, 0.12, 0],
-  [0.16, 0x4a6aa0, 0xd6b89a, 0x8c8682, 0xd0cce0, 0x584a40, 1.45, 0xffe2bc, 2.7, 0.3, 0.6, 0.2, 0],
-  [0.24, 0x2a2550, 0xe89a5c, 0x464256, 0x9aa4d2, 0x3d3631, 1.15, 0xffd2ae, 2.25, 1.0, 1.0, 1.0, 0.1],
-  [0.30, 0x101030, 0x8a4a58, 0x2c2a40, 0x7c86ba, 0x2a2630, 0.98, 0xc8a0a8, 1.45, 1.35, 1.2, 1.3, 0.5],
-  [0.36, 0x05070f, 0x1c2440, 0x182030, 0x6a7cae, 0x201e26, 1.0, 0x9db0ff, 1.2, 1.6, 1.4, 1.7, 1],
-  [0.64, 0x05070f, 0x1c2440, 0x182030, 0x6a7cae, 0x201e26, 1.0, 0x9db0ff, 1.2, 1.6, 1.4, 1.7, 1],
-  [0.70, 0x111a3a, 0x4a4a6c, 0x2a3044, 0x8890b8, 0x2a2830, 0.96, 0xb0b8e8, 1.25, 1.4, 1.2, 1.3, 0.6],
-  [0.76, 0x2a3c70, 0xf2a27a, 0x6a5c6c, 0xb0aacc, 0x3e3634, 1.2, 0xffc8a0, 2.1, 0.9, 0.9, 0.8, 0.1],
-  [0.84, 0x5078b0, 0xe0c8a8, 0x8a8c90, 0xc8d0e4, 0x564c44, 1.4, 0xfff0dc, 2.6, 0.3, 0.6, 0.2, 0],
-  [1.00, 0x3f6ea8, 0xb9c4cc, 0x8e959c, 0xd4dcee, 0x5b5248, 1.55, 0xfff1de, 2.9, 0.15, 0.55, 0.12, 0],
+  // 第5弾(立体感): 昼・夕方・朝は「空の光(影の中の明るさ)」を下げて「太陽」を上げた = 影が こく、光の面と影の面の差が はっきり。
+  //   空の光は 青く、地面の照り返しは 明るく あたたかく(壁の下がわ・影の面が 茶色く持ち上がる)。夜は 暗くしない(月の光を 少し強く)
+  [0.00, 0x3f6ea8, 0xb9c4cc, 0x8f99a6, 0xc4d4f4, 0x7a6c5c, 1.22, 0xfff1de, 4.2, 0.15, 0.55, 0.12, 0],
+  [0.16, 0x4a6aa0, 0xd6b89a, 0x8c8886, 0xc2c4e6, 0x76644f, 1.2, 0xffe2bc, 3.75, 0.3, 0.6, 0.2, 0],
+  [0.24, 0x2a2550, 0xe89a5c, 0x464256, 0x9aa4d2, 0x54463a, 1.1, 0xffd2ae, 2.75, 1.0, 1.0, 1.0, 0.1],
+  [0.30, 0x101030, 0x8a4a58, 0x2c2a40, 0x7c86ba, 0x2e2a32, 0.98, 0xc8a0a8, 1.55, 1.35, 1.2, 1.3, 0.5],
+  [0.36, 0x05070f, 0x1c2440, 0x182030, 0x6a7cae, 0x24222a, 1.0, 0x9db0ff, 1.38, 1.6, 1.4, 1.7, 1],
+  [0.64, 0x05070f, 0x1c2440, 0x182030, 0x6a7cae, 0x24222a, 1.0, 0x9db0ff, 1.38, 1.6, 1.4, 1.7, 1],
+  [0.70, 0x111a3a, 0x4a4a6c, 0x2a3044, 0x8890b8, 0x2e2c34, 0.96, 0xb0b8e8, 1.4, 1.4, 1.2, 1.3, 0.6],
+  [0.76, 0x2a3c70, 0xf2a27a, 0x6a5c6c, 0xb0aacc, 0x52463c, 1.12, 0xffc8a0, 2.55, 0.9, 0.9, 0.8, 0.1],
+  [0.84, 0x5078b0, 0xe0c8a8, 0x8a8e96, 0xc0cef0, 0x74665a, 1.16, 0xfff0dc, 3.65, 0.3, 0.6, 0.2, 0],
+  [1.00, 0x3f6ea8, 0xb9c4cc, 0x8f99a6, 0xc4d4f4, 0x7a6c5c, 1.22, 0xfff1de, 4.2, 0.15, 0.55, 0.12, 0],
 ].map((k) => k.map((v, i) => (i >= 1 && i <= 5) || i === 7 ? new THREE.Color(v) : v));
 const PHASES = [[0.225, 'dusk', '日が沈む…'], [0.32, 'night', '夜になった'], [0.5, 'midnight', '真夜中だ'], [0.72, 'dawn', '夜明けだ'], [0.82, 'day', '朝になった']];
 
@@ -478,11 +481,29 @@ export const Sky = {
     for (const w of this.wetMats) { w.m.roughness = w.r + (w.wr - w.r) * wet; w.m.color.copy(w.c).multiplyScalar(1 + (w.dk - 1) * wet); w.m.metalness = w.me + 0.12 * wet; }
     // 霧の距離(視点と天気で変える)
     const v = this._view, q = Engine.quality;
-    const far0 = v === 'top' ? 140 : (q === 'high' ? 290 : q === 'mid' ? 230 : 175) * this.viewDistMul;
-    const near0 = v === 'top' ? 40 : 45;
+    // 第5弾: 見下ろしは カメラを寝かせた分 遠くまで画面に入るので、霧を 近くした(前は 40〜140m)。画面の上のほう(奥)が 青白く かすんで 奥行きが出る。
+    //   描く物の数も 前と同じくらいに おさまる(霧の先は 描かない)
+    const far0 = v === 'top' ? 80 : (q === 'high' ? 290 : q === 'mid' ? 230 : 175) * this.viewDistMul;
+    const near0 = v === 'top' ? 24 : 45;
     const fm = Math.max(0.28, 1 - wx.rain * 0.2 - wx.storm * 0.32 - wx.fog * 0.62 - wx.snow * 0.3 - wx.ash * 0.4) * (1 - nightK * 0.12);
     this.fogMul = fm;
-    if (sc.fog) { sc.fog.near = near0 * (0.35 + 0.65 * fm); sc.fog.far = far0 * fm; this.fogFar = sc.fog.far; }
+    // 第5弾: カメラを大きく引いたとき(ボス)は 霧も 遠くへ(Engine.fogScale。肩越し・一人称は Engine.farBoost だけ)。上限 350m(空のドームの中)
+    const fsc = v === 'top' ? Engine.fogScale || 1 : Engine.farBoost || 1;
+    if (sc.fog) { sc.fog.near = near0 * (0.35 + 0.65 * fm) * fsc; sc.fog.far = Math.min(350, far0 * fm * fsc); this.fogFar = sc.fog.far; }
+    // 第5弾: 低い所にたまる かすみ(depth-air.js)と ふちの光。色は 地平線の色(昼 = 青白い・夕方 = だいだい)。夜は うすく・暗くしない
+    {
+      const hz = _c.copy(U.uHor.value).lerp(U.uFog.value, 0.35).multiplyScalar(1.15);
+      hz.r *= 0.96; hz.b *= 1.06;
+      if (Engine.hemi) { hz.r += Engine.hemi.color.r * 0.07 * nightK; hz.g += Engine.hemi.color.g * 0.07 * nightK; hz.b += Engine.hemi.color.b * 0.07 * nightK; }
+      const wxK = 1 + wx.fog * 1.5 + wx.rain * 0.5 + wx.storm * 0.7 + wx.snow * 0.8 + wx.ash * 1.0;
+      const topAir = v === 'top' && !Engine.lowCam;
+      const dens = (topAir ? 0.011 : 0.0042) * (1 - 0.4 * nightK) * wxK;
+      Air.set(dens, hz.r, hz.g, hz.b, topAir ? 0.5 : 0.62);
+      // ふちの光 = 空の光 + 太陽(月)の光。夜は 少し強く(暗い中で ゾンビの りんかくが 分かる)
+      const hI = Engine.hemi ? Engine.hemi.intensity : 1, sI = Engine.sun ? Engine.sun.intensity : 1, rk = (1.3 + 0.5 * nightK) * (1 - ov * 0.3);
+      const hc = Engine.hemi ? Engine.hemi.color : _c2.setRGB(0.7, 0.75, 0.9), scol = Engine.sun ? Engine.sun.color : hc;
+      Air.setRim((hc.r * hI * 0.22 + scol.r * sI * 0.055) * rk, (hc.g * hI * 0.22 + scol.g * sI * 0.055) * rk, (hc.b * hI * 0.22 + scol.b * sI * 0.055) * rk, 2.6);
+    }
     // 遠くの景色(霧の終わりに立てる)
     const cam = Engine.camera.position;
     this.dome.matrix.makeTranslation(cam.x, 0, cam.z); this.dome.matrixWorld.copy(this.dome.matrix);
