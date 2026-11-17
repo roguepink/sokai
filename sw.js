@@ -5,7 +5,7 @@
    - ゲームを直しただけなら VERSION は そのままでいい
    - FILES(覚えるファイル)を足したり消したりしたら VERSION を 1つ上げる(古い覚えを 一斉に捨てる)
    - FILES に書き忘れたファイルも、ページが「読みこんだもの一覧」を送ってくるので覚えられる(index.html) */
-const VERSION = 'sokai-v6';
+const VERSION = 'sokai-v7';
 const FILES = [
   './', 'index.html', 'install.js', 'shots/1.jpg', 'shots/2.jpg', 'shots/3.jpg', 'shots/4.jpg', 'shots/5.jpg', 'manifest.webmanifest', 'css/style.css', 'css/view.css',
   'icon-192.png', 'icon-512.png', 'maskable-512.png', 'apple-touch-icon.png',
@@ -29,6 +29,7 @@ const FILES = [
   'vendor/three/addons/shaders/OutputShader.js', 'vendor/three/addons/shaders/FXAAShader.js', 'vendor/three/addons/shaders/VignetteShader.js',
   'js/audio-boss.js', 'js/boss-attacks.js', 'js/boss-beasts.js', 'js/boss-classic.js', 'js/boss-giants.js', 'js/boss-kit.js', 'js/boss-warn.js', 'js/fx-boss.js', 'js/ui-bossdex.js', 'js/ui-bossfx.js', 'js/world-dgen.js', 'js/world-dgen2.js', 'js/world-district.js', 'js/world-dkit.js', 'js/world-dtex.js',
   'js/boss-kaiju.js', 'js/depth-air.js', 'js/depth-ground.js', 'js/depth-post.js', 'js/ui-icons.js', 'js/world-western.js', 'js/world-westex.js', 'js/world-westkit.js',
+  'js/kaiju-cam.js',
 ];
 const WAIT = 4000;   // ネットがこれより遅ければ、覚えているものを先に出す(ミリ秒)
 

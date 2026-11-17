@@ -184,7 +184,7 @@ export const VM = {
     const prev = Engine.scene.onAfterRender;
     Engine.scene.onAfterRender = function (r, s, cam, t) {
       if (prev) prev.call(this, r, s, cam, t);
-      if (cam === Engine.camera && VM.active) VM.render(r);
+      if (cam === Engine.camera && VM.active && !Engine.cineCam) VM.render(r);      // 場面カット(大怪獣の全身を 遠くから映す)の間は 手元の武器を 描かない
     };
     // 材質の準備を先にすませる(初めて一人称にしたとき固まらないように)
     try {

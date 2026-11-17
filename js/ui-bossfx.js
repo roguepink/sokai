@@ -135,7 +135,9 @@ export const BossShow = {
   _onOmen(d) {
     if (!Score.active) return;
     this.omen = { t: 0, sec: d.sec || 9, next: 0.4, n: 0 };
-    this._omenDark(1);
+    // 画面のふちを 暗く(第5弾の仕上げ: ひかえめに。夜は もっと弱く = 暗いと 見づらいので)
+    let night = 0; try { night = Engine.ctx && Engine.ctx.World ? Engine.ctx.World.night || 0 : 0; } catch (err) { /* なし */ }
+    this._omenDark(0.62 - 0.3 * night);
     this.ui.banner.show('…何かが 来る', '大地が ふるえている', 'boss', 3.4, 2);
     this.ui.el.vignette.classList.add('boss');
   },

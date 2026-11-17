@@ -17,6 +17,7 @@
 import * as THREE from '../vendor/three/build/three.module.min.js';
 import { Engine } from './engine.js';
 import { World } from './world.js';
+import { Events } from './events.js';
 
 const { sin, cos, tan, atan, atan2, hypot, min, max, abs, PI } = Math;
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -30,7 +31,7 @@ const _up = new THREE.Vector3(0, 1, 0);
 const _p0 = new THREE.Vector3(), _q0 = new THREE.Quaternion(), _q1 = new THREE.Quaternion(), _m = new THREE.Matrix4();
 
 // (x0,y0,z0) → (x1,y1,z1) の間に 建物(壁の箱)が あるか。4m きざみで 点を しらべる(太い建物だけ 分かればよい)
-function blocked(x0, y0, z0, x1, y1, z1) {
+function blocked(x0, y0, z0, x1, y1, z1, trees = false, pad = 0) {
   const W = World;
   if (!W.grid || !W.boxes || !W._cell) return false;
   const L = hypot(x1 - x0, y1 - y0, z1 - z0), n = Math.ceil(L / 4);
@@ -41,7 +42,10 @@ function blocked(x0, y0, z0, x1, y1, z1) {
     if (!cell) continue;
     for (let k = 0; k < cell.length; k++) {
       const b = W.boxes[cell[k]];
-      if (y < b.h && x > b.minX && x < b.maxX && z > b.minZ && z < b.maxZ && (b.maxX - b.minX > 1.5 || b.maxZ - b.minZ > 1.5)) return true;
+      // 細い物(木の幹・街灯)は、低い所を通る線だけ・まわり 2.5m を ふさぐ物として 数える(木の葉で 体が かくれないように)
+      const thin = b.maxX - b.minX <= 1.5 && b.maxZ - b.minZ <= 1.5, g = thin ? 2.5 : pad;
+      if (thin && (!trees || b.h < 3.5)) continue;
+      if (y < b.h + g && x > b.minX - g && x < b.maxX + g && z > b.minZ - g && z < b.maxZ + g) return true;
     }
   }
   return false;
@@ -89,7 +93,7 @@ export const KaijuCam = {
     // 画面の中で 体を 置く わく(上は 警報の帯・下は 名札と 地面の分 あける)
     const mx = 0.9, y0 = o.bottom == null ? -0.8 : o.bottom, y1 = o.top == null ? 0.8 : o.top;
     let best = null;
-    for (const cy of [3.5, 9, 18, 30, 46, 70]) {
+    for (const cy of [6, 18, 30, 46, 70]) {
       for (const off of offs) {
         const a = base + off;
         let D = 170;
@@ -116,12 +120,12 @@ export const KaijuCam = {
         const half = (World.half || 600) - 8;
         if (abs(_c.x) > half || abs(_c.z) > half) continue;
         if (blocked(_c.x, cy, _c.z, _c.x, cy + 0.1, _c.z)) continue;
-        if (cy < 12 && World.blockedAt && World.blockedAt(_c.x, _c.z, 2)) continue;
+        if (cy < 12 && World.blockedAt && World.blockedAt(_c.x, _c.z, 5)) continue;
         // 見える点の数(はじめの 6 つ = 頭・口・むね・こし・足 2 つ が 大事)
         let seen = 0, key = 0;
         for (let i = 0; i < n; i++) {
           const p = _pts[i];
-          if (!blocked(_c.x, _c.y, _c.z, p.x, max(p.y, 4), p.z)) { seen++; if (i < 4) key++; }
+          if (!blocked(_c.x, _c.y, _c.z, p.x, max(p.y, 4), p.z, cy < 12)) { seen++; if (i < 4) key++; }
         }
         const score = key * 30 + seen * 6 - cy * 0.5 - abs(off) * (tall ? 6 : 0) - (fit > 1.08 ? 40 : 0) - (D > 240 ? 10 : 0);
         if (!best || score > best.score) best = { score, x: _c.x, y: _c.y, z: _c.z, lx: _t.x, ly: _t.y, lz: _t.z, fov, key, seen, n, D };
@@ -143,15 +147,17 @@ export const KaijuCam = {
     if (e && P && e._M) {
       const top = E.viewMode === 'top';
       if (top) {
-        if (!World.inside) k = 1;
-        // 南がわの 建物で 主人公が かくれないか(0.25 秒ごと)。かくれるなら 高い所へ
+        // 南がわの 建物で 主人公が かくれないか(0.25 秒ごと)。かくれるなら 高い所へ。どの高さでも だめ(すぐ南が 高いビル)なら いつもの 見下ろしに もどす
         if ((this._elevT -= dt) <= 0) {
           this._elevT = 0.25;
-          const d = G.dist, px = P.pos.x, pz = P.pos.z;
-          let el = 0.95;
-          for (const a of [0.34, 0.46, 0.6, 0.78]) if (!blocked(px, 1.6, pz, px, 1.6 + sin(a) * d, pz + cos(a) * d)) { el = a; break; }
-          this._elev = el;
+          const d = tall ? 31 : 34, px = P.pos.x, pz = P.pos.z;
+          let el = 0;
+          // (屋根の ひさし・看板の分、建物を 2m 大きく見て しらべる。主人公の 頭の少し上から)
+          for (const a of [0.34, 0.46, 0.6, 0.78]) if (!blocked(px, 2.2, pz + 1.5, px, 2.2 + sin(a) * d, pz + cos(a) * d, false, 2)) { el = a; break; }
+          this._ok = el > 0 ? min(4, (this._ok || 0) + 1) : 0;      // 開けた所に 出て 0.5 秒 たってから もどる(行ったり来たり しない)
+          if (el > 0) this._elev = el;
         }
+        if (!World.inside && this._ok >= 2) k = 1;
         G.dist = tall ? 31 : 34; G.fov = 72; G.fovTall = 82;
         G.elev = damp(G.elev, this._elev, this._elev > G.elev ? 4 : 1.5, dt);
         G.frac = tall ? 0.2 : 0.14;
@@ -219,3 +225,12 @@ export const KaijuCam = {
 };
 
 Engine.camHook = (dt) => KaijuCam.frame(dt);
+// やりなおし・タイトルへ: 場面カットを やめる(主人公を 止めたままに しない)
+const _reset = () => {
+  KaijuCam.cut = null; KaijuCam.e = null; KaijuCam._points = null; Engine.cineLock = false; Engine.cineCam = false;
+  const G = Engine.giant; G.k = 0; G.upPitch = 0; G.upFov = 0;
+  if (KaijuCam.onCut) try { KaijuCam.onCut(false, ''); } catch (err) { /* そのまま */ }
+};
+Events.on('reset', _reset);
+Events.on('finish', _reset);
+

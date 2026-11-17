@@ -157,10 +157,11 @@ function applyPose(m, P, bob = 0) {
   j.armR.rotation.set(P[Q.aRx], 0, P[Q.aRz]); j.foreR.rotation.x = P[Q.fR];
 }
 
-// 出ている 大怪獣(霧と影を 遠くまで: Engine.setFarBoost(2)。立体感の係の 約束。いなくなったら 1 に もどす)
+// 出ている 大怪獣(霧と影を 少し 遠くまで: Engine.setFarBoost。立体感の係の 約束。いなくなったら 1 に もどす)
 const LIVE = [];
-// 見下ろしで カメラを とても遠くへ引いている間(登場)は 1 のまま(引いた分で もう 十分 遠い。2 にすると 霧の 近い方が 遠い方を こえる)
-function farBoost() { if (Engine.setFarBoost) Engine.setFarBoost(LIVE.length && !(Engine.viewMode === 'top' && Engine.camDist > 42) ? 2 : 1); }
+// 第5弾の仕上げ: 前は 2 倍(霧の終わりが 350m = 町が 遠くまで 全部 描かれて 重かった)。大怪獣は 100m ほどに 立つので 1.3 倍で 足りる
+// (体は 霧が 弱く かかる 材質なので かすまない。遠くのビルは かすんで 奥行きが出る)。場面カットの間だけ 2 倍(カメラが 170m ほど はなれる)
+function farBoost() { if (Engine.setFarBoost) Engine.setFarBoost(!LIVE.length ? 1 : KaijuCam.cutting ? 2 : 1.3); }
 
 // =====================================================================
 // 終末竜 ムクロドン
@@ -340,6 +341,7 @@ const kaiju = {
     for (const F of m.feet) { F.x = e.x + rx * F.side * STANCE; F.z = e.z + rz * F.side * STANCE; F.y = 0; F.planted = true; F.manual = false; F.t = 0; F.T = 1; F.landT = -9; F.yaw = f; F.tx = F.x; F.tz = F.z; F.sx = F.x; F.sz = F.z; F.ox = 0; F.oz = 0; }
     const bx = -sin(f), bz = cos(f);
     for (let i = 0; i <= TN; i++) m.tp[i].set(e.x + bx * (10 + i * 9), TH1[i], e.z + bz * (10 + i * 9));
+    for (let k = 0; k < 4; k++) m.fk[k].set(e.x + bx * (10 + TN * 9 + (k < 2 ? 12 : 28)), 4, e.z + bz * (10 + TN * 9 + (k < 2 ? 12 : 28)));      // 二またの先(はじめの 1 コマから 正しい所に。カメラ係が 使う)
     // 体の部品(当たりの丸): 足 2 つ・しっぽの低い所 4 つ・二またの先 2 つ
     const Z = B._Z;
     m.parts = { feet: [Z.addPart(e, FOOT_R, 5), Z.addPart(e, FOOT_R, 5)], tail: [], fork: [Z.addPart(e, 3.6, 3), Z.addPart(e, 3.6, 3)], far: Z.addPart(e, 9, 20) };
@@ -504,7 +506,7 @@ const kaiju = {
       L.ft.rotation.set(-META_TILT + 0.45 * up, dy, 0, 'YXZ');
     }
     nearFade(e, dead);
-    if (dead) { shadeStep(m, e, dt, true); return; }
+    if (dead) { farBoost(); shadeStep(m, e, dt, true); return; }
     tailStep(B, m, e, dt);
     bodyStep(B, m, e, dt);
     shadeStep(m, e, dt, false);
@@ -963,7 +965,7 @@ function bodyStep(B, m, e, dt) {
 // 腐れ火の息(1 ステップぶん): 口 (M) → 地面 (gx, gz)
 function breathTick(B, m, e, M, gx, gz, dt) {
   const vx = gx - M.x, vy = 0.5 - M.y, vz = gz - M.z, L = Math.hypot(vx, vy, vz) || 1, ux = vx / L, uy = vy / L, uz = vz / L, V = 70;
-  const n = FX.q(5), cam = Engine.camera.position, top = Engine.viewMode === 'top';
+  const n = FX.q(4), cam = Engine.camera.position, top = Engine.viewMode === 'top';
   for (let i = 0; i < n; i++) {
     const u = R(0.02, 0.92), w = 1.5 + u * 5;
     const x = M.x + vx * u + R(-w, w), y = M.y + vy * u + R(-w, w), z = M.z + vz * u + R(-w, w);
@@ -971,14 +973,14 @@ function breathTick(B, m, e, M, gx, gz, dt) {
     const cx = cam.x - x, cy = cam.y - y, cz = cam.z - z, t = clamp(cx * ux + cy * uy + cz * uz, 0, V * 0.42);
     if ((cx - ux * t) ** 2 + (cy - uy * t) ** 2 + (cz - uz * t) ** 2 < (top ? 30 : 16) ** 2) continue;
     // 第5弾の仕上げ: 明るさを おさえた(前は 1.2〜1.7 で 重なると 画面が 緑白く とんだ)。濃い緑の 炎の 流れに 見える
-    FX.flame(x, y, z, ux * V, uy * V, uz * V, 2.2 + u * 3.2, 0.42, HOT, COOL, 0.7, 0.55);
+    FX.flame(x, y, z, ux * V, uy * V, uz * V, 1.8 + u * 2.6, 0.42, HOT, COOL, 0.7, 0.5);
   }
   if (Math.random() < 0.5) FX.smoke(M.x + vx * 0.5 + R(-5, 5), M.y + vy * 0.5 + 4, M.z + vz * 0.5 + R(-5, 5), 5, 1.4, 0x2a3a1c, ux * 20, 4, uz * 20, 0.4);
-  FX.glow(M.x + ux * 4, M.y + uy * 4, M.z + uz * 4, 8, GREEN, 1.5);
+  FX.glow(M.x + ux * 4, M.y + uy * 4, M.z + uz * 4, 7, GREEN, 1.2);
   // 地面: 広がる 緑の炎・土けむり・骨の つぶて(カメラの すぐ近くでは 小さく・少なく)
   const gcd = Math.hypot(cam.x - gx, cam.z - gz), gk = clamp((gcd - 6) / 14, 0.25, 1);
-  for (let i = 0; i < FX.q(2); i++) { if (Math.random() > gk) continue; const a = R(0, TAU), s = R(8, 20); FX.flame(gx + R(-4, 4), 0.8, gz + R(-4, 4), cos(a) * s, R(3, 9), sin(a) * s, R(2.2, 3.8) * (0.5 + 0.5 * gk), R(0.5, 0.8), HOT, COOL, 0.8, 0.75); }
-  if (gk > 0.6) FX.glow(gx, 1.5, gz, 5, GREEN, 0.7);
+  for (let i = 0; i < FX.q(2); i++) { if (Math.random() > gk) continue; const a = R(0, TAU), s = R(8, 20); FX.flame(gx + R(-4, 4), 0.8, gz + R(-4, 4), cos(a) * s, R(3, 9), sin(a) * s, R(1.8, 3.0) * (0.5 + 0.5 * gk), R(0.5, 0.8), HOT, COOL, 0.8, 0.7); }
+  if (gk > 0.6) FX.glow(gx, 1.5, gz, 4, GREEN, 0.5);
   if (Math.random() < 0.4) FX.debris(gx, 1, gz, 3, 16, BONE2, 0.45, 1.6);
   if (Math.random() < 0.3) FX.smoke(gx, 1, gz, 4, 1.8, 0x2a2a20, R(-3, 3), 5, R(-3, 3), 0.5);
   if ((e.bt = (e.bt || 0) + dt) > 0.1) {

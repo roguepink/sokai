@@ -12,7 +12,7 @@
 
 ## 作り(ビルドなし)
 - `index.html`(画面の枠・タイトル/一時停止/結果)+ `css/style.css` + `js/*.js`(ES modules)
-- three.js r186 は `vendor/three/`(CDN を使わず同梱。オフラインでも動く)。import は `'three'` と `'three/addons/...'`(importmap)
+- three.js r186 は `vendor/three/`(CDN を使わず同梱。オフラインでも動く)。import は `'../vendor/three/build/three.module.min.js'` を 直接(**importmap は使わない**。古い iPhone で 真っ白になる)
 - 画像・音のファイルは使わない。見た目は three.js の形・canvas で描いた模様、音は WebAudio で作る
 - 確認: `source ~/.local/venvs/ryokoshi/bin/activate && python3 tools/playtest.py --secs 20 --shots 3`
   → `_check/pt-*.png` を **必ず目で見る**。fps・ゾンビ数・エラーが出る。`--before "JS"` / `--eval "JS"` で状態を作れる
@@ -70,6 +70,16 @@
   - 視点・カメラの API(`setZoom` `focusOn` `fovKick` `setViewMode` など)は なくさない。足すのは自由
   - 新しい js を足したら 報告に書く(まとめる人が `sw.js` の FILES に足して VERSION を上げる)。**importmap は使わない**(three は `../vendor/three/build/three.module.min.js` を直接 import)
   - スマホで重くしない(ノブさんのスマホは前に熱くなった)。描く回数・三角の数を 今より増やしすぎない。`tools/playtest_cpu.py --cpu 4` で確かめる
+- 第5弾で足された API とイベント(詳しくは 各ファイルの先頭のコメント)
+  - Engine: `setFarBoost(v)`(霧と影を 遠くまで。1〜3)`fogScale` / `giant{k,dist,elev,fov,fovTall,frac,upPitch,upFov}`(超巨大ボス用のカメラ。kaiju-cam.js が入れる)/ `camHook`(カメラを決めた直後に呼ぶ)`cineCam` `cineLock`(場面カット中。main.js の step が 主人公と武器を 止める)
+  - `KaijuCam`(kaiju-cam.js。`__game.KaijuCam`): `attach(e, points)` `detach(e)` `startCut('intro'|'rage'|'death', 秒, {az,top,bottom,extra,dolly})` `cutting` `sinceCut()` `onCut(on, kind)` `debug = {x,y,z,lx,ly,lz,fov}`(確認用: カメラを 固定)。カット中は `body.cine`(HUD を 引っこめる)
+  - Air(depth-air.js): `Air.rim(material)`(ふちの光)`Air.noHaze(material)`(かすみを かけない)`Air.set` `Air.setRim`。Ground(depth-ground.js): `Ground.add(...)`(足もとの丸い影)
+  - Zombies: `addPart(owner, r, hitY)`(大きいボスの 体の部品 = 当たりの丸。`e.part` `e.owner`。ダメージは 持ち主へ)
+  - Director: `kaijuOmen(sec)`(大怪獣の 予告を始める。確認用にも)`nextBossType`。大怪獣は ボス 5 体ごと or 約 4 分ごと。出ている間は ほかのボスを 出さない
+  - 大怪獣(boss-kaiju.js): `e.mode` = 'far'(86〜98m に立つ = 全身が見える。息・ほえ声・ゾンビの雨)| 'near'(46m まで 近づいて ふみつけ・しっぽ・かみつき・前足)。`e.force = '技の名前'` で 次の技を 指定(確認用)。`kaijuPoints(e, out)`
+  - World: `zoneAt(x,z)` に 'western'、`districtAt` / `zoneName` に「ウエスタン通り」(x -6〜206 / z -294〜-196。`inWest`)。WeaponIcons(ui-icons.js): `html(i)`
+  - イベント: `kaijuOmen {sec}` `kaijuStep {x,z,d,e,heavy}`(足音)`bossAct {type:'kaiju', act}`(roar howl breath breathFire tail tailSwing stomp stompLand bite claw rain nova death)`districtEnter {id:'western', name, theme}`
+  - 確認: `tools/steps.py`(JS → 待つ → 写真 を 順番に)。大怪獣を すぐ出す: `__game.Director.kaijuOmen(3)` / `(()=>{const D=__game.Director,P=__game.Player.pos,p=D._kaijuPoint(P.x,P.z); D.spawnBoss('kaiju',p.x,p.z);})()`
 
 ## 公開のしかた
 - `main` が GitHub Pages で公開中(https://roguepink.github.io/sokai/)。**`main` に入れる = 公開**。大きな更新は別の枝(例 `round2`)でまとめて、ノブさんに見せて OK をもらってから `main` へ
