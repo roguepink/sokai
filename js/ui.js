@@ -17,6 +17,7 @@ import { WeaponGrid } from './ui-weapons.js';
 import { Input } from './input.js';
 import { BossShow, bossThreat } from './ui-bossfx.js';
 import { BossDex } from './ui-bossdex.js';
+import { WeaponIcons } from './ui-icons.js';
 
 const $ = (id) => document.getElementById(id);
 const fmt = (n) => Math.floor(n).toLocaleString();
@@ -129,6 +130,9 @@ export const UI = {
       this.el.spin.appendChild(ring);
     }
 
+    // 武器の絵(3D の形から 1 回だけ作る。少しずつ描くので 起動は重くならない。作れなければ 絵文字のまま)
+    this.icons = WeaponIcons;
+    WeaponIcons.build(Engine.renderer, WEAPONS, Weapons._models);
     WeaponGrid.init(root, Input, Audio);
     this._buildWeaponBar();
     this._wireEvents();
