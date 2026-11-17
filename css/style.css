@@ -743,3 +743,6 @@ body:not(.pc) .pc-only { display: none; }
   .bs-chip { top: calc(var(--sat) + 88px); }
 }
 /* PC: スペースで 次の武器(2026-10-28 ノブさん)→ 今の武器の札の 2 行目(.wn-key)に 入れた(第5弾) */
+
+/* 第5弾の仕上げ: 場面カット(大怪獣の 全身を 遠くから映す 数秒)の間は 画面の部品を 引っこめる。警報の帯・名札・怒りの文字・ごほうびの札は 出したまま */
+body.cine #hud > :not(.banner):not(.sub-banner):not(.vignette):not(.fever-tint), body.cine #controls, body.cine #crosshair, body.cine .weapon-bar, body.cine #viewHint, body.cine #viewToast, body.cine #speedLines { opacity: 0 !important; transition: opacity .2s; }

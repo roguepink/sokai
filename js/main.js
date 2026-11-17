@@ -18,6 +18,7 @@ import { Flow } from './zombie-flow.js';
 import { Look } from './view-look.js';
 import { ViewHud } from './view-hud.js';
 import { ViewCam } from './view-camera.js';
+import { KaijuCam } from './kaiju-cam.js';
 import { WeaponGrid } from './ui-weapons.js';
 import { WEAPONS } from './weapons.js';
 
@@ -247,6 +248,8 @@ function handleView(real) {
 
 function step(dt) {
   Game.time += dt;
+  // 場面カット(大怪獣の 全身を 遠くから映す 数秒)の間は 主人公は 動かない・撃たない(Engine.cineLock。kaiju-cam.js)
+  if (Engine.cineLock) { Zombies.update(dt, Player); Director.update(dt, Player); FX.update(dt); World.update(dt, Player); if (Game.state === 'play') Score.update(dt); return; }
   Player.update(dt, Input);
   // 肩越し・一人称: 武器の「照準への吸いつき」は 指で向きを変えている間は 止める(はなすと だんだん もどる)。
   // 吸いつきが 指より強くて「前しか向けない」ことがあったため(2026-10-22 ノブさんの実機)
@@ -265,7 +268,7 @@ function step(dt) {
 
 // 確認用に外から見られる数字
 const stats = window.__stats = { ms: 0, fps: 0, zombies: 0, kills: 0, score: 0, state: '' };
-window.__game = { Game, Engine, Look, ViewHud, ViewCam, Flow, Audio, UI, Player, Zombies, Weapons, World, Score, Director, FX, Input, WeaponGrid, start, pause, resume, finish };
+window.__game = { Game, Engine, KaijuCam, Look, ViewHud, ViewCam, Flow, Audio, UI, Player, Zombies, Weapons, World, Score, Director, FX, Input, WeaponGrid, start, pause, resume, finish };
 
 boot().catch((e) => {
   console.error(e);

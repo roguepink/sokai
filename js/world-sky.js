@@ -480,7 +480,7 @@ export const Sky = {
     const wet = this.wet;
     for (const w of this.wetMats) { w.m.roughness = w.r + (w.wr - w.r) * wet; w.m.color.copy(w.c).multiplyScalar(1 + (w.dk - 1) * wet); w.m.metalness = w.me + 0.12 * wet; }
     // 霧の距離(視点と天気で変える)
-    const v = this._view, q = Engine.quality;
+    const v = Engine.cineCam ? 'tps' : this._view, q = Engine.quality;      // 場面カット(大怪獣の全身を 遠くから映す)の間は 肩越しと同じ 霧
     // 第5弾: 見下ろしは カメラを寝かせた分 遠くまで画面に入るので、霧を 近くした(前は 40〜140m)。画面の上のほう(奥)が 青白く かすんで 奥行きが出る。
     //   描く物の数も 前と同じくらいに おさまる(霧の先は 描かない)
     const far0 = v === 'top' ? 80 : (q === 'high' ? 290 : q === 'mid' ? 230 : 175) * this.viewDistMul;
@@ -489,14 +489,15 @@ export const Sky = {
     this.fogMul = fm;
     // 第5弾: カメラを大きく引いたとき(ボス)は 霧も 遠くへ(Engine.fogScale。肩越し・一人称は Engine.farBoost だけ)。上限 350m(空のドームの中)
     const fsc = v === 'top' ? Engine.fogScale || 1 : Engine.farBoost || 1;
-    if (sc.fog) { sc.fog.near = near0 * (0.35 + 0.65 * fm) * fsc; sc.fog.far = Math.min(350, far0 * fm * fsc); this.fogFar = sc.fog.far; }
+    // (near にも 上限: 大きく引くと near が far の上限 350 を こえて 画面が 白くなった。仕上げで直した)
+    if (sc.fog) { sc.fog.far = Math.min(350, far0 * fm * fsc); sc.fog.near = Math.min(near0 * (0.35 + 0.65 * fm) * fsc, sc.fog.far * 0.5); this.fogFar = sc.fog.far; }
     // 第5弾: 低い所にたまる かすみ(depth-air.js)と ふちの光。色は 地平線の色(昼 = 青白い・夕方 = だいだい)。夜は うすく・暗くしない
     {
       const hz = _c.copy(U.uHor.value).lerp(U.uFog.value, 0.35).multiplyScalar(1.15);
       hz.r *= 0.96; hz.b *= 1.06;
       if (Engine.hemi) { hz.r += Engine.hemi.color.r * 0.07 * nightK; hz.g += Engine.hemi.color.g * 0.07 * nightK; hz.b += Engine.hemi.color.b * 0.07 * nightK; }
       const wxK = 1 + wx.fog * 1.5 + wx.rain * 0.5 + wx.storm * 0.7 + wx.snow * 0.8 + wx.ash * 1.0;
-      const topAir = v === 'top' && !Engine.lowCam;
+      const topAir = v === 'top' && !Engine.lowCam && !(Engine.giant && Engine.giant.k > 0.5);      // 怪獣戦のカメラは 低いので 肩越しと同じ かすみ
       const dens = (topAir ? 0.011 : 0.0042) * (1 - 0.4 * nightK) * wxK;
       Air.set(dens, hz.r, hz.g, hz.b, topAir ? 0.5 : 0.62);
       // ふちの光 = 空の光 + 太陽(月)の光。夜は 少し強く(暗い中で ゾンビの りんかくが 分かる)
@@ -508,7 +509,7 @@ export const Sky = {
     const cam = Engine.camera.position;
     this.dome.matrix.makeTranslation(cam.x, 0, cam.z); this.dome.matrixWorld.copy(this.dome.matrix);
     const R = Math.min(355, (sc.fog ? sc.fog.far : 300) + 4);
-    this.ring.visible = v !== 'top';
+    this.ring.visible = v !== 'top' || !!(Engine.giant && Engine.giant.k > 0.5);      // 怪獣戦のカメラは 地平線が 見えるので 遠くの景色も
     this.ring.matrix.makeScale(R, R, R).setPosition(cam.x, -2.5, cam.z); this.ring.matrixWorld.copy(this.ring.matrix);
     this.RU.uCam.value.copy(cam);
     this.RU.uNight.value = Math.min(1, 0.25 + nightK * 0.9);

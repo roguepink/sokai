@@ -142,6 +142,13 @@ export const Engine = {
   // 「引いても まだ ボスの上のほうが 霧で かすむ / 影が とちゅうで切れる」ときに 足す。終わったら setFarBoost(1) でもどす
   setFarBoost(v) { this.farBoost = Math.max(1, Math.min(3, +v || 1)); },
   farBoost: 1,
+  // 第5弾(仕上げ): 超巨大なボス(大怪獣)用のカメラ。kaiju-cam.js が 毎フレーム 入れる(k = 0 なら いつものカメラ)
+  //   見下ろし: k だけ「怪獣戦のカメラ」へ = 主人公の 南・低い所(dist m・elev ラジアン)から、主人公を 画面の下(下から frac)に置いて 北の空を 見上げる。
+  //             スティックの向き(上 = 北 = 画面の奥)は 変わらない。画角は fov(たて長は fovTall)
+  //   肩越し・一人称: カメラだけ upPitch(ラジアン)上を向き、画角を upFov 度 広げる(ねらう向き lookYaw・lookPitch は そのまま)
+  giant: { k: 0, dist: 32, elev: 0.36, fov: 68, fovTall: 80, frac: 0.15, upPitch: 0, upFov: 0 },
+  // カメラを 決めた すぐあとに 呼ぶ(場面カット: カメラを 置きかえる。kaiju-cam.js)。cineCam = 置きかえている間(霧と かすみを 肩越しと同じに。world-sky.js)
+  camHook: null, cineCam: false,
   fogScale: 1,              // 霧の距離に かける数(引き具合 × farBoost)。world-sky.js が読む
   // 画角のパンチ(度。爆発・叩きつけなどで 一瞬 広がる。肩越し・一人称のとき)
   fovKick(deg) { ViewCam.punch(deg); },
@@ -235,7 +242,9 @@ export const Engine = {
       mode = 'close';
     } else if (demo && ViewCam.cine(this, realDt, target)) mode = 'close';
     else this._topCamera(realDt, target, inside, demo);
-    ViewCam.post(this, realDt, mode, innerWidth < innerHeight ? C.FOV * 1.35 : C.FOV);
+    ViewCam.post(this, realDt, mode, this._topFov(demo, inside));
+    this.cineCam = false;
+    if (this.camHook && !demo) this.camHook(realDt);
     this._updateSun(target, close, realDt);
   },
 
@@ -312,6 +321,13 @@ export const Engine = {
     sun.position.copy(_c).addScaledVector(_ld, ldist);
   },
 
+  // 見下ろしの画角(怪獣戦のカメラは 広く)
+  _topFov(demo, inside) {
+    const tall = innerWidth < innerHeight, G = this.giant, gk = demo || inside ? 0 : G.k;
+    const base = tall ? C.FOV * 1.35 : C.FOV;
+    return gk > 0.001 ? base + ((tall ? G.fovTall : G.fov) - base) * gk : base;
+  },
+
   // 見下ろしのカメラ(いつもの)
   _topCamera(realDt, target, inside, demo) {
     this.viewDir.set(0, 0, -1);
@@ -324,12 +340,16 @@ export const Engine = {
       // 高い建物にはさまれた道では、真上に近い角度にして 壁で主人公がかくれないように(main が street を 0..1 で入れる)
       this._street = damp(this._street || 0, inside ? 0 : this.street, 2.5, realDt);
       const tall = innerWidth < innerHeight ? C.TALL_PITCH : 0;      // たて長の画面は 少し 上から(奥が 入りすぎて 重くならないように)
-      this.camPitch = damp(this.camPitch, Math.min(1.25, C.PITCH + tall + (inside ? C.INSIDE_PITCH : 0) + C.STREET_PITCH * this._street), 4, realDt);
+      let wp = Math.min(1.25, C.PITCH + tall + (inside ? C.INSIDE_PITCH : 0) + C.STREET_PITCH * this._street);
+      if (!inside && this.giant.k > 0.001) wp += (this.giant.elev - wp) * this.giant.k;      // 怪獣戦のカメラ: 低い所から
+      this.camPitch = damp(this.camPitch, wp, 4, realDt);
     }
+    const G = this.giant, gk = demo || inside ? 0 : G.k;
     // ボスを見せる(focusOn): 中心を寄せる・引く・少し低い角度
     const fw = demo ? 0 : this.focus.w, F = this.focus;
-    const want = (inside ? C.INSIDE_DIST : C.DIST) * (this._zoomMult || 1) * (demo ? 1.12 + 0.08 * Math.sin(this.camYaw * 2.3) : 1 + 0.08 * (this._street || 0))
+    let want = (inside ? C.INSIDE_DIST : C.DIST) * (this._zoomMult || 1) * (demo ? 1.12 + 0.08 * Math.sin(this.camYaw * 2.3) : 1 + 0.08 * (this._street || 0))
       * (1 + (F.zoom - 1) * (fw > 0 ? Math.min(1, fw / Math.max(0.01, F.weight)) : 0));
+    if (gk > 0.001) want += (G.dist - want) * gk;
     this.camDist = damp(this.camDist, want, fw > 0 ? 5 : 3, realDt);
     // 第5弾: 走ると カメラが 進む先を 少し見る(行く先が広く見える・景色が流れて 奥行きが出る)。操作の向きは 変わらない
     const hero = this.ctx && this.ctx.Player, hv = hero && hero.vel;
@@ -343,7 +363,7 @@ export const Engine = {
     this.camTarget.x = damp(this.camTarget.x, tx, C.LERP, realDt);
     this.camTarget.z = damp(this.camTarget.z, tz, C.LERP, realDt);
     this.camTarget.y = damp(this.camTarget.y, target.y + 1 + (F.y * 0.35) * fw, C.LERP, realDt);
-    const d = this.camDist, p = Math.max(Math.min(this.camPitch, 0.52), this.camPitch - F.pitch * (fw > 0 ? Math.min(1, fw / Math.max(0.01, F.weight)) : 0));
+    const d = this.camDist, p = Math.max(Math.min(this.camPitch, 0.52, gk > 0.001 ? G.elev : 9), this.camPitch - F.pitch * (fw > 0 ? Math.min(1, fw / Math.max(0.01, F.weight)) : 0));
     const cam = this.camera;
     cam.position.set(
       this.camTarget.x + Math.sin(this.camYaw) * Math.cos(p) * d,
@@ -358,6 +378,8 @@ export const Engine = {
       this._shake = Math.max(0, this._shake - realDt * 2.2);
     }
     cam.lookAt(this.camTarget);
+    // 怪獣戦のカメラ: 見る向きを 上へ かたむける(主人公が 画面の下から frac の所に来る。上は 空 = 巨体が そびえる)
+    if (gk > 0.001) cam.rotateX(gk * Math.atan((1 - 2 * G.frac) * Math.tan(this._topFov(demo, inside) * Math.PI / 360)));
   },
 
   // ---------- 軽量化: 1 秒に描く回数をそろえる ----------

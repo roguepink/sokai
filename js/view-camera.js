@@ -183,7 +183,9 @@ export const ViewCam = {
       const wp = Math.atan2(FC.y - cam.position.y, dh);
       fpit = Math.max(-0.15, Math.min(0.55, wp - p)) * FC.w;
     }
-    _e.set(p + fpit, -(yaw + fyaw), this.roll, 'YXZ');
+    // 第5弾(仕上げ): 超巨大なボスが 前にいる間は カメラだけ 上を向く(Engine.giant.upPitch。kaiju-cam.js)。カメラの位置は そのまま = 主人公は 画面の下へ
+    const G = E.giant, gup = G ? G.upPitch || 0 : 0;
+    _e.set(p + fpit + gup, -(yaw + fyaw), this.roll, 'YXZ');
     if (E._shake > 0) {
       const s = E._shake * E._shake * (fps ? 0.018 : 0.03);
       const t = (this.shakeT += dt * 31);
@@ -199,7 +201,8 @@ export const ViewCam = {
     const dashing = hero && hero.moves && hero.moves.dashing;
     this.speedFov = damp(this.speedFov, dashing ? 12 : spd > 0.8 ? 3 * (spd - 0.8) / 0.2 : 0, dashing ? 12 : 4, dt);
     const base = (fps ? F.FOV : T.FOV) * (innerWidth < innerHeight ? 1.25 : 1);
-    this._fov = base + this.fovKick + this.speedFov + (fps ? -2 : T.FIRE_FOV) * this.aimK;
+    this._fov = base + this.fovKick + this.speedFov + (fps ? -2 : T.FIRE_FOV) * this.aimK * (gup > 0.02 ? 0.3 : 1) + (G ? G.upFov || 0 : 0);
+    this._gup = gup;
     this._near = fps ? 0.06 : 0.15;
   },
 
@@ -340,7 +343,7 @@ export const ViewCam = {
       const r = E.project(hero.pos.x + Math.sin(y) * 18, 1.3 + hero.pos.y * 0.5, hero.pos.z - Math.cos(y) * 18, this.cross);
       this.cross.ok = !!r;
       if (!r) { this.cross.x = innerWidth / 2; this.cross.y = innerHeight / 2; }
-      this.cross.y = Math.max(innerHeight * 0.36, Math.min(innerHeight * 0.6, this.cross.y));
+      this.cross.y = Math.max(innerHeight * 0.36, Math.min(innerHeight * (0.6 + Math.min(0.22, (this._gup || 0) * 0.7)), this.cross.y));
       this.cross.x = Math.max(innerWidth * 0.4, Math.min(innerWidth * 0.6, this.cross.x));
     }
   },

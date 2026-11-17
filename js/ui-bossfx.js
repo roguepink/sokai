@@ -16,7 +16,8 @@
 //   そのあと 無双モード(score.js)→ 演出おわり
 // 第5弾: 大怪獣(kaiju)は 特別あつかい。
 //   予告(kaijuOmen {sec}・9 秒): 画面のふちが 暗くなる + 「…何かが 来る」+ 遠くの 地ひびき(だんだん 近く・強く)
-//   登場: 「⚠ 超巨大怪獣 出現 ⚠」「最強の災厄」+ 高さ・全長。カメラは 主人公の 後ろの 低い所から 見上げる(boss-kaiju.js の kaijuIntroCam。3.6 秒)
+//   登場: 「⚠ 超巨大怪獣 出現 ⚠」「最強の災厄」+ 高さ・全長。カメラは 遠くの 低い所へ 移って 全身を 映す(kaiju-cam.js の 場面カット。3.9 秒。その間 主人公は 止まる)
+//   怒り・倒れる所も 全身が入る 短い 場面カット。カットの間は HUD を 引っこめる(body.cine)
 //   音: 足音(kaijuStep)・ほえ声・息・しっぽ(bossAct の type が kaiju のとき)
 // 次のボス: 「👹 次のボスまで 0:24」の札(ボスがいない間)。のこり 3 秒から カウントの音
 import { Events } from './events.js';
@@ -31,7 +32,7 @@ import { Bosses } from './ui-boss.js';
 import { BossDex, bossLook } from './ui-bossdex.js';
 import { BossFX } from './fx-boss.js';
 import { flash } from './ui-fx.js';
-import { kaijuIntroCam } from './boss-kaiju.js';
+import { KaijuCam } from './kaiju-cam.js';
 
 // 大怪獣の 動き(bossAct の act)→ 音の名前
 const KAIJU_SND = { roar: 'kaijuRoar', howl: 'kaijuHowl', breathFire: 'kaijuBreath', tailSwing: 'kaijuTail', death: 'kaijuDeath', nova: 'kaijuHowl' };
@@ -104,6 +105,7 @@ export const BossShow = {
       if (d.act === 'roar' || d.act === 'howl') Audio.vibrate([60, 40, 60, 40, 200]);
     });
     Events.on('bossDeath', (d) => { if (d && d.e && d.e.type === 'kaiju') this._omenDark(0); });
+    KaijuCam.onCut = (on) => document.body.classList.toggle('cine', !!on);
     Events.on('feverStart', () => { if (this.seq) this.seq.fever = true; });
     Events.on('pause', () => L.classList.add('paused'));
     Events.on('resume', () => L.classList.remove('paused'));
@@ -112,7 +114,8 @@ export const BossShow = {
   },
 
   clear() {
-    this.intro = null; this.seq = null; this.omen = null; this._low = null; this._pending.length = 0; this._waves.length = 0;
+    this.intro = null; this.seq = null; this.omen = null; this._pending.length = 0; this._waves.length = 0;
+    document.body.classList.remove('cine');
     this._omenDark(0);
     if (Score._nova) Score._nova = null;
     this._introAt = -1e9; this._tick = -1; this._chipTxt = ''; this._chipOn = false; this._chainTxt = null;
@@ -151,29 +154,6 @@ export const BossShow = {
     if (o.t > o.sec + 1) this.omen = null;      // 出たら 登場の演出へ(暗さは 登場のあとで うすく)
   },
 
-  // 見下ろしの 大怪獣の登場: 主人公の 後ろの 低い所から 見上げる。描く直前に カメラを 置きかえる(操作・ねらいは そのまま。3 秒ほどで もどる)
-  _low: null,
-  _lowStart(shot, sec) {
-    const cam = Engine.camera;
-    this._low = { s: shot, t: 0, sec, w: 0, last: performance.now(), p0: cam.position.clone(), q0: cam.quaternion.clone(), p1: cam.position.clone(), q1: cam.quaternion.clone() };
-    if (!this._lowHooked) { this._lowHooked = true; Engine.beforeRender.push(() => this._lowApply()); }
-  },
-  _lowApply() {
-    const L = this._low; if (!L) return;
-    const now = performance.now(), dt = Math.min(0.1, (now - L.last) / 1000); L.last = now;
-    if (!this.ui.paused) L.t += dt;
-    const on = Engine.viewMode === 'top' && Score.active && L.t < L.sec - 0.7;
-    L.w += ((on ? 1 : 0) - L.w) * Math.min(1, dt * 5.5);
-    if (!on && L.w < 0.01) { this._low = null; return; }
-    const cam = Engine.camera, s = L.s, k = L.w * L.w * (3 - 2 * L.w);
-    L.p0.copy(cam.position); L.q0.copy(cam.quaternion);
-    cam.position.set(s.x, s.y, s.z); cam.lookAt(s.lx, s.ly, s.lz);
-    L.p1.copy(cam.position); L.q1.copy(cam.quaternion);
-    cam.position.lerpVectors(L.p0, L.p1, k); cam.quaternion.slerpQuaternions(L.q0, L.q1, k);
-    cam.updateMatrixWorld();
-    if (k > 0.5) Engine.lowCam = true;      // 低いカメラの間は 霧とかすみを 肩越しと同じに(立体感の係の 印)
-  },
-
   // ---------------- 登場 ----------------
   _onSpawn(d) {
     if (!Score.active) return;
@@ -191,7 +171,11 @@ export const BossShow = {
     const look = bossLook(e && e.type, e);
     const kj = !!e && e.type === 'kaiju';
     el.alert.firstElementChild.textContent = kj ? '⚠ 超巨大怪獣 出現 ⚠' : '⚠ 巨大ボス接近 ⚠';
-    el.alert.style.animationDuration = kj ? '3.6s' : ''; el.card.style.animationDuration = kj ? '3.2s' : '';
+    // 大怪獣: まず 全身だけを 見せる(場面カット)→ 1.3 秒後に 名札(画面の下)。警報の帯は いちばん上
+    const tallScr = innerWidth < innerHeight;
+    const cut = kj && KaijuCam.startCut('intro', 3.9, { inT: 0.5, outT: 0.9, dolly: 0.09, bottom: tallScr ? -0.6 : -0.8, top: 0.8 });
+    el.alert.style.animationDuration = kj ? '3.8s' : ''; el.alert.style.top = cut ? 'calc(var(--sat) + 6px)' : '';
+    el.card.style.animationDuration = kj ? '2.4s' : ''; el.card.style.animationDelay = cut ? '1.3s' : '';
     el.ord.textContent = kj ? '最強の災厄' : `第${n}の災厄`;
     el.name.textContent = name;
     el.card.style.setProperty('--nlen', String(Math.max(6, [...name].length + 1)));
@@ -202,20 +186,20 @@ export const BossShow = {
     el.size.style.letterSpacing = kj ? '0' : '';
     el.card.classList.toggle('t5', th >= 5);
     replay(el.alert); replay(el.card);
-    const ic = kj ? kaijuIntroCam(e, Player) : null, dur = ic ? ic.sec : 2.0;
+    const dur = kj ? 3.8 : 2.0;
     ui.banner.hold(dur + 0.1);
     ui.el.hud.classList.remove('bossintro'); void ui.el.hud.offsetWidth; ui.el.hud.classList.add('bossintro');
     flash(ui.el.flash, '#ff1a1a', 0.35, 600);
     ui.el.vignette.classList.add('boss');
-    el.card.style.top = ic && ic.low ? (innerWidth < innerHeight ? '60%' : '54%') : '';      // 見下ろしの 大怪獣: 名札は 下へ(全身が 上に 映る)
-    if (ic) { Engine.focusOn(e.x, ic.y, e.z, ic.sec, ic.o); this._omenDark(0.55); this.omen = null; if (ic.shot) this._lowStart(ic.shot, ic.sec); }
+    el.card.style.top = cut ? (tallScr ? '72%' : '63%') : '';      // 大怪獣: 名札は 下へ(全身が 上に 映る)
+    if (kj) { this._omenDark(0.2); this.omen = null; if (!cut) Engine.focusOn(e.x, 60, e.z, 3.6, { weight: 1, zoom: 1, pitch: 0, inT: 0.5, outT: 0.7 }); }
     else if (e) {
       Engine.focusOn(e.x, size * 0.6, e.z, 2.0, { weight: 0.55, zoom: 1.2 + Math.min(0.35, size / 60), pitch: 0.2, inT: 0.35, outT: 0.5 });
       BossFX.bossIntro(e.x, e.z, size);
     }
     Audio.play('bossIntro', { size });
     Audio.vibrate([30, 50, 30, 50, 40, 40, 140]);
-    this.intro = { t: 0, e, roared: false, dur: dur + 0.05, y: ic ? ic.y : size * 0.6, kj };
+    this.intro = { t: 0, e, roared: false, dur: dur + 0.05, y: kj ? 60 : size * 0.6, kj };
   },
 
   _introStep(dt) {
@@ -227,7 +211,7 @@ export const BossShow = {
     else if (!it.roared) { it.roared = true; Engine.shake(1.1); Engine.fovKick(6); }
     if (it.e && it.e.alive !== false) Engine.focusTrack(it.e.x, it.y, it.e.z);
     if (it.t >= (it.dur || 2.05)) {
-      if (it.kj) this._omenDark(0.18);         // 戦いの間は 少しだけ 暗いまま
+      if (it.kj) this._omenDark(0.1);          // 戦いの間は ほんの少しだけ 暗いまま(暗いと 見づらいので ひかえめ)
       this.intro = null;
       this.ui.el.hud.classList.remove('bossintro');
     }
@@ -269,6 +253,7 @@ export const BossShow = {
     const last = ph >= 3 || (e && e.phases && ph >= e.phases);
     this.ui.banner.show(last ? '最終形態!!' : '怒り状態!', last ? `${name} ・ とどめを刺せ!` : `${name} が 本気になった!`, 'rage', 1.9, 3);
     replay(this.el.rage);
+    if (e && e.type === 'kaiju' && KaijuCam.sinceCut() > 10) KaijuCam.startCut('rage', 2.1, { inT: 0.35, outT: 0.65, dolly: 0.1, bottom: -0.8, top: 0.62 });      // 全身が入る 短い場面(文字は 上に)
     flash(this.ui.el.flash, '#ff2a00', 0.3, 500);
     Engine.shake(0.9);
     if (e) BossFX.bossIntro(e.x, e.z, bossSize(e) * 0.8);
@@ -303,7 +288,10 @@ export const BossShow = {
     Engine.slowMo(1.3, 0.25);
     Engine.shake(1.6);
     Engine.bloomKick(0.6, 0.7);
-    if (kj) Engine.focusOn(x, 30, z, 8.6, { weight: 0.5, zoom: 1.5, pitch: 0.32, inT: 0.4, outT: 0.8 });
+    // 大怪獣: ひざをつく → 最後の声 → 横へ たおれる、を 全身が入る 場面カットで(たおれる先まで 画面に入れる)
+    const KM = kj && e._M, fdx = KM ? KM.fdx || 0 : 0, fdz = KM ? KM.fdz || 0 : 0;
+    if (kj && !KaijuCam.startCut('death', 6.0, { inT: 0.45, outT: 0.9, dolly: 0.04, bottom: -0.72, top: 0.8, az: [0.35, -0.35, 0.65, -0.65, 0.1, 0.9, -0.9], extra: [x + fdx * 88, 6, z + fdz * 88, x + fdx * 50, 40, z + fdz * 50] }))
+      Engine.focusOn(x, 30, z, 8.6, { weight: 0.5, zoom: 1.5, pitch: 0.32, inT: 0.4, outT: 0.8 });
     else Engine.focusOn(x, size * 0.45, z, 3.4, { weight: 0.7, zoom: 1.15 + Math.min(0.4, size / 50), pitch: 0.24, inT: 0.3, outT: 0.6 });
     flash(ui.el.flash, '#fff6c8', 0.75, 380);
     setTimeout(() => flash(ui.el.flash, '#ffc83a', 0.4, 520), 120);
