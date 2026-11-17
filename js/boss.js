@@ -320,6 +320,7 @@ export const Bosses = {
     const spec = SPECS[e.type];
     m.dead = true; m.deadT = 0; m.fell = false; m.burst = false;
     e.state = 'dead'; e.st = 0;
+    m.fade = 1; m._op = 1; for (const mt of m.mats) mt.opacity = 1;      // すけていたら もどす(たおれる姿は はっきり見せる)
     // たおれる向き: 主人公から はなれる向き(主人公の方へ たおれないと こわくないので 半分は 主人公の横)
     let dx = e.x - (this._player ? this._player.pos.x : e.x), dz = e.z - (this._player ? this._player.pos.z : e.z + 1);
     const l = Math.hypot(dx, dz) || 1; dx /= l; dz /= l;
@@ -355,7 +356,7 @@ export const Bosses = {
     for (let i = this._active.length - 1; i >= 0; i--) {
       const m = this._active[i];
       const e = m.e;
-      if (e && !m.dead && top && this._player && e.state !== 'enter') {
+      if (e && (!m.dead || (SPECS[m.type].zoomDead && !m.burst)) && top && this._player && e.state !== 'enter') {
         const d = Math.hypot(e.x - this._player.pos.x, e.z - this._player.pos.z);
         const sp = SPECS[m.type];
         const z = sp.zoomFor ? sp.zoomFor(e, d) : 1 + clamp(((e.def.zoom || e.size) - 3) / 12, 0, 1.0) * clamp(1.5 - d / 50, 0, 1);
@@ -363,7 +364,7 @@ export const Bosses = {
       }
       if (!m.dead) continue;
       this._deadStep(m, dt);
-      if (m.deadT > m.fallT + 2.5) { this._active.splice(i, 1); this._free(m); }
+      if (m.deadT > m.fallT + 2.5 + (SPECS[m.type].burstAt || 0)) { this._active.splice(i, 1); this._free(m); }
     }
     // カメラを少し引く(見下ろし。大きいボスが近いとき)
     const zw = World.inside ? 1 : zoom;
@@ -421,7 +422,7 @@ export const Bosses = {
       return;
     }
     // たおれたあと: 少しして はじける
-    if (!m.burst && m.deadT > T + 0.35) {
+    if (!m.burst && m.deadT > T + (spec.burstAt || 0.35)) {
       m.burst = true;
       this._burst(m, e, spec);
     }

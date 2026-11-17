@@ -10,6 +10,11 @@
 //   bossFanfare ボス撃破のファンファーレ(ふつうの fanfare より大きく長い)
 //   bossNova    金の衝撃波(低い ドゥン + 風 + きらきら)
 //   bossTick    次のボスまで のこり 3・2・1 秒(心臓の音)
+// 第5弾: 大怪獣(終末竜 ムクロドン)の音。どれも ここだけの 作り(有名な怪獣の 鳴き声に 似せない: 低い うなり + 割れた声 + 地鳴り)
+//   kaijuOmen   予告: 遠くの 地ひびき(k = 0..1 で だんだん 近く・大きく)
+//   kaijuStep   足音: 低い ドスン(o.d = 主人公までの距離。近いほど 大きい。o.heavy = ふみつけ)
+//   kaijuRoar   ほえ声(長い。登場・怒り)   kaijuHowl  ほえ声の衝撃波(短い)
+//   kaijuBreath 腐れ火の息(ゴォーッ + ばちばち)   kaijuTail  しっぽの うなる風   kaijuDeath  たおれるときの 声
 // 音量は 今までの音(explosion・fanfare)と同じくらいまで(オフラインで鳴らして 大きさを確かめた)。
 const rnd = (a, b) => a + Math.random() * (b - a);
 const note = (semi) => 523.25 * Math.pow(2, semi / 12);   // C5 から 半音
@@ -18,9 +23,12 @@ const PENTA = [0, 2, 4, 7, 9];
 export const GAP4 = {
   bossIntro: 1, heroHit: 0.2, bossPhase: 0.8, bossKill: 0.3, jpCoin: 0.028, jpLine: 0.08, jpTick: 0.05, jpTotal: 0.3,
   bossFanfare: 1.5, bossNova: 0.3, bossTick: 0.4,
+  kaijuOmen: 0.5, kaijuStep: 0.25, kaijuRoar: 2, kaijuHowl: 1.5, kaijuBreath: 2, kaijuTail: 1, kaijuDeath: 3,
 };
-export const LEN4 = { bossIntro: 2.2, heroHit: 0.4, bossPhase: 1.3, bossKill: 1.6, jpTotal: 1.2, bossFanfare: 2.6, bossNova: 1.4, bossTick: 0.4 };
-export const IMPORTANT4 = ['bossIntro', 'heroHit', 'bossPhase', 'bossKill', 'jpLine', 'jpTotal', 'bossFanfare', 'bossNova', 'bossTick'];
+export const LEN4 = { bossIntro: 2.2, heroHit: 0.4, bossPhase: 1.3, bossKill: 1.6, jpTotal: 1.2, bossFanfare: 2.6, bossNova: 1.4, bossTick: 0.4,
+  kaijuOmen: 1.2, kaijuStep: 0.7, kaijuRoar: 2.6, kaijuHowl: 1.6, kaijuBreath: 3, kaijuTail: 1.2, kaijuDeath: 3.2 };
+export const IMPORTANT4 = ['bossIntro', 'heroHit', 'bossPhase', 'bossKill', 'jpLine', 'jpTotal', 'bossFanfare', 'bossNova', 'bossTick',
+  'kaijuRoar', 'kaijuHowl', 'kaijuDeath'];
 
 let _curve = null;
 function shaper(A) {
@@ -58,7 +66,80 @@ function brass(A, t, semis, dur, gain, lp = 2600, a = 0.03, verb = 0.4) {
   for (const s of semis) for (const dt of [-7, 7]) A.tn(t, { dur, gain, a, wave: 'sawtooth', f0: note(s), lp, verb, detune: dt });
 }
 
+// 大怪獣の声: 低い うなり(のこぎり波)+ 割れた声(がらがら ふるえる 四角い波)+ 地鳴り。高さは 下がっていく(上がって さけぶ 形に しない)
+function kaijuVoice(A, t, dur, gain, base, fall = 0.55) {
+  const c = A.ctx, ws = shaper(A);
+  const f = c.createBiquadFilter(); f.type = 'lowpass'; f.Q.value = 2.5;
+  f.frequency.setValueAtTime(260, t); f.frequency.exponentialRampToValueAtTime(900, t + dur * 0.18); f.frequency.exponentialRampToValueAtTime(240, t + dur);
+  const g = c.createGain();
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + 0.16); g.gain.setValueAtTime(gain, t + dur * 0.6); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  ws.connect(f).connect(g).connect(A.sfx);
+  const v = c.createGain(); v.gain.value = 0.5; g.connect(v).connect(A.verb);
+  // ゆっくりした ゆれ(のどの ふるえ)
+  const lfo = c.createOscillator(), lg = c.createGain(); lfo.frequency.setValueAtTime(4.5, t); lfo.frequency.linearRampToValueAtTime(9, t + dur); lg.gain.value = 5; lfo.connect(lg);
+  for (const m of [1, 1.015, 1.49, 0.5]) {
+    const o = c.createOscillator(); o.type = 'sawtooth';
+    o.frequency.setValueAtTime(base * m * 1.15, t); o.frequency.exponentialRampToValueAtTime(base * m, t + dur * 0.25); o.frequency.exponentialRampToValueAtTime(base * m * fall, t + dur);
+    lg.connect(o.frequency); o.connect(ws); o.start(t); o.stop(t + dur + 0.05);
+  }
+  lfo.start(t); lfo.stop(t + dur + 0.05);
+  // 割れた声: 四角い波を 1 秒に 23 回 がらがらと 切る
+  const sq = c.createOscillator(); sq.type = 'square';
+  sq.frequency.setValueAtTime(base * 3.1, t); sq.frequency.exponentialRampToValueAtTime(base * 2.2, t + dur);
+  const am = c.createGain(); am.gain.value = 0;
+  const r = c.createOscillator(); r.type = 'square'; r.frequency.setValueAtTime(23, t); r.frequency.linearRampToValueAtTime(15, t + dur);
+  const rg = c.createGain(); rg.gain.value = 0.5; r.connect(rg).connect(am.gain);
+  const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = base * 5; bp.Q.value = 1.2;
+  const sg = c.createGain(); sg.gain.setValueAtTime(0.0001, t); sg.gain.exponentialRampToValueAtTime(gain * 0.22, t + 0.3); sg.gain.exponentialRampToValueAtTime(0.0001, t + dur * 0.9);
+  sq.connect(am).connect(bp).connect(sg).connect(A.sfx);
+  sq.start(t); sq.stop(t + dur); r.start(t); r.stop(t + dur);
+  // 地鳴り
+  A.tn(t, { dur: dur * 0.9, gain: gain * 1.4, a: 0.1, f0: 38, f1: 26 });
+  A.nz(t, { dur: dur * 0.9, gain: gain * 0.7, a: 0.2, type: 'lowpass', f0: 420, f1: 110, verb: 0.5 });
+}
+
 export const SOUNDS4 = {
+  kaijuOmen(A, t, o) {
+    const k = Math.max(0, Math.min(1, (o && o.k) || 0));
+    A.tn(t, { dur: 0.7, gain: 0.25 + 0.4 * k, a: 0.01, f0: 46, f1: 24 });
+    A.nz(t, { dur: 0.9, gain: 0.08 + 0.14 * k, a: 0.03, type: 'lowpass', f0: 200 + 200 * k, f1: 60, verb: 0.6 });
+    A.duckMusic(0.75 - 0.25 * k, 0.5);
+  },
+  kaijuStep(A, t, o) {
+    const d = (o && o.d) || 60, k = Math.max(0.14, Math.min(1, 1.15 - d / 130)) * (o && o.heavy ? 1.15 : 1);
+    A.tn(t, { dur: 0.55, gain: 0.7 * k, f0: 52, f1: 22 });
+    A.tn(t + 0.02, { dur: 0.3, gain: 0.3 * k, f0: 96, f1: 40 });
+    A.nz(t, { dur: 0.5, gain: 0.3 * k, a: 0.004, type: 'lowpass', f0: 700, f1: 90, verb: 0.45 });
+    A.nz(t + 0.05, { dur: 0.35, gain: 0.1 * k, type: 'bandpass', f0: 900, q: 1.5, buf: A.crackle });     // くずれる がれき
+    if (k > 0.5) A.duckMusic(0.7, 0.3);
+  },
+  kaijuRoar(A, t) {
+    A.nz(t, { dur: 0.6, gain: 0.1, a: 0.5, type: 'bandpass', f0: 300, f1: 900, q: 1 });      // 息を すいこむ
+    kaijuVoice(A, t + 0.75, 2.2, 0.3, 47);
+    A.duckMusic(0.3, 2.8);
+  },
+  kaijuHowl(A, t) {
+    kaijuVoice(A, t, 1.5, 0.3, 58, 0.45);
+    A.nz(t, { dur: 0.9, gain: 0.3, a: 0.02, type: 'bandpass', f0: 1800, f1: 300, q: 0.8, verb: 0.5 });   // 空気が ふるえる
+    A.duckMusic(0.3, 1.6);
+  },
+  kaijuBreath(A, t, o) {
+    const dur = (o && o.dur) || 2.8;
+    A.nz(t, { dur, gain: 0.34, a: 0.15, type: 'lowpass', f0: 1500, f1: 500, q: 1.2, verb: 0.3 });
+    A.nz(t, { dur, gain: 0.16, a: 0.2, type: 'bandpass', f0: 2600, q: 1, buf: A.crackle });
+    A.tn(t, { dur, gain: 0.35, a: 0.2, wave: 'sawtooth', f0: 44, f1: 36, lp: 300 });
+    A.duckMusic(0.5, dur);
+  },
+  kaijuTail(A, t) {
+    A.nz(t, { dur: 1.1, gain: 0.3, a: 0.45, type: 'bandpass', f0: 180, f1: 1100, q: 1.3 });
+    A.tn(t + 0.3, { dur: 0.8, gain: 0.3, a: 0.3, f0: 40, f1: 60 });
+  },
+  kaijuDeath(A, t) {
+    kaijuVoice(A, t + 0.3, 2.8, 0.3, 52, 0.32);
+    A.duckMusic(0.3, 3.2);
+  },
+
+
   bossIntro(A, t) {
     // 太鼓: ドン … ドン … ドン・ドン(だんだん速く)
     [[0, 0.8], [0.34, 0.85], [0.58, 0.9], [0.76, 1]].forEach(([d, v]) => taiko(A, t + d, v, 120 - d * 30));

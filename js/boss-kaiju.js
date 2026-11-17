@@ -30,6 +30,7 @@ const TN = 7, TL = 1.0;                         // しっぽの節(太い所)
 const TR = (i) => 1.15 - 0.65 * i / TN;         // 節 i の 太さ(設計)
 const TH0 = [42, 33, 25, 17.5, 12, 8.5, 6.5, 5.2];   // 節の高さ(m。つけ根が 42m のとき)
 const FK = 3, FL = 0.8;                         // 二またの先(節の数・長さ)
+const MYFOCUS = 3600;                           // カメラを 寄せる 自分の 合図(Engine.focus.dur が これなら 自分の)
 const GREEN = 0x9aff2a, HOT = 0xe8ff80, COOL = 0x2c8a14, BONE2 = 0xcfc4a4;
 
 const _v = new THREE.Vector3(), _a = new THREE.Vector3(), _d = new THREE.Vector3(), _q = new THREE.Quaternion(), _qi = new THREE.Quaternion();
@@ -119,9 +120,9 @@ function minis(G, bone, mt, n, r, y0, y1, s = 1.25, a0 = 0, a1 = TAU) {
 // ---------------------------------------------------------------
 const Q = { lean: 0, spY: 1, chX: 2, chY: 3, n1: 4, n2: 5, nY: 6, hdX: 7, hdZ: 8, jaw: 9, aLx: 10, aLz: 11, fL: 12, aRx: 13, aRz: 14, fR: 15, drop: 16, pY: 17, pZ: 18 };
 const NQ = 19;
-const BASE = [-0.48, 0, -0.12, 0, -0.38, -0.3, 0, 1.2, 0, -0.08, 0.9, -0.2, 0.7, 0.9, 0.2, 0.7, 0, 0, 0];
-const P_BITE = [-1.5, 0, -0.25, 0, -0.3, -0.25, 0, -0.15, 0, -0.95, 0.4, -0.5, 0.9, 0.4, 0.5, 0.9, 1.35, 0, 0];
-const P_CLAW = [-1.3, 0, -0.2, 0, 0.1, 0.2, 0, 1.0, 0, -0.4, 0.75, -0.1, 0.25, 0.75, 0.1, 0.25, 1.5, 0, 0];
+const BASE = [-0.62, 0, -0.12, 0, -0.34, -0.25, 0, 1.27, 0, -0.08, 0.9, -0.2, 0.7, 0.9, 0.2, 0.7, 0, 0, 0];
+const P_BITE = [-1.62, 0, -0.3, 0, -0.35, -0.3, 0, -0.1, 0, -0.95, 1.2, -0.5, 0.9, 1.2, 0.5, 0.9, 1.9, 0, 0];
+const P_CLAW = [-1.3, 0, -0.2, 0, 0.1, 0.2, 0, 1.0, 0, -0.4, 1.8, -0.1, 0.15, 1.8, 0.1, 0.15, 1.6, 0, 0];
 function applyPose(m, P, bob = 0) {
   const j = m.j;
   j.pelvis.position.y = HIP_Y - P[Q.drop] + bob;
@@ -160,19 +161,19 @@ function hookFog() {
 // 終末竜 ムクロドン
 // =====================================================================
 const kaiju = {
-  def: { name: '終末竜 ムクロドン', title: '万の屍をまとう 歩く墓場', icon: '🦖', hp: 420000, speed: 8, r: 7, points: 30000, scale: 25, size: 90, len: 150, h: 88, tier: 4, S, color: 0x7b7c63 },
+  def: { name: '終末竜 ムクロドン', title: '万の屍をまとう 歩く墓場', icon: '🦖', hp: 240000, speed: 9, r: 7, points: 30000, scale: 25, size: 90, len: 150, h: 88, tier: 4, S, color: 0x7b7c63 },
   special: true,            // ふつうの順番には 入らない(出現係が 特別に出す)
   noStand: true, passHero: true, vehicle: true, noCollide: true, noFar: true, noFreeze: true,
-  enter: 'walkin', fall: 'topple', fallT: 3.8, fallW: 34, fallAmt: 1.0,
+  enter: 'walkin', fall: 'topple', fallT: 3.8, fallW: 34, fallAmt: 1.0, zoomDead: true, burstAt: 1.6,
   phaseAt: [0.6, 0.3], roarT: 2.5, roarAt: 0.95, roarR: 72,
 
   build(m) {
-    const skin = mat(m, { map: skinTex('#7b7c63', { wounds: 26, veins: 70, vein: 'rgba(50,80,24,0.55)', boils: 16, boilC: '#a4b04c', drips: 22, rep: 3 }), color: 0xffffff, roughness: 0.8 });
+    const skin = mat(m, { map: skinTex('#8f8b84', { wounds: 34, veins: 90, vein: 'rgba(70,34,84,0.6)', boils: 7, boilC: '#b0a274', drips: 28, rep: 5 }), color: 0xffffff, roughness: 0.8 });
     const flesh = mat(m, { map: bodiesTex(), color: 0xe8d8d0, roughness: 0.7, shadow: false });
     const bone = mat(m, { map: boneTex(), color: 0xffffff, roughness: 0.5, shadow: false });
-    const dark = mat(m, { map: skinTex('#3a1618', { wounds: 12, veins: 30, rep: 2 }), color: 0xffffff, roughness: 0.55, shadow: false });
-    const glow = mat(m, { color: 0x1c3a06, emissive: GREEN, emissiveIntensity: 2.2, glow: true, roughness: 0.4 });
-    for (const mt of m.mats) weakFog(mt, 0.62);
+    const dark = mat(m, { map: skinTex('#5c1c1e', { wounds: 14, veins: 40, vein: 'rgba(20,0,0,0.6)', rep: 2 }), color: 0xffffff, roughness: 0.55, shadow: false });
+    const glow = mat(m, { color: 0x1c3a06, emissive: GREEN, emissiveIntensity: 1.8, glow: true, roughness: 0.4 });
+    for (const mt of m.mats) weakFog(mt, 0.5);
 
     const G = new Rig(m);
     // ---- こし ----
@@ -191,13 +192,13 @@ const kaiju = {
     ribs(G, chest, bone, 6, 0.28, 0.19, 1.02, 0.075, -0.62, PI * 0.92, 1.22);
     const heart = G.bone(chest, 0, 0.8, -1.3);
     G.add(heart, blob(0.4, 0.22, 2, 14, 10), glow, 0, 0, 0, 0, 0, 0, 1.1, 1.2, 0.8);
-    for (const sx of [-1, 1]) for (let k = 0; k < 3; k++) G.add(chest, torus(0.5 + k * 0.22, 0.035, 4, 10, PI * 0.5), glow, sx * 0.25, 0.7, -1.38 + k * 0.06, 0, 0, sx > 0 ? -0.3 - k * 0.5 : PI * 0.5 + 0.3 + k * 0.5);   // 心臓から のびる 光る血管
-    // 背中: 外へ開いた あばら骨(2 列)
+    // 背中: 外へ開いた あばら骨(横へ はり出して 前へ まがる。5 組)+ 背骨の こぶ + むき出しの 赤い肉
     for (let i = 0; i < 5; i++) for (const sx of [-1, 1]) {
-      const len = 2.3 - abs(i - 1.5) * 0.35;
-      G.add(i < 2 ? spine : chest, horn(len, 0.2, -0.45, 7), bone, sx * (0.55 + (i % 2) * 0.12), i < 2 ? 1.0 + i * 0.75 : 0.25 + (i - 2) * 0.6, 1.15, 0.75, 0, -sx * 0.75);
+      const len = 2.9 - abs(i - 2) * 0.45;
+      G.add(i < 2 ? spine : chest, horn(len, 0.21, 0.62, 8), bone, sx * 0.62, i < 2 ? 1.05 + i * 0.7 : 0.3 + (i - 2) * 0.55, 1.0, 0.3, 0, -sx * (1.0 - i * 0.06));
     }
-    for (let i = 0; i < 7; i++) G.add(i < 3 ? spine : chest, spike(R(0.55, 0.9), 0.13, 5), bone, 0, i < 3 ? 0.4 + i * 0.6 : 0.1 + (i - 3) * 0.48, 1.3 - (i > 4 ? (i - 4) * 0.25 : 0), 1.2, 0, 0);
+    for (let i = 0; i < 7; i++) G.add(i < 3 ? spine : chest, blob(0.26, 0.2, i, 8, 6), bone, 0, i < 3 ? 0.4 + i * 0.6 : 0.1 + (i - 3) * 0.48, 1.32 - (i > 4 ? (i - 4) * 0.25 : 0));
+    G.add(spine, sph(1.5, 10, 6, PI * 0.2, PI * 0.6, PI * 0.25, PI * 0.5), dark, 0, 0.9, 0.0, 0, 0, 0, 1.02, 1.0, 0.95);
     for (let i = 0; i < 9; i++) { const a = R(0.4, 2.7) * (i % 2 ? 1 : -1); G.add(i % 3 ? chest : spine, sph(R(0.1, 0.2), 7, 5), glow, sin(a) * 1.72, R(0.2, 1.5), cos(a) * 1.4); }   // 光る できもの
     // ---- 前足(長い・かぎ爪 3 本) ----
     const arms = {}, fores = {}, hands = {};
@@ -227,7 +228,7 @@ const kaiju = {
     G.add(head, lathe([[0.001, -0.6], [0.54, -0.44], [0.73, 0.1], [0.69, 0.5], [0.6, 0.72]], 14, (p) => { p.z *= p.z < 0 ? 0.32 : 0.86; }), skin, 0, 0, 0, -PI / 2, 0, 0);
     for (const sx of [-1, 1]) {
       G.add(head, sph(0.17, 8, 6), dark, sx * 0.46, 0.2, -0.82);
-      G.add(head, sph(0.1, 8, 6), glow, sx * 0.5, 0.21, -0.86);
+      G.add(head, sph(0.13, 8, 6), glow, sx * 0.51, 0.21, -0.87);
       // 横へ はり出して 前へ まがる 大きな角(左は 折れている)
       G.add(head, horn(sx < 0 ? 1.0 : 1.7, 0.24, 0.55, 8), bone, sx * 0.55, 0.3, -0.05, 0, 0, -sx * 1.15);
       for (let i = 0; i < 8; i++) G.add(head, spike(0.3 - i * 0.012, 0.065, 4), bone, sx * (0.42 - i * 0.035), -0.1, -0.55 - i * 0.2, PI, 0, 0);     // 上の歯
@@ -248,6 +249,7 @@ const kaiju = {
       const sh = G.bone(th, 0, -L1, 0);
       G.add(sh, limb(L2, 0.54, 0.34, 1.12, 12), skin);
       G.add(sh, spike(0.75, 0.16, 5), bone, 0, 0.1, -0.45, -1.35, 0, 0);      // ひざの トゲ
+      G.add(sh, sph(0.5, 8, 6, sx > 0 ? PI * 1.2 : PI * 1.3, PI * 0.5, PI * 0.3, PI * 0.45), dark, 0, -0.8, 0, 0, 0, 0, 1.0, 1.6, 1.0);
       minis(G, sh, flesh, 5, 0.42, -1.6, -0.4, 1.4);
       const mt = G.bone(sh, 0, -L2, 0);
       G.add(mt, limb(META, 0.37, 0.3, 1.05, 10), skin);
@@ -318,7 +320,7 @@ const kaiju = {
   // ---------- 出た ----------
   spawn(B, e, m) {
     hookFog();
-    m.B = B; m.wph = 0; m.sag = 0; m.dip = 0; m.sw = 0; m.rain = 0; m.lost = 0; m.burns.length = 0; m.deadInit = false; m.shK = 0;
+    m.B = B; m.wph = 0; m.sag = 0; m.dip = 0; m.sw = 0; m.rain = 0; m.lost = 0; m.burns.length = 0; m.rainP = null; m.deadInit = false; m.shK = 0; m.tick = 0;
     m.P.set(BASE);
     e.face = Math.atan2(B._player ? B._player.pos.x - e.x : 0, B._player ? -(B._player.pos.z - e.z) : 1);
     const f = e.face, rx = cos(f), rz = sin(f);
@@ -339,6 +341,7 @@ const kaiju = {
     if (m.shade.parent) m.shade.parent.remove(m.shade);
     if (m.prints.parent) m.prints.parent.remove(m.prints);
     const i = LIVE.indexOf(m); if (i >= 0) LIVE.splice(i, 1);
+    if (Engine.focus.dur === MYFOCUS && Engine.focus.t > Engine.focus.outT) Engine.focusEnd();
     m.parts = null;
   },
 
@@ -360,14 +363,14 @@ const kaiju = {
     FX.flash(e.x, 30, e.z, GREEN, 600, 120, 0.8);
     for (let i = 0; i < FX.q(26); i++) { const a = R(0, TAU), r = R(8, 40); FX.flame(e.x + cos(a) * r, R(1, 50), e.z + sin(a) * r, cos(a) * 8, R(4, 14), sin(a) * 8, R(3, 6), R(0.6, 1.2), HOT, COOL); }
   },
-  onDeath(B, e, m) { act(e, 'death'); },
+  onDeath(B, e, m) { act(e, 'death'); if (Engine.focus.dur === MYFOCUS && Engine.focus.t > Engine.focus.outT) Engine.focusEnd(); },
   burstFx(B, e, m, x, z) {
     for (let i = 0; i < FX.q(30); i++) { const a = R(0, TAU), r = R(4, 50); FX.flame(x + cos(a) * r, R(1, 12), z + sin(a) * r, cos(a) * 10, R(6, 18), sin(a) * 10, R(3, 7), R(0.7, 1.4), HOT, COOL); }
     if (FX.ring) { FX.ring(x, z, 4, 90, 1.1, GREEN, 3, 2.4, 0.9); FX.ring(x, z, 2, 60, 0.8, 0xffffff, 1.4, 2, 0.7); }
   },
 
   // 見下ろし: カメラを 大きく引く(近いほど)
-  zoomFor(e, d) { return 1 + 1.9 * clamp(1.75 - d / 60, 0, 1); },
+  zoomFor(e, d) { return 1 + 1.6 * clamp(1.75 - d / 60, 0, 1); },
 
   // 主人公とカメラの間に あし・しっぽ・はら があるとき だけ すかす(肩越し・見下ろし)
   fade(m, e, cam, P) {
@@ -390,6 +393,10 @@ const kaiju = {
 
   // たおれる向き: 主人公から はなれる方へ(generic が えらぶ)。足の位置を 体の中の数字に とめる
   fallDir(B, e, m) {
+    // 主人公から見て 横へ たおれる(見下ろしでは 画面を 横切って たおれる = よく見える)。少しだけ 向こうがわへ
+    const P = B._player, dx = e.x - (P ? P.pos.x : e.x), dz = e.z - (P ? P.pos.z : e.z + 1), l = Math.hypot(dx, dz) || 1, sd = Math.random() < 0.5 ? 1 : -1;
+    const a = sd * R(1.15, 1.4), ca = cos(a), sa = sin(a);
+    m.fdx = (dx * ca - dz * sa) / l; m.fdz = (dx * sa + dz * ca) / l;
     for (const F of m.feet) { toLocal(e, F.x, 0, F.z, _a); F.lx = _a.x; F.ly = 0; F.lz = _a.z; F.manual = false; }
     m.deadInit = true;
   },
@@ -410,10 +417,10 @@ const kaiju = {
     T[Q.aLx] += 0.12 * sin(m.wph + 1) * wk + 0.05 * breath; T[Q.aRx] -= 0.12 * sin(m.wph + 1) * wk - 0.05 * breath;
     let shake = 0;
     const rear = (k) => {      // のけぞって ほえる
-      T[Q.lean] = -0.48 + 0.36 * k; T[Q.chX] = -0.12 + 0.2 * k; T[Q.n1] = -0.38 + 0.3 * k; T[Q.n2] = -0.3 + 0.4 * k; T[Q.hdX] = 1.2 - 0.45 * k;
+      T[Q.lean] = BASE[0] + 0.48 * k; T[Q.chX] = -0.12 + 0.2 * k; T[Q.n1] = BASE[4] + 0.26 * k; T[Q.n2] = BASE[5] + 0.35 * k; T[Q.hdX] = BASE[7] - 0.45 * k;
       T[Q.jaw] = -0.12 - 0.9 * k; T[Q.aLx] = 0.9 - 0.5 * k; T[Q.aRx] = 0.9 - 0.5 * k; T[Q.aLz] = -0.2 - 0.9 * k; T[Q.aRz] = 0.2 + 0.9 * k; T[Q.fL] = T[Q.fR] = 0.7 - 0.3 * k;
     };
-    const crouch = (k) => { T[Q.lean] = -0.48 - 0.35 * k; T[Q.n1] = -0.38 - 0.2 * k; T[Q.hdX] = 1.2 + 0.25 * k; T[Q.drop] = 0.5 * k; T[Q.jaw] = -0.02; };
+    const crouch = (k) => { T[Q.lean] = BASE[0] - 0.3 * k; T[Q.n1] = BASE[4] - 0.2 * k; T[Q.hdX] = BASE[7] + 0.25 * k; T[Q.drop] = 0.5 * k; T[Q.jaw] = -0.02; };
     if (St === 'roar' || St === 'howl') {
       const T0 = St === 'roar' ? 0.85 : 0.95;
       if (st < T0) { crouch(ease(st / T0)); rate = 6; } else { rear(min(1, (st - T0) / 0.25) * (st < T0 + 1.3 ? 1 : max(0, 1 - (st - T0 - 1.3) * 2))); rate = 12; shake = st < T0 + 1.3 ? 0.035 : 0; }
@@ -421,10 +428,10 @@ const kaiju = {
       T[Q.jaw] = -0.3;
     } else if (St === 'stomp') {
       const sd = m.feet[e.foot].side;
-      T[Q.lean] = -0.36; T[Q.pZ] = -sd * 0.09; T[Q.spY] = sd * 0.12; T[Q.hdX] = 1.35; T[Q.jaw] = -0.45; rate = 6;
+      T[Q.lean] = -0.45; T[Q.pZ] = -sd * 0.09; T[Q.spY] = sd * 0.12; T[Q.hdX] = 1.35; T[Q.jaw] = -0.45; rate = 6;
     } else if (St === 'tail') {
       const k = e.sweepK || 0;      // -0.12(ため)→ 1(ふりきった)
-      T[Q.pY] = -e.side * 0.5 * k; T[Q.spY] = e.side * 0.4 * k; T[Q.lean] = -0.6; T[Q.nY] = e.side * 0.25 * k; T[Q.jaw] = -0.5; T[Q.drop] = 0.35; rate = 7;
+      T[Q.pY] = -e.side * 0.5 * k; T[Q.spY] = e.side * 0.4 * k; T[Q.lean] = -0.7; T[Q.nY] = e.side * 0.25 * k; T[Q.jaw] = -0.5; T[Q.drop] = 0.35; rate = 7;
     } else if (St === 'breath' || St === 'breath2') {
       const T0 = e.T0 || 1.5;
       if (st < T0) { const k = ease(min(1, st / (T0 * 0.8))); rear(0.75 * k); T[Q.jaw] = -0.25 - 0.3 * k; T[Q.aLz] = -0.4; T[Q.aRz] = 0.4; rate = 5; }
@@ -433,7 +440,7 @@ const kaiju = {
         const gx = e.bgx - e.x, gz = e.bgz - e.z, gd = Math.hypot(gx, gz) || 1;
         let yaw = Math.atan2(gx, -gz) - e.face; yaw = Math.atan2(sin(yaw), cos(yaw)); yaw = clamp(yaw, -1.2, 1.2);
         const pit = -Math.atan2(62, max(10, gd - 30));            // 口の高さ 60m くらいから 見下ろす
-        T[Q.lean] = -0.62; T[Q.chX] = -0.2; T[Q.n1] = -0.5; T[Q.n2] = -0.45; T[Q.hdX] = pit + 1.77; T[Q.spY] = -yaw * 0.3; T[Q.chY] = -yaw * 0.2; T[Q.nY] = -yaw * 0.28;
+        T[Q.lean] = -0.66; T[Q.chX] = -0.2; T[Q.n1] = -0.5; T[Q.n2] = -0.45; T[Q.hdX] = pit + 1.81; T[Q.spY] = -yaw * 0.3; T[Q.chY] = -yaw * 0.2; T[Q.nY] = -yaw * 0.28;
         T[Q.jaw] = -0.95; T[Q.aLz] = -0.6; T[Q.aRz] = 0.6; T[Q.drop] = 0.3; rate = 9; shake = 0.02;
       }
     } else if (St === 'bite') {
@@ -457,9 +464,9 @@ const kaiju = {
     } else if (dead) {
       // ひざをつく → 頭を上げて 最後の声 → うなだれる
       const k = ease(min(1, st / 1.5));
-      T[Q.drop] = 2.1 * k; T[Q.lean] = -0.48 + 0.3 * k - 0.5 * ease(seg(st, 1.9, 3.2)); T[Q.aLx] = T[Q.aRx] = 0.3; T[Q.fL] = T[Q.fR] = 0.2; T[Q.aLz] = -0.25; T[Q.aRz] = 0.25;
+      T[Q.drop] = 2.1 * k; T[Q.lean] = BASE[0] + 0.4 * k - 0.5 * ease(seg(st, 1.9, 3.2)); T[Q.aLx] = T[Q.aRx] = 0.3; T[Q.fL] = T[Q.fR] = 0.2; T[Q.aLz] = -0.25; T[Q.aRz] = 0.25;
       const cry = st < 1.9 ? ease(min(1, st / 0.5)) : max(0, 1 - (st - 1.9) * 1.5);
-      T[Q.n1] = -0.38 + 0.4 * cry; T[Q.n2] = -0.3 + 0.4 * cry; T[Q.hdX] = 1.2 - 0.3 * cry + 0.5 * ease(seg(st, 2.0, 3.2)); T[Q.jaw] = -0.9 * cry - 0.25; T[Q.hdZ] = 0.2 * sin(t * 5) * cry;
+      T[Q.n1] = BASE[4] + 0.4 * cry; T[Q.n2] = BASE[5] + 0.4 * cry; T[Q.hdX] = BASE[7] - 0.3 * cry + 0.5 * ease(seg(st, 2.0, 3.2)); T[Q.jaw] = -0.9 * cry - 0.25; T[Q.hdZ] = 0.2 * sin(t * 5) * cry;
       rate = 5; shake = 0.02 * cry;
     }
     const kk = min(1, dt * rate);
@@ -505,7 +512,7 @@ const kaiju = {
     const sp = 10;
     e.vx += (c.dx * sp - e.vx) * min(1, dt * 1.5); e.vz += (c.dz * sp - e.vz) * min(1, dt * 1.5);
     turnTo(e, Math.atan2(c.dx, -c.dz), dt, 0.8);
-    if (e.st > 3.0 || c.d < 62) { e.state = 'roar'; e.st = 0; e.hitDone = 0; act(e, 'roar'); }
+    if (e.st > 1.2 || c.d < 62) { e.state = 'roar'; e.st = 0; e.hitDone = 0; act(e, 'roar'); }
     return -1;
   },
 
@@ -516,12 +523,12 @@ const kaiju = {
     const brake = (k = 3) => { const q = Math.exp(-k * dt); e.vx *= q; e.vz *= q; };
     if (St === 'walk') {
       // 立つ所: 見下ろし = 画面の上(北)/ 肩越し・一人称 = 今の方角のまま 40〜50m
-      if ((e.sT -= dt) <= 0) { e.sT = R(5, 9); e.sA = R(-0.75, 0.75); e.sD = R(24, 34); }
+      if ((e.sT -= dt) <= 0) { e.sT = R(5, 9); e.sA = R(-0.8, 0.8); e.sD = R(17, 27); }
       let tx, tz;
       if (Engine.viewMode === 'top') { tx = c.px + sin(e.sA) * e.sD; tz = c.pz - cos(e.sA) * e.sD; }
-      else { const a = Math.atan2(-c.dx, -c.dz) + e.sA * 0.3; tx = c.px + sin(a) * (e.sD + 16); tz = c.pz + cos(a) * (e.sD + 16); }
+      else { const a = Math.atan2(-c.dx, -c.dz) + e.sA * 0.3; tx = c.px + sin(a) * (e.sD + 34); tz = c.pz + cos(a) * (e.sD + 34); }
       const ox = tx - e.x, oz = tz - e.z, od = Math.hypot(ox, oz) || 1;
-      const sp = e.def.speed * (1 + 0.15 * e.phase) * (c.d > 110 ? 2.2 : c.d > 70 ? 1.5 : 1) * clamp(od / 12, 0, 1) * (od < 3 ? 0 : 1);
+      const sp = e.def.speed * (1 + 0.15 * e.phase) * (od > 90 ? 2.2 : od > 35 ? 1.7 : 1) * clamp(od / 12, 0, 1) * (od < 3 ? 0 : 1);
       e.vx += (ox / od * sp - e.vx) * min(1, dt * 1.2); e.vz += (oz / od * sp - e.vz) * min(1, dt * 1.2);
       turnTo(e, Math.atan2(c.dx, -c.dz), dt, 0.5 * sm);
       if (e.cool <= 0 && m.feet[0].planted && m.feet[1].planted) {
@@ -552,7 +559,7 @@ const kaiju = {
         footFx(B, m, e, F, 1.8);
         slam(B, e, e.tx, e.tz, 15, { dmg: 3200, hero: 30, lift: 11, big: true, cause: 'stomp', shake: 2, world: 3000, force: 40 });
         ringWave(B, e, e.tx, e.tz, { r0: 10, speed: 24, max: 46 + e.phase * 8, w: 2.6, dmg: 900, hero: 20 });
-        act(e, 'stomp', e.tx, e.tz);
+        act(e, 'stompLand', e.tx, e.tz);
       }
       if (st > T2 + 0.65 / sm && m.feet[1 - e.foot].planted) {
         if (--e.n2 > 0) { e.st = 0; e.hitDone = 0; startStomp(m, e, c); } else done(e, 1.5, c);
@@ -564,7 +571,7 @@ const kaiju = {
       const T0 = 1.35 / sm, T1 = T0 + 1.45;
       brake(3);
       const sx = rx * e.side, sz = rz * e.side;
-      if (st < T1) Warn.cone(e.x, e.z, sx, sz, 98, PI / 2, st / T0);
+      if (st < T1) Warn.cone(e.x, e.z, sx, sz, 98, PI / 2, st / T0, 0x9a2208);
       // しっぽの 角度: ため(反対へ 少し)→ 後ろから 横を通って 前まで
       e.sweepK = st < T0 ? -0.12 * ease(st / T0) : -0.12 + 1.12 * ease(min(1, (st - T0) / (T1 - T0)));
       m.sw = st < T1 + 0.5 ? min(1, st / 0.5) : max(0, 1 - (st - T1 - 0.5) / 0.6);
@@ -587,14 +594,14 @@ const kaiju = {
       turnTo(e, Math.atan2((e.bx0 + e.bx1) / 2 - e.x, -((e.bz0 + e.bz1) / 2 - e.z)), dt, 0.5);
       const L = Math.hypot(e.bx1 - e.bx0, e.bz1 - e.bz0), W = 13;
       const k = (st - T0) / T1, k1 = two ? clamp(k * 2, 0, 1) : clamp(k, 0, 1), k2 = clamp(k * 2 - 1, 0, 1);
-      if (k1 < 1) Warn.rect(e.bx0, e.bz0, e.bx1 - e.bx0, e.bz1 - e.bz0, L, W, st < T0 ? st / T0 : 1, 0xff3a10);
-      if (two && k2 < 1) Warn.rect(e.cx0, e.cz0, e.cx1 - e.cx0, e.cz1 - e.cz0, L, W, clamp(st / (T0 + T1 * 0.5), 0, 1), 0xff3a10);
+      if (k1 < 1) Warn.rect(e.bx0, e.bz0, e.bx1 - e.bx0, e.bz1 - e.bz0, L, W, st < T0 ? st / T0 : 1, 0xc02a0a);
+      if (two && k2 < 1) Warn.rect(e.cx0, e.cz0, e.cx1 - e.cx0, e.cz1 - e.cz0, L, W, clamp(st / (T0 + T1 * 0.5), 0, 1), 0xc02a0a);
       mouthPos(m, _v);
       if (st < T0) {       // ため: 口と 胸に 緑の光が 集まる
         FX.glow(_v.x, _v.y, _v.z, 6 + 10 * st / T0, GREEN, 3);
         if (Math.random() < dt * 30) { const a = R(0, TAU), r = R(8, 16); FX.spark(_v.x + cos(a) * r, _v.y + R(-6, 6), _v.z + sin(a) * r, -cos(a) * r * 2, 0, -sin(a) * r * 2, 0.45, 0.5, HOT, 4, GREEN, 2, 0.06, 0, 0, 0); }
       } else if (k < 1) {
-        if (!e.hitDone) { e.hitDone = 1; act(e, 'breath'); }
+        if (!e.hitDone) { e.hitDone = 1; act(e, 'breathFire'); }
         const gx = k1 < 1 || !two ? e.bx0 + (e.bx1 - e.bx0) * k1 : e.cx0 + (e.cx1 - e.cx0) * k2, gz = k1 < 1 || !two ? e.bz0 + (e.bz1 - e.bz0) * k1 : e.cz0 + (e.cz1 - e.cz0) * k2;
         e.bgx = gx; e.bgz = gz;
         breathTick(B, m, e, _v, gx, gz, dt);
@@ -646,7 +653,7 @@ const kaiju = {
     if (St === 'howl') {
       const T0 = 0.95;
       brake(3);
-      if (st < T0 + 0.15) Warn.circle(e.x, e.z, 80, st / (T0 + 0.15), 0xffb060);
+      if (st < T0 + 0.15) Warn.circle(e.x, e.z, 80, st / (T0 + 0.15), 0x9a5a20);
       else if (!e.hitDone) {
         e.hitDone = 1;
         act(e, 'howl');
@@ -679,7 +686,7 @@ const kaiju = {
       const T0 = e.T0 = 1.8;
       brake(3);
       if (st < T0) {
-        Warn.circle(e.x, e.z, 62, st / T0, 0xff3a10);
+        Warn.circle(e.x, e.z, 62, st / T0, 0x9a2208);
         if (Math.random() < dt * 40) { const a = R(0, TAU), r = R(20, 60); FX.spark(e.x + cos(a) * r, R(2, 40), e.z + sin(a) * r, -cos(a) * r * 1.4, 0, -sin(a) * r * 1.4, 0.6, 0.6, HOT, 4, GREEN, 2, 0.06, 0, 0, 0); }
       } else {
         const n = Math.floor((st - T0) / 0.45);
@@ -697,8 +704,8 @@ const kaiju = {
   },
 };
 // [名前, 最小距離, 最大距離, 重み, 怒りの段階]
-const LIST = [['stomp', 0, 50, 4], ['tail', 0, 90, 3], ['breath', 28, 140, 3.5], ['bite', 40, 95, 3], ['claw', 18, 62, 3], ['howl', 0, 80, 1.5], ['rain', 0, 120, 2],
-  ['stomp3', 0, 56, 3.5, 1], ['breath2', 26, 130, 3.5, 1], ['nova', 0, 70, 3.5, 2]];
+const LIST = [['stomp', 0, 50, 4], ['tail', 0, 62, 3], ['breath', 30, 120, 3.5], ['bite', 30, 62, 3], ['claw', 14, 62, 3], ['howl', 0, 58, 1.5], ['rain', 0, 60, 2],
+  ['stomp3', 0, 56, 3.5, 1], ['breath2', 26, 110, 3.5, 1], ['nova', 0, 70, 3.5, 2]];
 
 function turnTo(e, want, dt, rate) {
   let da = want - e.face; da = Math.atan2(sin(da), cos(da));
@@ -852,7 +859,8 @@ function tailHit(B, m, e, dt) {
   };
   for (let i = 3; i <= TN; i++) one(P[i].x, P[i].y, P[i].z, TR(i) * S, i);
   for (let k = 0; k < 4; k++) one(m.fk[k].x, m.fk[k].y, m.fk[k].z, 4, k + 9);
-  if (e.n % 20 === 1) { quake(B, P[TN].x, P[TN].z, 0.9, 120); act(e, 'tail', P[TN].x, P[TN].z); }
+  if (e.n === 1) act(e, 'tailSwing', P[TN].x, P[TN].z);
+  if (e.n % 20 === 1) quake(B, P[TN].x, P[TN].z, 0.9, 120);
 }
 
 // ---------------------------------------------------------------
@@ -894,11 +902,19 @@ function bodyStep(B, m, e, dt) {
     if (!(m.sw > 0)) for (let i = 4; i <= TN; i++) { const p = m.tp[i], r = TR(i) * S; if (p.y - r < 2) push(p.x, p.z, r * 0.8); }
     if (moved) World.collideCircle(Pl.pos, Pl.radius);
   }
+  // 見下ろし: カメラの中心を 怪獣の方へ 少し寄せて、少し 低い角度に(足が 画面の 上のはしで 切れない)。ほかの演出(登場・撃破)が 使っている間は さわらない
+  const FC = Engine.focus;
+  if (Pl && Engine.viewMode === 'top' && e.state !== 'enter' && !World.inside) {
+    const dx = e.x - Pl.pos.x, dz = e.z - Pl.pos.z, d = Math.hypot(dx, dz) || 1, r = min(d, 30);
+    const qx = Pl.pos.x + dx / d * r, qz = Pl.pos.z + dz / d * r;
+    if (FC.t <= 0) Engine.focusOn(qx, 0, qz, MYFOCUS, { weight: 0.36, zoom: 1, pitch: 0.1, inT: 1.6, outT: 0.8 });
+    else if (FC.dur === MYFOCUS) Engine.focusTrack(qx, 0, qz);
+  } else if (FC.dur === MYFOCUS && FC.t > FC.outT) Engine.focusEnd();
   // 腐れ火の のこり火
   for (let i = m.burns.length - 3; i >= 0; i -= 3) {
     const b = m.burns;
     if ((b[i + 2] -= dt) <= 0) { b.splice(i, 3); continue; }
-    if (Math.random() < dt * 5) FX.flame(b[i] + R(-4, 4), 0.5, b[i + 1] + R(-4, 4), R(-1, 1), R(3, 7), R(-1, 1), R(2, 3.5), R(0.5, 0.9), HOT, COOL);
+    if (Math.random() < dt * 5) FX.flame(b[i] + R(-4, 4), 0.5, b[i + 1] + R(-4, 4), R(-1, 1), R(3, 6), R(-1, 1), R(1.4, 2.4), R(0.5, 0.8), HOT, COOL, 2, 0.9);
     if (Math.random() < dt * 2) { B._Z.damageCircle(b[i], b[i + 1], 5.5, 260, { force: 4, cause: 'breath' }); if (heroIn(B, b[i], b[i + 1], 3.5)) hitHero(B, e, b[i], b[i + 1], 10, 3, 'breath'); }
   }
   // ゾンビの雨の 落ちる所(小さな 赤い丸)
@@ -912,17 +928,20 @@ function bodyStep(B, m, e, dt) {
 // 腐れ火の息(1 ステップぶん): 口 (M) → 地面 (gx, gz)
 function breathTick(B, m, e, M, gx, gz, dt) {
   const vx = gx - M.x, vy = 0.5 - M.y, vz = gz - M.z, L = Math.hypot(vx, vy, vz) || 1, ux = vx / L, uy = vy / L, uz = vz / L, V = 70;
-  const n = FX.q(5);
+  const n = FX.q(5), cam = Engine.camera.position, top = Engine.viewMode === 'top';
   for (let i = 0; i < n; i++) {
     const u = R(0.02, 0.92), w = 1.5 + u * 5;
-    FX.flame(M.x + vx * u + R(-w, w), M.y + vy * u + R(-w, w), M.z + vz * u + R(-w, w), ux * V, uy * V, uz * V, 3 + u * 6, 0.42, HOT, COOL, 2.2, 1.2);
+    const x = M.x + vx * u + R(-w, w), y = M.y + vy * u + R(-w, w), z = M.z + vz * u + R(-w, w);
+    // これから 進む先(0.4 秒ぶん)が カメラの近くを 通るなら 出さない
+    const cx = cam.x - x, cy = cam.y - y, cz = cam.z - z, t = clamp(cx * ux + cy * uy + cz * uz, 0, V * 0.42);
+    if ((cx - ux * t) ** 2 + (cy - uy * t) ** 2 + (cz - uz * t) ** 2 < (top ? 22 : 9) ** 2) continue;
+    FX.flame(x, y, z, ux * V, uy * V, uz * V, 3 + u * 6, 0.42, HOT, COOL, 2.2, 1.2);
   }
-  if (Math.random() < 0.5) FX.smoke(M.x + vx * 0.5 + R(-5, 5), M.y + vy * 0.5 + 4, M.z + vz * 0.5 + R(-5, 5), 5, 1.4, 0x2a3a1c, ux * 20, 4, uz * 20, 0.45);
-  FX.glow(M.x + ux * 4, M.y + uy * 4, M.z + uz * 4, 11, GREEN, 3);
-  FX.glow(M.x + ux * 4, M.y + uy * 4, M.z + uz * 4, 5, 0xffffff, 3);
+  if (!top && Math.random() < 0.5) FX.smoke(M.x + vx * 0.5 + R(-5, 5), M.y + vy * 0.5 + 4, M.z + vz * 0.5 + R(-5, 5), 5, 1.4, 0x2a3a1c, ux * 20, 4, uz * 20, 0.45);
+  if (!top) { FX.glow(M.x + ux * 4, M.y + uy * 4, M.z + uz * 4, 11, GREEN, 3); FX.glow(M.x + ux * 4, M.y + uy * 4, M.z + uz * 4, 5, 0xffffff, 3); }
   // 地面: 広がる 緑の炎・土けむり・骨の つぶて
   for (let i = 0; i < FX.q(3); i++) { const a = R(0, TAU), s = R(8, 22); FX.flame(gx + R(-4, 4), 0.8, gz + R(-4, 4), cos(a) * s, R(3, 10), sin(a) * s, R(3.5, 6), R(0.5, 0.9), HOT, COOL); }
-  FX.glow(gx, 1.5, gz, 14, GREEN, 2.4);
+  FX.glow(gx, 1.5, gz, 9, GREEN, 1.6);
   if (Math.random() < 0.4) FX.debris(gx, 1, gz, 3, 16, BONE2, 0.45, 1.6);
   if (Math.random() < 0.3) FX.smoke(gx, 1, gz, 4, 1.8, 0x2a2a20, R(-3, 3), 5, R(-3, 3), 0.5);
   if ((e.bt = (e.bt || 0) + dt) > 0.1) {
@@ -960,28 +979,28 @@ function howl(B, e, r) {
 // ---------------------------------------------------------------
 function shadeStep(m, e, dt, dead) {
   const im = m.shade, sun = Engine.sun;
-  let ox = 0, oz = 0, k = 0.5;
+  let ox = 0, oz = 0, k = 0.3;
   if (sun) {
     _a.copy(sun.position).sub(sun.target.position).normalize();
-    const y = max(0.35, _a.y); ox = -_a.x / y; oz = -_a.z / y;       // 高さ 1m あたりの ずれ
-    try { k = 0.5 * (0.45 + 0.55 * clamp(1 - (World.night || 0), 0, 1)); } catch (err) {}
+    const y = max(0.5, _a.y), h = Math.hypot(_a.x, _a.z) || 1, sl = min(1.1, h / y);       // 高さ 1m あたりの ずれ(1.1 まで)
+    ox = -_a.x / h * sl; oz = -_a.z / h * sl;
+    try { k = 0.3 * (0.4 + 0.6 * clamp(1 - (World.night || 0), 0, 1)); } catch (err) {}
   }
   m.shK += ((dead ? 0 : 1) - m.shK) * min(1, dt * (dead ? 0.6 : 2));
   k *= m.shK;
   let n = 0;
   const put = (x, y, z, w, l, yaw, v) => {
-    const h = min(y, 32);        // 高い所の影は 遠くへ 行きすぎないように
+    const h = min(y, 30);
     _q.setFromAxisAngle(_yAxis, -yaw);
     im.setMatrixAt(n, _m4.compose(_p3.set(x + ox * h, 0.06 + n * 0.0015, z + oz * h), _q, _s3.set(w, 1, l)));
     im.setColorAt(n, _col.setRGB(v * k, v * k, v * k)); n++;
   };
   const f = e.face, fx = sin(f), fz = -cos(f), hip = m.j.pelvis.position.y * S;
-  put(e.x - fx * 4, hip, e.z - fz * 4, 46, 52, f, 0.8);                           // こし・はら
-  put(e.x + fx * 16, hip + 12, e.z + fz * 16, 50, 46, f, 0.75);                   // むね・前足
-  put(e.x + fx * 38, hip + 22, e.z + fz * 38, 22, 34, f, 0.6);                    // くび・あたま
-  for (let i = 1; i <= TN; i++) { const p = m.tp[i], r = TR(i) * S; put(p.x, p.y, p.z, r * 2.7, r * 2.7 + 6, 0, 0.6); }
-  for (let j = 0; j < 2; j++) put(m.fk[j].x, 3, m.fk[j].z, 9, 9, 0, 0.5);
-  for (const F of m.feet) put(F.x, F.y, F.z, 15, 17, F.yaw || 0, 0.45 + 0.25 * clamp(F.y / LIFT, 0, 1));
+  put(e.x + fx * 7, hip + 6, e.z + fz * 7, 58, 84, f, 1);                         // こし・はら・むね(1 つの 大きな だ円)
+  put(e.x + fx * 44, hip + 20, e.z + fz * 44, 24, 30, f, 0.8);                    // あたま
+  for (let i = 2; i <= TN; i += 2) { const p = m.tp[i], r = TR(i) * S; put(p.x, p.y, p.z, r * 3.2, r * 3.2, 0, 0.85); }      // しっぽ(1 つおき)
+  put((m.fk[2].x + m.fk[3].x) / 2, 3, (m.fk[2].z + m.fk[3].z) / 2, 22, 22, 0, 0.6);
+  for (const F of m.feet) if (F.y > 1) put(F.x, 0, F.z, 17, 19, F.yaw || 0, 0.9 * clamp(F.y / LIFT, 0, 1));     // 上げた足の 真下(ここへ 落ちてくる)
   for (; n < im.count; n++) im.setColorAt(n, _col.setRGB(0, 0, 0));
   im.instanceMatrix.needsUpdate = true; im.instanceColor.needsUpdate = true;
   // 足あと: 24 秒で うすれる
@@ -1002,12 +1021,12 @@ function shadeStep(m, e, dt, dead) {
 // ---------------------------------------------------------------
 export function kaijuIntroCam(e, hero) {
   const hx = hero.pos.x, hz = hero.pos.z;
-  if (Engine.viewMode !== 'top') return { y: 60, sec: 3.0, o: { weight: 1, zoom: 1, pitch: 0, inT: 0.5, outT: 0.7 } };
+  if (Engine.viewMode !== 'top') return { y: 60, sec: 3.6, o: { weight: 1, zoom: 1, pitch: 0, inT: 0.5, outT: 0.7 } };
   const north = hz - e.z, side = abs(e.x - hx);
   // 低い カメラ: 主人公の 南 約 30m・高さ 3〜4m。そこまで 壁が なく、怪獣が 北に いるとき
   const cz = hz + 30, clear = north > 50 && side < north * 0.9 && !World.buildingAt(hx, cz) && World.segmentHit(hx, hz, hx, cz, 2.5) >= 1 && !World.inside;
-  if (clear) return { y: 143, sec: 3.0, o: { weight: 0.3, zoom: 4.4, pitch: 1.15, inT: 0.6, outT: 0.7 } };
-  return { y: 70, sec: 3.0, o: { weight: 0.45, zoom: 3.6, pitch: 0.5, inT: 0.5, outT: 0.7 } };
+  if (clear) return { y: 143, sec: 3.6, o: { weight: 0.3, zoom: 4.4, pitch: 1.15, inT: 0.6, outT: 0.7 } };
+  return { y: 70, sec: 3.6, o: { weight: 0.45, zoom: 3.6, pitch: 0.5, inT: 0.5, outT: 0.7 } };
 }
 
 export const KAIJU = { kaiju };

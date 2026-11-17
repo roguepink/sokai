@@ -33,7 +33,7 @@ export const Bosses = {
     if (!e) {
       // 名前つきの e が来なかった: ボスの印がある敵、なければ出た場所にいちばん近い敵
       const L = Zombies.list || [];
-      for (const z of L) if (z.boss && z.alive !== false && !this.list.some((b) => b.e === z)) { e = z; break; }
+      for (const z of L) if (z.boss && !z.part && z.alive !== false && !this.list.some((b) => b.e === z)) { e = z; break; }
       if (!e && d.x != null) {
         let bd = 16;
         for (const z of L) { const dd = (z.x - d.x) ** 2 + (z.z - d.z) ** 2; if (dd < bd && !this.list.some((b) => b.e === z)) { bd = dd; e = z; } }
@@ -67,7 +67,7 @@ export const Bosses = {
     // e なしで来たボスや、イベントなしのボスも拾う(0.5 秒ごと)
     if ((this._scanT -= dt) <= 0) {
       this._scanT = 0.5;
-      for (const z of Zombies.list || []) if (z.boss && z.alive !== false && z.hp > 0) this._track(z, z.name);
+      for (const z of Zombies.list || []) if (z.boss && !z.part && z.alive !== false && z.hp > 0) this._track(z, z.name);      // 体の部品(大怪獣の 足・しっぽ)は 数えない
     }
   },
 };

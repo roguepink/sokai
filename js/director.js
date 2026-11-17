@@ -5,6 +5,8 @@
 // - 地面から はい出てくるゾンビ(画面の中でも出る。見ていて楽しい)
 // - 建物の中・森からも出る
 // - ボス: 最初は 30 秒、そのあと 45〜60 秒ごと(ときどき 2 体)。16 種類を 袋から順に(同じのが続かない)。出る前に形を用意しておく
+// - 大怪獣(最強の 1 体・kaiju): ふつうの順番とは 別。ボスを 5 体倒すごと、または 約 4 分ごとに、9 秒の予告(イベント kaijuOmen {sec})のあと
+//   120m ほど先(見ている方)に 現れる。出ている間は ほかのボスを 出さない。倒すと また 数えなおす
 // - 出来事(zombie-events.js): 30〜45 秒ごとに 物資投下・金色ゾンビ・空爆・津波 … / 新しい場所の発見
 // - 無双モード中(Score.feverActive): 数を増やし、まわりから波のように押しよせる(なぎ倒す相手)
 import { Zombies } from './zombies.js';
@@ -36,6 +38,7 @@ const HORDES = [
 ];
 
 const BOSS_HP = 1 / 3;
+const KAIJU_KILLS = 5, KAIJU_EVERY = 240, KAIJU_OMEN = 9;
 
 export const Director = {
   time: 0,
@@ -46,12 +49,14 @@ export const Director = {
   _nextHorde: 26,
   _hordeIdx: 0,
   _queue: [],
+  _kaiju: { kills: 0, nextT: KAIJU_EVERY, omen: 0, wait: 0, n: 0, e: null },   // 大怪獣の 予定
   _stat: { want: 0, ok: 0 },   // 確認用: 近くに出したかった数 / 出せた数               // 大群の「これから出す」予定 {type, x, z, t}
 
   reset() {
     this.time = 0; this._acc = 0; this._nextBoss = 30; this._bossIdx = 0;
     this._bag.length = 0; this._nextType = null; this._pairT = 0; this._lastType = '';
     this._nextHorde = 26; this._hordeIdx = 0; this._queue.length = 0; this._waveT = 0;
+    const K = this._kaiju; K.kills = 0; K.nextT = KAIJU_EVERY; K.omen = 0; K.wait = 0; K.n = 0; K.e = null;
     Happenings.reset();
   },
 
@@ -59,19 +64,67 @@ export const Director = {
   happen(kind) { if (!Happenings._scene) Happenings.init(Engine.scene, this); return Happenings.start(kind, this._player || { pos: { x: 0, z: 0 } }); },
   bossTypes() { return BOSS_ORDER.slice(); },
   // 次のボスまでの秒数 / 次の種類(画面係が使う。種類は 8 秒前に決まる。まだなら null)
-  get nextBossIn() { return Math.max(0, (this._pairT > 0 ? Math.min(this._pairT, this._nextBoss) : this._nextBoss) - this.time); },
-  get nextBossType() { return this._nextType; },
+  get nextBossIn() { return this._kaiju.omen > 0 ? this._kaiju.omen : Math.max(0, (this._pairT > 0 ? Math.min(this._pairT, this._nextBoss) : this._nextBoss) - this.time); },
+  get nextBossType() { return this._kaiju.omen > 0 ? 'kaiju' : this._nextType; },
   // ボスを出す(体力は時間とともに強く。hpMul で調整)
   // BOSS_HP: ボスの体力の全体の倍率(ノブさん 2026-10-24「多すぎるから今の 1/3 に」)
   spawnBoss(type, x, z, hpMul = 1) {
     const def = BOSS_TYPES[type]; if (!def) return null;
-    const lap = Math.floor(this._bossIdx / BOSS_ORDER.length);
+    const kaiju = type === 'kaiju', K = this._kaiju;
+    if (kaiju && K.e && K.e.alive) return null;      // 大怪獣は 1 体だけ
+    const lap = kaiju ? K.n : Math.floor(this._bossIdx / BOSS_ORDER.length);
     const e = Zombies.spawn(type, x, z);
     if (e) {
       e.hp = e.maxHp = Math.round(def.hp * BOSS_HP * Math.min(2, 1 + this.time / 600) * (1 + lap * 0.2) * hpMul);
       if (lap > 0) e.name = def.name + ' ' + ['', 'II', 'III', 'IV', 'V'][Math.min(4, lap)];
+      if (kaiju) { K.e = e; K.n++; K.omen = 0; K.wait = 0; }
     }
     return e;
+  },
+  // 大怪獣の 予告を はじめる(確認用にも: __game.Director.kaijuOmen())
+  kaijuOmen(sec = KAIJU_OMEN) {
+    const K = this._kaiju;
+    if ((K.e && K.e.alive) || K.omen > 0) return false;
+    K.omen = sec; K.wait = 0;
+    Bosses.prepare('kaiju');
+    Events.emit('kaijuOmen', { sec });
+    return true;
+  },
+  // 大怪獣の 出る場所: 見ている方(見下ろしなら 北)の 115〜135m 先。地図の外には 出さない
+  _kaijuPoint(px, pz) {
+    const v = Engine.viewDir || { x: 0, z: -1 };
+    const base = Math.atan2(v.z, v.x), h = (World.half || 600) - 40;
+    // 横長の画面: まん中の 名札に かくれないよう 少し 横へ(±17〜26°)。縦長: ほぼ 正面
+    const off = innerWidth > innerHeight ? R(0.3, 0.45) * (Math.random() < 0.5 ? -1 : 1) : R(-0.15, 0.15);
+    for (let i = 0; i < 18; i++) {
+      const a = base + (i < 6 ? off : R(-0.4, 0.4) * (i < 12 ? 3 : 8)), d = R(100, 115);
+      const x = px + Math.cos(a) * d, z = pz + Math.sin(a) * d;
+      if (Math.abs(x) < h && Math.abs(z) < h) return { x, z };
+    }
+    return { x: Math.max(-h, Math.min(h, px)), z: Math.max(-h, Math.min(h, pz - 120)) };
+  },
+  _kaijuStep(dt, px, pz) {
+    const K = this._kaiju;
+    if (!this._kaijuHook) {
+      this._kaijuHook = true;
+      Events.on('bossDeath', (d) => { if (d && d.e && d.e.type !== 'kaiju' && Score.active) this._kaiju.kills++; });
+    }
+    if (K.e && !K.e.alive) {       // 倒した: 数えなおす
+      K.e = null; K.kills = 0; K.nextT = this.time + KAIJU_EVERY;
+      this._nextBoss = Math.max(this._nextBoss, this.time + R(35, 50));
+    }
+    if (K.e) {                     // 出ている間は ほかのボスを 出さない
+      this._nextBoss = Math.max(this._nextBoss, this.time + 6); this._pairT = 0;
+    } else if (K.omen > 0) {
+      this._nextBoss = Math.max(this._nextBoss, this.time + K.omen + 6); this._pairT = 0;
+      if ((K.omen -= dt) <= 0) { K.omen = 0; const p = this._kaijuPoint(px, pz); this.spawnBoss('kaiju', p.x, p.z); }
+    } else if (Score.active && (K.kills >= KAIJU_KILLS || this.time >= K.nextT)) {
+      // ほかのボスが いなくなるのを 待つ(長くても 30 秒)
+      let alive = 0;
+      for (const e of Zombies.list) if (e.boss && !e.part) alive++;
+      if (alive === 0 || (K.wait += dt) > 30) this.kaijuOmen();
+      else this._nextBoss = Math.max(this._nextBoss, this.time + 4);
+    }
   },
   // 次に出すボス(袋から。はじめの 2 体は 大きすぎない種類)
   _pickType() {
@@ -245,11 +298,12 @@ export const Director = {
       if (e && q.rush) { e.spdMul *= 1.25; e.reachL = 1; }
     }
 
+    this._kaijuStep(dt, px, pz);
     // ---- ボス(必ず出る。最初 30 秒、そのあと 45〜60 秒ごと。ときどき 2 体) ----
     // 8 秒前に 次の種類を決めて 形を用意しておく(出たときに 固まらないように)
     if (!this._nextType && this.time >= this._nextBoss - 8) { this._nextType = this._pickType(); Bosses.prepare(this._nextType); }
     let alive = 0;
-    if (this.time >= this._nextBoss || (this._pairT > 0 && this.time >= this._pairT)) for (const e of Zombies.list) if (e.boss) alive++;
+    if (this.time >= this._nextBoss || (this._pairT > 0 && this.time >= this._pairT)) for (const e of Zombies.list) if (e.boss && !e.part) alive++;
     if (this._pairT > 0 && this.time >= this._pairT) {
       this._pairT = 0;
       if (alive < 2) { if (!this._nextType) { this._nextType = this._pickType(); } this._spawnNextBoss(px, pz); alive++; }

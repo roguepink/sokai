@@ -14,6 +14,10 @@
 //   0.6〜 ごほうびの内わけが 1 行ずつ(瞬殺ボーナス・ボス連続撃破・コンボ・初撃破・自己ベスト)→ JACKPOT の合計が くるくる上がる
 //   ボスの体が地面に落ちた(bossFall。来なければ 倒して 1.6 秒[ゲームの時間]後)= 金の衝撃波が 画面のゾンビを ぜんぶ吹きとばす
 //   そのあと 無双モード(score.js)→ 演出おわり
+// 第5弾: 大怪獣(kaiju)は 特別あつかい。
+//   予告(kaijuOmen {sec}・9 秒): 画面のふちが 暗くなる + 「…何かが 来る」+ 遠くの 地ひびき(だんだん 近く・強く)
+//   登場: 「⚠ 超巨大怪獣 出現 ⚠」「最強の災厄」+ 高さ・全長。カメラは 主人公の 後ろの 低い所から 見上げる(boss-kaiju.js の kaijuIntroCam。3.6 秒)
+//   音: 足音(kaijuStep)・ほえ声・息・しっぽ(bossAct の type が kaiju のとき)
 // 次のボス: 「👹 次のボスまで 0:24」の札(ボスがいない間)。のこり 3 秒から カウントの音
 import { Events } from './events.js';
 import { Engine } from './engine.js';
@@ -27,6 +31,10 @@ import { Bosses } from './ui-boss.js';
 import { BossDex, bossLook } from './ui-bossdex.js';
 import { BossFX } from './fx-boss.js';
 import { flash } from './ui-fx.js';
+import { kaijuIntroCam } from './boss-kaiju.js';
+
+// 大怪獣の 動き(bossAct の act)→ 音の名前
+const KAIJU_SND = { roar: 'kaijuRoar', howl: 'kaijuHowl', breathFire: 'kaijuBreath', tailSwing: 'kaijuTail', death: 'kaijuDeath', nova: 'kaijuHowl' };
 
 const fmt = (n) => Math.floor(n).toLocaleString();
 const mmss = (s) => { s = Math.max(0, Math.ceil(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
@@ -48,6 +56,7 @@ export const BossShow = {
     const L = document.createElement('div');
     L.className = 'bs-layer hidden';
     L.innerHTML = `
+      <div id="bsOmen" style="position:absolute;inset:0;opacity:0;transition:opacity 2.5s ease;background:radial-gradient(ellipse at 50% 45%, rgba(0,0,0,0) 28%, rgba(6,14,4,.5) 70%, rgba(2,6,2,.88) 100%)"></div>
       <div class="bs-hit" id="bsHit"></div>
       <div class="bs-chroma" id="bsChroma"></div>
       <div class="bs-rage" id="bsRage"></div>
@@ -63,7 +72,7 @@ export const BossShow = {
     (hud.parentNode || document.body).appendChild(L);
     const q = (id) => L.querySelector('#' + id);
     this.el = {
-      layer: L, hit: q('bsHit'), chroma: q('bsChroma'), rage: q('bsRage'), alert: q('bsAlert'), card: q('bsCard'), ord: q('bsOrd'), name: q('bsName'), title: q('bsTitle'),
+      layer: L, omen: q('bsOmen'), hit: q('bsHit'), chroma: q('bsChroma'), rage: q('bsRage'), alert: q('bsAlert'), card: q('bsCard'), ord: q('bsOrd'), name: q('bsName'), title: q('bsTitle'),
       pips: q('bsPips'), size: q('bsSize'), stamp: q('bsStamp'), stampSub: q('bsStampSub'), speed: q('bsSpeed'), jack: q('bsJack'), lines: q('bsLines'), total: q('bsTotal'),
       nova: q('bsNova'), coins: q('bsCoins'), chip: q('bsChip'), chipTxt: q('bsChipTxt'), chipT: q('bsChipT'), chipNew: q('bsChipNew'), chipChain: q('bsChipChain'),
     };
@@ -84,6 +93,16 @@ export const BossShow = {
     Events.on('bossPhase', (d) => this._onPhase(d || {}));
     Events.on('bossJackpot', (j) => this._onJackpot(j || {}));
     Events.on('bossFall', (d) => this._onFall(d || {}));
+    // ---- 大怪獣 ----
+    Events.on('kaijuOmen', (d) => this._onOmen(d || {}));
+    Events.on('kaijuStep', (d) => { if (!d) return; Audio.play('kaijuStep', d); if (d.d < 70) Audio.vibrate(d.heavy ? [60, 30, 60] : 35); });
+    Events.on('bossAct', (d) => {
+      if (!d || d.type !== 'kaiju') return;
+      const snd = KAIJU_SND[d.act];
+      if (snd) Audio.play(snd, d.act === 'breathFire' ? { dur: d.e && d.e.state === 'breath2' ? 4.4 : 2.8 } : d);
+      if (d.act === 'roar' || d.act === 'howl') Audio.vibrate([60, 40, 60, 40, 200]);
+    });
+    Events.on('bossDeath', (d) => { if (d && d.e && d.e.type === 'kaiju') this._omenDark(0); });
     Events.on('feverStart', () => { if (this.seq) this.seq.fever = true; });
     Events.on('pause', () => L.classList.add('paused'));
     Events.on('resume', () => L.classList.remove('paused'));
@@ -92,7 +111,8 @@ export const BossShow = {
   },
 
   clear() {
-    this.intro = null; this.seq = null; this._pending.length = 0; this._waves.length = 0;
+    this.intro = null; this.seq = null; this.omen = null; this._pending.length = 0; this._waves.length = 0;
+    this._omenDark(0);
     if (Score._nova) Score._nova = null;
     this._introAt = -1e9; this._tick = -1; this._chipTxt = ''; this._chipOn = false; this._chainTxt = null;
     const el = this.el; if (!el.layer) return;
@@ -105,6 +125,30 @@ export const BossShow = {
 
   get busy() { return !!(this.intro || this.seq); },
   get introActive() { return !!this.intro; },
+
+  // ---------------- 大怪獣の 予告 ----------------
+  _omenDark(v) { const o = this.el.omen; if (o) o.style.opacity = String(v); },
+  _onOmen(d) {
+    if (!Score.active) return;
+    this.omen = { t: 0, sec: d.sec || 9, next: 0.4, n: 0 };
+    this._omenDark(0.9);
+    this.ui.banner.show('…何かが 来る', '大地が ふるえている', 'boss', 3.4, 3);
+    this.ui.el.vignette.classList.add('boss');
+  },
+  _omenStep(dt) {
+    const o = this.omen; if (!o) return;
+    o.t += dt;
+    const k = Math.min(1, o.t / o.sec);
+    // 遠くの 足音: だんだん 近く・強く・速く
+    if (o.t >= o.next) {
+      o.next = o.t + 1.5 - 0.6 * k; o.n++;
+      Engine.shake(0.12 + 0.5 * k);
+      Audio.play('kaijuOmen', { k });
+      if (k > 0.4) Audio.vibrate(20 + 40 * k);
+      if (o.n === 4) this.ui._sub('⚠ <b>超巨大な 何か</b>が 近づいてくる…', 'big', 3);
+    }
+    if (o.t > o.sec + 1) this.omen = null;      // 出たら 登場の演出へ(暗さは 登場のあとで うすく)
+  },
 
   // ---------------- 登場 ----------------
   _onSpawn(d) {
@@ -121,36 +165,43 @@ export const BossShow = {
     this._chipOn = false; el.chip.classList.add('hidden');
     const size = bossSize(e), info = e ? Bosses.info(e) : null, n = info ? info.n : Bosses.seen || 1;
     const look = bossLook(e && e.type, e);
-    el.ord.textContent = `第${n}の災厄`;
+    const kj = !!e && e.type === 'kaiju';
+    el.alert.firstElementChild.textContent = kj ? '⚠ 超巨大怪獣 出現 ⚠' : '⚠ 巨大ボス接近 ⚠';
+    el.alert.style.animationDuration = kj ? '3.6s' : ''; el.card.style.animationDuration = kj ? '3.2s' : '';
+    el.ord.textContent = kj ? '最強の災厄' : `第${n}の災厄`;
     el.name.textContent = name;
     el.card.style.setProperty('--nlen', String(Math.max(6, [...name].length + 1)));
     el.title.textContent = look.title;
     const th = threat(e, size);
     el.pips.innerHTML = '<i class="on"></i>'.repeat(th) + '<i></i>'.repeat(5 - th);
-    el.size.textContent = e && e.size ? `全長 ${Math.round(e.size)}m` : '';
+    el.size.textContent = kj ? `測定不能 ・ 高さ ${Math.round(e.size)}m ・ 全長 ${e.def.len || 150}m` : e && e.size ? `全長 ${Math.round(e.size)}m` : '';
     el.card.classList.toggle('t5', th >= 5);
     replay(el.alert); replay(el.card);
-    ui.banner.hold(2.1);
+    const ic = kj ? kaijuIntroCam(e, Player) : null, dur = ic ? ic.sec : 2.0;
+    ui.banner.hold(dur + 0.1);
     ui.el.hud.classList.remove('bossintro'); void ui.el.hud.offsetWidth; ui.el.hud.classList.add('bossintro');
     flash(ui.el.flash, '#ff1a1a', 0.35, 600);
     ui.el.vignette.classList.add('boss');
-    if (e) {
+    if (ic) { Engine.focusOn(e.x, ic.y, e.z, ic.sec, ic.o); this._omenDark(0.55); this.omen = null; }
+    else if (e) {
       Engine.focusOn(e.x, size * 0.6, e.z, 2.0, { weight: 0.55, zoom: 1.2 + Math.min(0.35, size / 60), pitch: 0.2, inT: 0.35, outT: 0.5 });
       BossFX.bossIntro(e.x, e.z, size);
     }
     Audio.play('bossIntro', { size });
     Audio.vibrate([30, 50, 30, 50, 40, 40, 140]);
-    this.intro = { t: 0, e, roared: false };
+    this.intro = { t: 0, e, roared: false, dur: dur + 0.05, y: ic ? ic.y : size * 0.6, kj };
   },
 
   _introStep(dt) {
     const it = this.intro; if (!it) return;
     it.t += dt;
     // 地鳴り: だんだん強く → 咆哮で ドン
-    if (it.t < 0.9) Engine.shake(0.18 + 0.35 * it.t / 0.9);
+    if (it.kj) { if (it.t < 0.9) Engine.shake(0.15 + 0.2 * it.t / 0.9); }      // 大怪獣は 足音と ほえ声で ゆれる
+    else if (it.t < 0.9) Engine.shake(0.18 + 0.35 * it.t / 0.9);
     else if (!it.roared) { it.roared = true; Engine.shake(1.1); Engine.fovKick(6); }
-    if (it.e && it.e.alive !== false) Engine.focusTrack(it.e.x, bossSize(it.e) * 0.6, it.e.z);
-    if (it.t >= 2.05) {
+    if (it.e && it.e.alive !== false) Engine.focusTrack(it.e.x, it.y, it.e.z);
+    if (it.t >= (it.dur || 2.05)) {
+      if (it.kj) this._omenDark(0.3);          // 戦いの間は 少しだけ 暗いまま
       this.intro = null;
       this.ui.el.hud.classList.remove('bossintro');
     }
@@ -203,7 +254,8 @@ export const BossShow = {
   _onJackpot(j) {
     if (!Score.active) return;
     const e = j.e, size = bossSize(e), x = j.x != null ? j.x : e ? e.x : Player.pos.x, z = j.z != null ? j.z : e ? e.z : Player.pos.z;
-    this._pending.push({ e, x, z, size, g: 0, r: 0 });
+    const kj = !!e && e.type === 'kaiju';      // 大怪獣は たおれるのに 4 秒かかる: 地面に つくまで 衝撃波を 待つ・カメラも 長く
+    this._pending.push({ e, x, z, size, g: 0, r: 0, wait: kj ? 6 : NOVA_FALLBACK });
     const lines = jackLines(j);
     // もう演出中(ボスを続けて倒した): 行を足して 合計を のばす
     if (this.seq && this.seq.t < 3.5) {
@@ -223,10 +275,11 @@ export const BossShow = {
     Engine.slowMo(1.3, 0.25);
     Engine.shake(1.6);
     Engine.bloomKick(0.6, 0.7);
-    Engine.focusOn(x, size * 0.45, z, 3.4, { weight: 0.7, zoom: 1.15 + Math.min(0.4, size / 50), pitch: 0.24, inT: 0.3, outT: 0.6 });
+    if (kj) Engine.focusOn(x, 30, z, 8.6, { weight: 0.5, zoom: 1.5, pitch: 0.32, inT: 0.4, outT: 0.8 });
+    else Engine.focusOn(x, size * 0.45, z, 3.4, { weight: 0.7, zoom: 1.15 + Math.min(0.4, size / 50), pitch: 0.24, inT: 0.3, outT: 0.6 });
     flash(ui.el.flash, '#fff6c8', 0.75, 380);
     setTimeout(() => flash(ui.el.flash, '#ffc83a', 0.4, 520), 120);
-    ui.banner.hold(9);
+    ui.banner.hold(kj ? 12 : 9);
     ui.el.hud.classList.remove('bosscam'); void ui.el.hud.offsetWidth; ui.el.hud.classList.add('bosscam');
     BossFX.bossKillFlash(x, z, size);
     // ハンコ
@@ -239,7 +292,7 @@ export const BossShow = {
     Audio.play('bossKill', { size });
     Audio.vibrate([90, 40, 60, 40, 160]);
     ui.slowRoll(2.6);
-    this.seq = { t: 0, j, x, z, size, lines, shown: 0, lineT: 0.6, total: j.total, rollTo: j.total, rollFrom: 0, rollT: -1, rolled: false,
+    this.seq = { t: 0, kj, j, x, z, size, lines, shown: 0, lineT: 0.6, total: j.total, rollTo: j.total, rollFrom: 0, rollT: -1, rolled: false,
       coins: false, fever: false, nova: false, novaAt: 0, novaDone: false, rolledAt: 0, cineEnd: false, ending: false };
   },
 
@@ -279,7 +332,7 @@ export const BossShow = {
     }
     // 映画の場面おわり(黒い帯・カメラ・ハンコ): 衝撃波が出て 0.7 秒(出なければ 5 秒)
     const portrait = innerHeight > innerWidth;
-    if (!s.cineEnd && ((s.nova && s.t - s.novaAt > 0.7) || s.t > 5)) {
+    if (!s.cineEnd && ((s.nova && s.t - s.novaAt > (s.kj ? 2.2 : 0.7)) || s.t > (s.kj ? 9 : 5))) {
       s.cineEnd = true;
       el.stamp.classList.add('out');
       ui.el.hud.classList.remove('bosscam');
@@ -287,7 +340,7 @@ export const BossShow = {
       if (!portrait) ui.banner.release();      // 横画面: 内わけは左なので、まんなかの文字(無双モード!!)は もう出してよい
     }
     // 内わけの札おわり: 衝撃波の一掃が 足されて 合計が出きった(出なければ 8 秒)
-    if (!s.ending && s.cineEnd && ((s.novaDone && s.rolled && s.t - s.rolledAt > 1.1) || s.t > 8)) {
+    if (!s.ending && s.cineEnd && ((s.novaDone && s.rolled && s.t - s.rolledAt > 1.1) || s.t > (s.kj ? 12 : 8))) {
       s.ending = true; s.endT = s.t;
       el.jack.classList.add('out');
       ui.banner.release();
@@ -297,7 +350,12 @@ export const BossShow = {
       this.seq = null;
       return;
     }
-    if (!s.cineEnd) Engine.focusTrack(s.x, s.size * 0.45, s.z);
+    if (!s.cineEnd) {
+      // 大怪獣: たおれる先(体の まん中あたり)へ カメラを 寄せていく
+      const M = s.kj && s.j.e && s.j.e._M, k = M ? Math.min(1, s.t / 2.5) * 30 : 0;
+      if (M) Engine.focusTrack(s.x + (M.fdx || 0) * k, 30, s.z + (M.fdz || 0) * k);
+      else Engine.focusTrack(s.x, s.size * 0.45, s.z);
+    }
   },
 
   // お金・宝石が ボスから飛び出して 点数へ
@@ -439,6 +497,7 @@ export const BossShow = {
   // 毎フレーム(UI.update から。dt = 実時間、gdt = 一時停止なら 0)
   update(dt, gdt) {
     if (!gdt) return;
+    this._omenStep(gdt);
     this._introStep(gdt);
     this._seqStep(gdt);
     // bossFall が来ないとき: ゲームの時間で 1.6 秒たったら 衝撃波
@@ -446,7 +505,7 @@ export const BossShow = {
     for (let i = this._pending.length - 1; i >= 0; i--) {
       const p = this._pending[i];
       p.g += gdt * ts; p.r += gdt;
-      if (p.g >= NOVA_FALLBACK || p.r > 4.5) { this._pending.splice(i, 1); this._nova(p.x, p.z, p.size, p.e); }
+      if (p.g >= (p.wait || NOVA_FALLBACK) || p.r > (p.wait || NOVA_FALLBACK) + 3) { this._pending.splice(i, 1); this._nova(p.x, p.z, p.size, p.e); }
     }
     if (this._waves.length) this._waveStep(gdt);
     if ((this._chipT -= gdt) <= 0) { this._chipT = 0.2; this._chipStep(0.2); }
@@ -466,7 +525,7 @@ export function bossSize(e) {
 export function bossThreat(e) { return threat(e, bossSize(e)); }
 function threat(e, size) {
   const t = e && +e.bossTier;
-  if (t > 0) return Math.max(1, Math.min(5, Math.round(t <= 3 ? t + 2 : t)));
+  if (t > 0) return Math.max(1, Math.min(5, Math.round(t + 2)));
   return Math.max(2, Math.min(5, Math.round(size / 5) + 1));
 }
 
