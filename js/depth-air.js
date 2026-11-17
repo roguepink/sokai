@@ -91,6 +91,13 @@ export const Air = {
       if (!u || !u.fogColor) continue;
       u.uDepthAir = { value: AIR }; u.uDepthAirC = { value: AIRC }; u.uDepthRim = { value: RIM };
     }
+    if (THREE.UniformsLib && THREE.UniformsLib.fog) { THREE.UniformsLib.fog.uDepthAir = { value: AIR }; THREE.UniformsLib.fog.uDepthAirC = { value: AIRC }; }
+    // 光を足す重ね方(足し算など)の材質には かすみを かけない(かすみの色まで 足されて、四角く 白く浮くので)。
+    // どの係が いつ作った材質でも 効くように、材質の「おおもと」に 1 回だけ しかける(自分で onBeforeCompile を持つ材質は そのまま)
+    const MP = THREE.Material.prototype;
+    const plain = (m) => !m.isShaderMaterial && m.blending !== THREE.NormalBlending && m.blending !== THREE.NoBlending;
+    MP.onBeforeCompile = function (sh) { if (plain(this) && sh && sh.fragmentShader) sh.fragmentShader = '#define DEPTH_NOHAZE\n' + sh.fragmentShader; };
+    MP.customProgramCacheKey = function () { return (plain(this) && this.onBeforeCompile === MP.onBeforeCompile ? 'depth-nohaze|' : '') + this.onBeforeCompile.toString(); };
   },
 
   // かすみ: dens 濃さ(0 = なし)/ r,g,b 色(光の色。画面の色ではない)/ cap 上限。Sky.apply が毎回
@@ -106,23 +113,11 @@ export const Air = {
     mat.needsUpdate = true;
     return mat;
   },
-  // 光を足す重ね方(足し算)の材質には かすみを かけない(かすみの色が 足されて 白く浮くので)
+  // この材質には かすみを かけない(足し算の材質は 自動で そうなる。それ以外で 外したいとき。最初に描く前に呼ぶ)
   noHaze(mat) {
     if (!mat || mat.isShaderMaterial || (mat.defines && mat.defines.DEPTH_NOHAZE !== undefined)) return mat;
     mat.defines = Object.assign({}, mat.defines, { DEPTH_NOHAZE: '' });
     mat.needsUpdate = true;
     return mat;
-  },
-  // シーンの中を 1 回 見て回る(最初のコマの前): 足し算の材質 → かすみなし
-  scan(root) {
-    if (!this.enabled || !root) return;
-    root.traverse((o) => {
-      const m = o.material; if (!m) return;
-      const each = (mt) => {
-        if (!mt || mt.isShaderMaterial) return;
-        if (mt.fog !== false && mt.blending !== THREE.NormalBlending && mt.blending !== undefined) this.noHaze(mt);
-      };
-      if (Array.isArray(m)) m.forEach(each); else each(m);
-    });
   },
 };

@@ -210,7 +210,7 @@ export const Render = {
           this.computeMats(B);
           B.lastPose = this.frame;
         }
-        if (d < 70) Ground.add(x, z, 0.5 * B.s * B.fat + 0.12, 0.55, B.e.y || 0);      // 足もとの丸い影
+        if (d < 70) Ground.add(x, z, 0.62 * B.s * B.fat + 0.2, 0.46, B.e.y || 0);      // 足もとの丸い影
       } else this.computeMats(B);
       // 部位を書く
       const hide = B.hide;

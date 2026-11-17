@@ -53,7 +53,8 @@ export const CONFIG = {
   RENDER: {
     SHADOW_SIZE: 2048,
     SHADOW_AREA: 40,        // 影を計算するプレイヤー周りの広さ(肩越し・一人称)
-    TOP_SHADOW_AREA: 30,    // 同じく 見下ろしのとき(カメラを引くと 自動で広がる)
+    TOP_SHADOW_NS: 22,      // 見下ろしのときの 影の広さ(南北の半分。m)。カメラを引くと 自動で広がる
+    TOP_SHADOW_EW: 26,      // 同じく 東西(光から見た 縦の半分。地面では 光が低いほど 長くなる。37° で 約 43m)
     FOG_NEAR: 40,
     FOG_FAR: 140,
     // 第5弾(立体感)

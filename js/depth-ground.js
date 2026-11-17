@@ -8,7 +8,7 @@ import * as THREE from '../vendor/three/build/three.module.min.js';
 
 const MAX_DYN = 380;          // ゾンビ 320 + 主人公 + ボス
 const MAX_STATIC = 1400;      // 車など
-const Y = 0.05;
+const Y = 0.1;                // 板を置く高さ(地面は 場所で 0〜0.2m。広場・歩道・建物の床は 少し高い)
 
 const VS = `
 attribute vec4 iA;            // x, y, z, 向き
@@ -23,13 +23,16 @@ void main() {
   vUv = position.xy; vShape = iB.w;
   vA = iB.z * (1.0 - smoothstep(uFar * 0.55, uFar, -mv.z));
   gl_Position = projectionMatrix * mv;
+  // 奥行きだけ 0.34m 上の点のものを使う: 少し高い床(歩道・広場・建物の中)でも かくれない。画面の位置は そのまま
+  vec4 hi = projectionMatrix * viewMatrix * vec4(wp.x, wp.y + 0.34, wp.z, 1.0);
+  gl_Position.z = hi.z / hi.w * gl_Position.w;
 }`;
 const FS = `
 uniform vec3 uCol;
 varying vec2 vUv; varying float vA; varying float vShape;
 void main() {
   float a;
-  if (vShape < 0.5) { float r = length(vUv); a = smoothstep(1.0, 0.2, r); a *= a; }
+  if (vShape < 0.5) { float r = length(vUv); a = 1.0 - smoothstep(0.15, 1.0, r); }
   else { vec2 q = max(abs(vUv) - 0.5, 0.0) * 2.0; a = 1.0 - smoothstep(0.0, 1.0, length(q)); }
   a *= vA;
   if (a < 0.004) discard;
@@ -51,8 +54,7 @@ export const Ground = {
     g.setAttribute('iA', this._A); g.setAttribute('iB', this._B);
     g.instanceCount = 0;
     this.U = { uCol: { value: new THREE.Color(0.012, 0.014, 0.024) }, uFar: { value: 70 } };
-    const m = new THREE.ShaderMaterial({ uniforms: this.U, vertexShader: VS, fragmentShader: FS, transparent: true, depthWrite: false, fog: false, side: THREE.DoubleSide,
-      polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
+    const m = new THREE.ShaderMaterial({ uniforms: this.U, vertexShader: VS, fragmentShader: FS, transparent: true, depthWrite: false, fog: false, side: THREE.DoubleSide });
     const mesh = this.mesh = new THREE.Mesh(g, m);
     mesh.name = 'depth-contact';
     mesh.frustumCulled = false; mesh.renderOrder = -1; mesh.castShadow = false; mesh.receiveShadow = false;
@@ -82,7 +84,7 @@ export const Ground = {
       } else if (s > c) { rot = r.rot; hw = r.ez; hd = r.ex; }
       const o = n * 4, big = r.def.big ? 0.8 : 1;
       A[o] = r.x; A[o + 1] = (r.y || 0) + Y; A[o + 2] = r.z; A[o + 3] = rot;
-      B[o] = hw * 1.22 + 0.25; B[o + 1] = hd * 1.22 + 0.25; B[o + 2] = 0.62 * big * this.strength; B[o + 3] = shape;
+      B[o] = hw * 1.22 + 0.25; B[o + 1] = hd * 1.22 + 0.25; B[o + 2] = 0.55 * big * this.strength; B[o + 3] = shape;
       n++;
     }
     // (この回に もう足してあった ゾンビの分は 上書きされる。起動の 1 コマだけなので そのまま)
@@ -109,13 +111,13 @@ export const Ground = {
     if (ctx) {
       if (!this._staticDone && ctx.World && ctx.World.props && ctx.World.props.length) this.buildStatic(ctx.World.props);
       const P = ctx.Player;
-      if (P && P.pos && !hideHero) this.add(P.pos.x, P.pos.z, 0.62, 0.62, P.pos.y);
+      if (P && P.pos && !hideHero) this.add(P.pos.x, P.pos.z, 0.85, 0.5, P.pos.y);
       const L = ctx.Zombies && ctx.Zombies.list;
       if (L) for (let i = 0; i < L.length; i++) {
         const e = L[i];
         if (!e.boss || !e.alive) continue;
         const r = Math.max(1.2, (e.r || 1) * 1.7);
-        this.add(e.x, e.z, r, r > 6 ? 0.42 : 0.55, e.y || 0);
+        this.add(e.x, e.z, r, r > 6 ? 0.36 : 0.46, e.y || 0);
       }
     }
     if (far) this.U.uFar.value = far;

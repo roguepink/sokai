@@ -223,11 +223,6 @@ export const Engine = {
   // カメラをプレイヤーに追従させる
   updateCamera(realDt, target, inside, demo) {
     if (!this._vcInit) { this._vcInit = true; ViewCam.init(); }
-    // 第5弾: 光を足す重ね方の材質(光だまり・炎)には かすみを かけない(最初のコマの前に 1 回だけ 見て回る)
-    if (!this._depthInit && this.ctx) {
-      this._depthInit = true;
-      try { Air.scan(this.scene); } catch (e) { console.warn('depth scan', e); }
-    }
     this._demo = demo;
     const close = !demo && this.viewMode !== 'top';
     if (!demo && ViewCam.shot) ViewCam.endShot(this.camera);
@@ -292,23 +287,26 @@ export const Engine = {
     const zr = close ? 1 : this.camDist / C.DIST, stepOf = (z) => (z > 2.6 ? 3 : z > 1.75 ? 2 : z > 1.25 ? 1.45 : 1);
     let sc = this._shSc || 1;
     if (stepOf(zr) > sc) sc = stepOf(zr); else if (stepOf(zr / 0.9) < sc) sc = stepOf(zr / 0.9);
-    const ldist = (close ? 90 : 66 * Math.max(1, sc * 0.8)) * Math.max(1, this.farBoost);      // 光を置く距離(見下ろしは 近く = 影の地図に入る物が へる)
-    // 見下ろしは 画面に入る地面が せまいので 影の広さを TOP_SHADOW_AREA に(光を寝かせた分 影の地図に入る物が ふえるのを 打ち消す。影も 細かくなる)
-    const S = (close ? RD.SHADOW_AREA : RD.TOP_SHADOW_AREA) * sc;
-    if (S !== this._shS || ldist !== this._shDist) {
-      this._shS = S; this._shDist = ldist; this._shSc = sc;
+    // 影の地図に入れる広さ(光から見た 横 Sr・縦 Su の半分。m)。肩越し・一人称は 四角(SHADOW_AREA)。
+    // 見下ろしは 画面に入る地面に 合わせて しぼる(光は いつも 西から = 横 Sr が 南北・縦 Su が 東西)。
+    // せまい分 影が 細かく くっきりし、影の地図に入る物(描く回数)も へる
+    const wide = close || this._demo;        // タイトルの見本プレイは カメラが回るので 四角のまま
+    const Sr = (wide ? RD.SHADOW_AREA : RD.TOP_SHADOW_NS) * sc, Su = (wide ? RD.SHADOW_AREA : RD.TOP_SHADOW_EW) * sc;
+    const ldist = (close ? 90 : 80 * sc) * Math.max(1, this.farBoost);      // 光を置く距離(これより 高い物の影は 切れる)
+    if (Sr !== this._shS || Su !== this._shU || ldist !== this._shDist) {
+      this._shS = Sr; this._shU = Su; this._shDist = ldist;
       const sc_ = sun.shadow.camera;
-      sc_.left = -S; sc_.right = S; sc_.top = S; sc_.bottom = -S; sc_.far = ldist + (close ? 110 : 70 * sc);
+      sc_.left = -Sr; sc_.right = Sr; sc_.top = Su; sc_.bottom = -Su; sc_.far = ldist + (close ? 110 : 55 * sc);
       sc_.updateProjectionMatrix();
       this._viewT = Math.max(this._viewT || 0, 2);      // 広さが変わった直後は 影を すぐ 描きなおす
     }
     this._shSc = sc;
-    if (!close) cz -= 7 * sc;      // 見下ろしは 画面の奥(北)のほうが 広く見えるので、影の中心を 少し奥へ
-    const texel = (2 * S) / sun.shadow.mapSize.x;
+    if (!wide) cz -= 8 * sc;      // 見下ろしは 画面の奥(北)のほうが 広く見えるので、影の中心を 少し奥へ
+    const texel = (2 * Sr) / sun.shadow.mapSize.x, texelU = (2 * Su) / sun.shadow.mapSize.y;
     _rt.set(-_ld.z, 0, _ld.x).normalize();               // 光から見た 横
     _up.crossVectors(_ld, _rt);                           // 光から見た 縦
     _c.set(cx, 0, cz);
-    const a = Math.round(_c.dot(_rt) / texel) * texel, b = Math.round(_c.dot(_up) / texel) * texel, n = _c.dot(_ld);
+    const a = Math.round(_c.dot(_rt) / texel) * texel, b = Math.round(_c.dot(_up) / texelU) * texelU, n = _c.dot(_ld);
     _c.copy(_rt).multiplyScalar(a).addScaledVector(_up, b).addScaledVector(_ld, n);
     sun.target.position.copy(_c);
     sun.position.copy(_c).addScaledVector(_ld, ldist);
@@ -398,7 +396,8 @@ export const Engine = {
     if (this.bloom) this.bloom.strength = (this.viewMode === 'fps' ? 0.35 : this.viewMode === 'tps' ? 0.42 : 0.5) + (this._bk || 0);
     // 第5弾: 霧の距離(引いた分だけ 遠くへ)と、画面の仕上げ(夜は コントラストを弱く・暗い所を 少し持ち上げる)
     const zr = this.viewMode === 'top' || this._demo ? Math.max(1, this.camDist / C.DIST) : 1;
-    this.fogScale = Math.pow(zr, 0.9) * this.farBoost;
+    const fk = this.viewMode === 'top' && this.focus.w > 0 ? 1 + 0.6 * Math.min(1, this.focus.w / Math.max(0.01, this.focus.weight)) : 1;   // ボスを見せている間は 遠くまで
+    this.fogScale = Math.pow(zr, 0.9) * this.farBoost * fk;
     if (this.final) {
       let n = 0; try { n = World.night || 0; } catch (e) { /* なし */ }
       this.final.grade.set(RD.VIGNETTE * (this.viewMode === 'top' ? 1 : 0.8), RD.CONTRAST * (1 - 0.65 * n), 1.06, 0.035 * n);

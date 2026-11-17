@@ -483,7 +483,7 @@ export const Sky = {
     const v = this._view, q = Engine.quality;
     // 第5弾: 見下ろしは カメラを寝かせた分 遠くまで画面に入るので、霧を 近くした(前は 40〜140m)。画面の上のほう(奥)が 青白く かすんで 奥行きが出る。
     //   描く物の数も 前と同じくらいに おさまる(霧の先は 描かない)
-    const far0 = v === 'top' ? 92 : (q === 'high' ? 290 : q === 'mid' ? 230 : 175) * this.viewDistMul;
+    const far0 = v === 'top' ? 80 : (q === 'high' ? 290 : q === 'mid' ? 230 : 175) * this.viewDistMul;
     const near0 = v === 'top' ? 24 : 45;
     const fm = Math.max(0.28, 1 - wx.rain * 0.2 - wx.storm * 0.32 - wx.fog * 0.62 - wx.snow * 0.3 - wx.ash * 0.4) * (1 - nightK * 0.12);
     this.fogMul = fm;
