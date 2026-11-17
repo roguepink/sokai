@@ -39,6 +39,8 @@ TEMP = {
 }
 
 MEASURE = """([FIXED, TEMP]) => {
+  // 点数・コンボの数字は 増えたとき 一瞬だけ ふくらむ(0.2 秒)。測るときは ふつうの大きさで
+  for (const id of ['hudScore', 'hudComboN']) { const e = document.getElementById(id); if (e) e.style.transform = 'none'; }
   const vis = (el) => {
     const r = el.getBoundingClientRect();
     if (r.width < 3 || r.height < 3) return null;
@@ -54,6 +56,8 @@ MEASURE = """([FIXED, TEMP]) => {
   // 字だけの部品は、字の四角で測る(箱が 字より大きいことがあるので)
   const tight = (el) => {
     const r0 = vis(el); if (!r0) return null;
+    // 武器の列は まわりの あき(見えない 6px)を のぞいて測る
+    if (el.id === 'weaponBar') { const p = parseFloat(getComputedStyle(el).paddingTop) || 0; return { x: r0.x + p, y: r0.y + p, w: r0.w - 2 * p, h: r0.h - 2 * p }; }
     if (el.matches('#banner, #subBanner, #hudScoreBox, #hudCombo, .hud-stats, #hudWeapon, #viewToast')) {
       const rg = document.createRange(); rg.selectNodeContents(el);
       let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
@@ -69,7 +73,9 @@ MEASURE = """([FIXED, TEMP]) => {
   let minFont = 99, minFontWho = '';
   for (let i = 0; i < out.length; i++) {
     const a = out[i];
-    if (!a.temp && (a.x < -1 || a.y < -1 || a.x + a.w > W + 1 || a.y + a.h > H + 1) && !a.name.startsWith('武器の列')) off.push(a.name);
+    // 点数・コンボは 数字が増えたとき 一瞬ふくらむので、はみ出しは 10px まで見のがす
+    const m = /^(点数|コンボ)/.test(a.name) ? 10 : 1;
+    if (!a.temp && (a.x < -m || a.y < -m || a.x + a.w > W + m || a.y + a.h > H + m) && !a.name.startsWith('武器の列')) off.push(a.name);
     for (let j = i + 1; j < out.length; j++) {
       const b = out[j];
       if (a.el.contains(b.el) || b.el.contains(a.el)) continue;

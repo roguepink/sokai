@@ -5,29 +5,24 @@
 .look-zone { position: absolute; right: 0; top: calc(var(--sat) + 60px); bottom: 0; width: 45%; pointer-events: auto; touch-action: none; }
 
 /* ---- 👁 視点ボタン(短く押す = 切りかえ / 長押し = 設定) ---- */
-.btn-view { top: calc(var(--sat) + 8px); right: calc(var(--sar) + 64px); width: 44px; height: 44px; font-size: 16px;
-  flex-direction: column; background: rgba(0,0,0,.45); border: 2px solid rgba(255,255,255,.45); }
-.btn-view small { font-size: 9px; line-height: 1; }
-body.pc .btn-view::after { content: 'V'; position: absolute; bottom: -14px; font-size: 10px; opacity: .7; }
+/* 四角いボタン(一時停止・武器の列と 同じ形・同じ大きさ。style.css の --sq / --panel / --line-hi) */
+#controls .btn-view { top: calc(var(--sat) + var(--top)); right: calc(var(--sar) + var(--edge) + var(--sq) + var(--gap)); width: var(--sq); height: var(--sq); font-size: 16px;
+  flex-direction: column; gap: 1px; border-radius: var(--r-m); background: var(--panel); border: var(--bw) solid var(--line-hi); box-shadow: var(--lift); }
+.btn-view small { font-size: var(--fs-xs); line-height: 1; }
 
-/* ---- ダッシュ(2回で ジャンプ叩きつけ)。回転斬りの左 ---- */
-#controls .btn-dash { right: calc(var(--sar) + 262px); bottom: calc(var(--sab) + 20px); width: 78px; height: 78px; font-size: 15px;
-  flex-direction: column; gap: 1px; color: #fff;
-  background: radial-gradient(circle at 40% 32%, #d7a8ff, #6a24c8 62%, #3e0f86); border: 3px solid rgba(255,255,255,.65);
-  box-shadow: 0 0 16px rgba(170, 90, 255, .55); transition: filter .12s; }
-.btn-dash small { font-size: 8.5px; font-weight: 800; line-height: 1; opacity: .92; white-space: nowrap; letter-spacing: -.02em; }
+/* ---- ダッシュ(2回で ジャンプ叩きつけ)。回転斬りの左。丸いボタンの作りは style.css(撃つ・回転斬りと 同じ) ---- */
+#controls .btn-dash { right: calc(var(--sar) + 262px); bottom: calc(var(--sab) + 20px); width: 84px; height: 84px; font-size: var(--fs-m);
+  flex-direction: column; gap: 2px; color: #fff;
+  --bc: rgba(170, 90, 255, .55); background: radial-gradient(circle at 38% 30%, #dcb6ff, #7a32d8 55%, #3e0f86); }
+.btn-dash small { font-size: var(--fs-xs); font-weight: 800; line-height: 1.05; opacity: .95; white-space: nowrap; letter-spacing: -.02em; }
 #controls .btn-dash.cool { filter: saturate(.45) brightness(.78); }
 #controls .btn-dash.air { transform: scale(.9); filter: brightness(1.55); }
-body.pc .btn-dash::after { content: '右クリック(2回で叩きつけ)'; }
 @media (max-height: 380px) {
-  #controls .btn-dash { right: calc(var(--sar) + 236px); width: 70px; height: 70px; font-size: 14px; }
-  .btn-dash small { font-size: 8px; }
+  #controls .btn-dash { right: calc(var(--sar) + 236px); width: 78px; height: 78px; font-size: 14px; }
 }
 /* 縦長: 左の親指(スティック)とぶつからないように、回転斬りの上へ */
 @media (orientation: portrait) {
-  #controls .btn-dash { right: calc(var(--sar) + 170px); bottom: calc(var(--sab) + 120px); width: 64px; height: 64px; font-size: 13px; }
-  .btn-dash small { font-size: 7.5px; }
-  #controls .btn-prev { right: calc(var(--sar) + 90px); }   /* ◀▶ を 撃つボタンの上に ならべる(ダッシュの場所をあける) */
+  #controls .btn-dash { right: calc(var(--sar) + 164px); bottom: calc(var(--sab) + 114px); width: 74px; height: 74px; font-size: 14px; }
 }
 
 /* ---- 照準(肩越し・一人称)。撃つと広がる(--sp)・敵に重なると赤(.on) ---- */
@@ -66,40 +61,37 @@ body.pc .btn-dash::after { content: '右クリック(2回で叩きつけ)'; }
 /* ---- 視点の名前(切りかえたとき) ---- */
 .view-toast { position: fixed; z-index: 14; left: 50%; top: calc(var(--sat) + 74px); transform: translateX(-50%); pointer-events: none;
   display: flex; flex-direction: column; align-items: center; gap: 2px; text-shadow: var(--stroke); white-space: nowrap; }
-.view-toast b { font-size: 24px; font-weight: 900; padding: 4px 18px; border-radius: 999px; background: rgba(0,0,0,.45); border: 2px solid rgba(255,255,255,.35); }
-.view-toast small { font-size: 12px; font-weight: 800; opacity: .9; }
+.view-toast b { font-size: 24px; font-weight: 900; padding: 4px 18px; border-radius: var(--r-pill); background: var(--panel); border: var(--bw) solid var(--line-hi); box-shadow: var(--lift); }
+.view-toast small { font-size: var(--fs-s); font-weight: 800; opacity: .9; }
 .view-toast.go { animation: vtIn 1.6s ease-out both; }
 @keyframes vtIn { 0% { opacity: 0; transform: translate(-50%, -8px) scale(.9); } 12% { opacity: 1; transform: translate(-50%, 0) scale(1.05); }
   20% { transform: translate(-50%, 0) scale(1); } 80% { opacity: 1; } 100% { opacity: 0; } }
 
 /* ---- はじめての人への ひとこと ---- */
 .view-hint { position: fixed; z-index: 14; pointer-events: none; display: flex; align-items: center; gap: 10px;
-  padding: 10px 16px; border-radius: 16px; background: rgba(0,0,0,.62); border: 2px solid rgba(255,255,255,.45);
+  padding: 10px 16px; border-radius: var(--r-m); background: var(--panel-hi); border: var(--bw) solid var(--line-hi); box-shadow: var(--lift);
   font-size: 17px; font-weight: 900; line-height: 1.3; text-shadow: 0 2px 0 #000; animation: hintIn .35s cubic-bezier(.2,1.5,.4,1) both; }
 .view-hint span { display: flex; flex-direction: column; }
-.view-hint small { font-size: 11px; font-weight: 800; opacity: .85; margin-top: 3px; }
+.view-hint small { font-size: var(--fs-xs); font-weight: 800; opacity: .9; margin-top: 3px; }
 .view-hint em { font-style: normal; color: var(--gold); }
 .view-hint b { font-size: 30px; }
-.view-hint.look { right: calc(var(--sar) + 70px); top: 21%; }
-.view-hint.slam { left: calc(var(--sal) + 14px); top: 46%; white-space: nowrap; }
+/* 場所: 左の まんなか(左スティックの あたり。ほかの表示が ない所)。前は 右上で コンボ・ボスの体力・大きな文字に かぶっていた */
+.view-hint.look, .view-hint.slam { left: calc(var(--sal) + var(--edge) + 4px); top: 46%; white-space: nowrap; }
 .view-hint b.swipe { display: inline-block; animation: swipe 1.1s ease-in-out infinite; }
 @keyframes swipe { 0%, 100% { transform: translateX(-16px); } 50% { transform: translateX(16px); } }
 @keyframes hintIn { from { opacity: 0; } }
-@media (orientation: portrait) { .view-hint.look { right: 12px; top: 24%; } }
 /* 背の低い横画面: 小さめに(主人公・チャレンジの札に かぶらない)。チャレンジの札が出ているときは その下(view-hud.js) */
 @media (orientation: landscape) and (max-height: 430px) {
-  .view-hint { padding: 7px 12px; gap: 8px; font-size: 14px; border-radius: 12px; }
+  .view-hint { padding: 7px 12px; gap: 8px; font-size: 14px; border-radius: var(--r-m); }
   .view-hint b { font-size: 24px; }
-  .view-hint small { font-size: 10px; }
-  .view-hint.slam { top: 50%; }
+  .view-hint.look, .view-hint.slam { top: 34%; }      /* ミニマップの下。武器が変わった表示(まんなかの下)と かぶらない */
 }
 /* 縦長: 照準より下、無双ゲージより上 */
 @media (orientation: portrait) {
   .view-hint { font-size: 15px; padding: 8px 12px; }
   .view-hint b { font-size: 24px; }
-  .view-hint.slam { top: auto; bottom: calc(var(--sab) + 302px); left: calc(var(--sal) + 12px); }
+  .view-hint.look, .view-hint.slam { top: auto; bottom: calc(var(--sab) + 340px); left: calc(var(--sal) + 12px); }
 }
-body.pc .view-hint.look { right: auto; left: calc(var(--sal) + 14px); top: 40%; }
 
 /* ---- 視点の設定(👁 を長押し) ---- */
 .view-panel { z-index: 22; gap: 12px; }
@@ -121,18 +113,5 @@ body.pc .view-hint.look { right: auto; left: calc(var(--sal) + 14px); top: 40%; 
 /* 指の機械では 上下の設定は使わない(指は 左右だけ回す) */
 body:not(.pc) .view-panel .pc-only { display: none; }
 
-/* ◀▶(武器の切りかえ)を 撃つボタンから 少し はなす(すきまが 2〜4px しかなく、撃つつもりが 武器が変わることがあった)。
-   武器の名前も いっしょに上へ */
-@media (orientation: landscape) {
-  #controls .btn-prev, #controls .btn-next { bottom: calc(var(--sab) + 162px); }
-  #hud .weapon-name { bottom: calc(var(--sab) + 220px); }
-}
-@media (orientation: landscape) and (max-height: 380px) {
-  #controls .btn-prev, #controls .btn-next { bottom: calc(var(--sab) + 150px); }
-  #hud .weapon-name { bottom: calc(var(--sab) + 204px); }
-}
-body.pc #hud .weapon-name { bottom: calc(var(--sab) + 172px); }
-@media (orientation: portrait) {
-  #controls .btn-prev, #controls .btn-next { bottom: calc(var(--sab) + 160px); width: 48px; height: 48px; }
-  #controls .btn-next { right: calc(var(--sar) + 28px); }
-}
+/* ◀▶(武器の切りかえ)と 今の武器の札は、撃つボタンの上に 1 列(◀ 札 ▶)。場所は style.css の --sw-b(下から)/ --sw-h(高さ)/ --wchip(札の幅)で 決める。
+   撃つボタンから 14px 以上 はなす(前に すきまが 2〜4px しかなく、撃つつもりが 武器が変わることがあった) */

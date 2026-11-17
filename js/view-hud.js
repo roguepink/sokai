@@ -122,7 +122,7 @@ export const ViewHud = {
   // 左上のチャレンジの札が出ていたら、その下へ(重ならないように。札は あとから出ることもある)
   _placeHint() {
     const h = this.hint, ch = document.getElementById('hudChallenge');
-    if (this._hintKind !== 'slam' || innerWidth < innerHeight) return;
+    if (!this._hintKind || innerWidth < innerHeight) return;
     h.style.top = '';
     if (!ch || ch.classList.contains('hidden')) return;
     const r = ch.getBoundingClientRect(), top = h.getBoundingClientRect().top;
