@@ -112,7 +112,7 @@ export const BossShow = {
   },
 
   clear() {
-    this.intro = null; this.seq = null; this.omen = null; this._pending.length = 0; this._waves.length = 0;
+    this.intro = null; this.seq = null; this.omen = null; this._low = null; this._pending.length = 0; this._waves.length = 0;
     this._omenDark(0);
     if (Score._nova) Score._nova = null;
     this._introAt = -1e9; this._tick = -1; this._chipTxt = ''; this._chipOn = false; this._chainTxt = null;
@@ -151,6 +151,29 @@ export const BossShow = {
     if (o.t > o.sec + 1) this.omen = null;      // 出たら 登場の演出へ(暗さは 登場のあとで うすく)
   },
 
+  // 見下ろしの 大怪獣の登場: 主人公の 後ろの 低い所から 見上げる。描く直前に カメラを 置きかえる(操作・ねらいは そのまま。3 秒ほどで もどる)
+  _low: null,
+  _lowStart(shot, sec) {
+    const cam = Engine.camera;
+    this._low = { s: shot, t: 0, sec, w: 0, last: performance.now(), p0: cam.position.clone(), q0: cam.quaternion.clone(), p1: cam.position.clone(), q1: cam.quaternion.clone() };
+    if (!this._lowHooked) { this._lowHooked = true; Engine.beforeRender.push(() => this._lowApply()); }
+  },
+  _lowApply() {
+    const L = this._low; if (!L) return;
+    const now = performance.now(), dt = Math.min(0.1, (now - L.last) / 1000); L.last = now;
+    if (!this.ui.paused) L.t += dt;
+    const on = Engine.viewMode === 'top' && Score.active && L.t < L.sec - 0.7;
+    L.w += ((on ? 1 : 0) - L.w) * Math.min(1, dt * 5.5);
+    if (!on && L.w < 0.01) { this._low = null; return; }
+    const cam = Engine.camera, s = L.s, k = L.w * L.w * (3 - 2 * L.w);
+    L.p0.copy(cam.position); L.q0.copy(cam.quaternion);
+    cam.position.set(s.x, s.y, s.z); cam.lookAt(s.lx, s.ly, s.lz);
+    L.p1.copy(cam.position); L.q1.copy(cam.quaternion);
+    cam.position.lerpVectors(L.p0, L.p1, k); cam.quaternion.slerpQuaternions(L.q0, L.q1, k);
+    cam.updateMatrixWorld();
+    if (k > 0.5) Engine.lowCam = true;      // 低いカメラの間は 霧とかすみを 肩越しと同じに(立体感の係の 印)
+  },
+
   // ---------------- 登場 ----------------
   _onSpawn(d) {
     if (!Score.active) return;
@@ -184,7 +207,8 @@ export const BossShow = {
     ui.el.hud.classList.remove('bossintro'); void ui.el.hud.offsetWidth; ui.el.hud.classList.add('bossintro');
     flash(ui.el.flash, '#ff1a1a', 0.35, 600);
     ui.el.vignette.classList.add('boss');
-    if (ic) { Engine.focusOn(e.x, ic.y, e.z, ic.sec, ic.o); this._omenDark(0.55); this.omen = null; }
+    el.card.style.top = ic && ic.low ? (innerWidth < innerHeight ? '60%' : '54%') : '';      // 見下ろしの 大怪獣: 名札は 下へ(全身が 上に 映る)
+    if (ic) { Engine.focusOn(e.x, ic.y, e.z, ic.sec, ic.o); this._omenDark(0.55); this.omen = null; if (ic.shot) this._lowStart(ic.shot, ic.sec); }
     else if (e) {
       Engine.focusOn(e.x, size * 0.6, e.z, 2.0, { weight: 0.55, zoom: 1.2 + Math.min(0.35, size / 60), pitch: 0.2, inT: 0.35, outT: 0.5 });
       BossFX.bossIntro(e.x, e.z, size);
@@ -290,6 +314,8 @@ export const BossShow = {
     el.stampSub.textContent = j.name + (j.time > 0 ? ` ・ ${j.time.toFixed(1)}秒` : '');
     el.speed.textContent = j.speed ? j.speed.label : '';
     el.speed.style.display = j.speed ? '' : 'none';
+    // ハンコは 点数の下から(点数・武器の列に かぶらない。UI の係の お願い)
+    try { const sb = ui.el.scoreBox.getBoundingClientRect(); if (sb.height > 0) el.stamp.style.top = Math.round(sb.bottom + 6) + 'px'; } catch (err) { /* そのまま */ }
     el.stamp.classList.remove('out'); replay(el.stamp);
     el.lines.innerHTML = ''; el.total.textContent = '0';
     el.jack.classList.remove('on', 'out', 'done');

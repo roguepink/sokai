@@ -18,6 +18,7 @@ import { Engine } from './engine.js';
 import { Events } from './events.js';
 import { Gore } from './zombie-gore.js';
 import { Warn } from './boss-warn.js';
+import { Air } from './depth-air.js';
 import { R, sin, cos, max, min, abs, PI, TAU, clamp, lathe, skinTex, bodiesTex, canvasTex, mat, limb, limbZ, spike, horn, blob, box, sph, torus, ribs, Rig, ease, seg } from './boss-kit.js';
 import { act, slam, hitHero, heroIn, heroDist, quake, pick, begin, done, lead, ringWave } from './boss-attacks.js';
 
@@ -137,25 +138,10 @@ function applyPose(m, P, bob = 0) {
   j.armR.rotation.set(P[Q.aRx], 0, P[Q.aRz]); j.foreR.rotation.x = P[Q.fR];
 }
 
-// ---------------------------------------------------------------
-// 霧の しあげ(見下ろしで カメラを 大きく引いたとき、主人公のまわりが 霧で 白くならないように。描く直前)
-// ---------------------------------------------------------------
+// 出ている 大怪獣(霧と影を 遠くまで: Engine.setFarBoost(2)。立体感の係の 約束。いなくなったら 1 に もどす)
 const LIVE = [];
-const FOGS = { n: -1, f: -1, dn: 0, df: 0 };
-let _hooked = false;
-function hookFog() {
-  if (_hooked) return; _hooked = true;
-  Engine.beforeRender.push(() => {
-    const fog = Engine.scene && Engine.scene.fog; if (!fog || fog.near === undefined) return;
-    if (fog.near === FOGS.n && fog.far === FOGS.f) { fog.near -= FOGS.dn; fog.far -= FOGS.df; }      // 前に 足した分(空の係が 入れ直していないとき)
-    FOGS.dn = FOGS.df = 0;
-    if (LIVE.length && Engine.viewMode === 'top') {
-      const need = Engine.camDist * 0.92 - fog.near;
-      if (need > 0) { FOGS.dn = need; FOGS.df = need * 1.4; fog.near += FOGS.dn; fog.far += FOGS.df; }
-    }
-    FOGS.n = fog.near; FOGS.f = fog.far;
-  });
-}
+// 見下ろしで カメラを とても遠くへ引いている間(登場)は 1 のまま(引いた分で もう 十分 遠い。2 にすると 霧の 近い方が 遠い方を こえる)
+function farBoost() { if (Engine.setFarBoost) Engine.setFarBoost(LIVE.length && !(Engine.viewMode === 'top' && Engine.camDist > 42) ? 2 : 1); }
 
 // =====================================================================
 // 終末竜 ムクロドン
@@ -175,7 +161,7 @@ const kaiju = {
     const dark = mat(m, { map: skinTex('#5c1c1e', { wounds: 14, veins: 40, vein: 'rgba(20,0,0,0.6)', rep: 2 }), color: 0xffffff, roughness: 0.55, shadow: false });
     const glow = mat(m, { color: 0x1c3a06, emissive: GREEN, emissiveIntensity: 1.8, glow: true, roughness: 0.4 });
     // すかすときは ざらざら(alphaHash)でなく なめらかに(体が 画面いっぱいに なるので)。ふだんは こさ 1 = ふつうの見た目
-    for (const mt of m.mats) { weakFog(mt, 0.5); mt.alphaHash = false; mt.transparent = true; mt.depthWrite = true; }
+    for (const mt of m.mats) { weakFog(mt, 0.5); mt.alphaHash = false; mt.transparent = true; mt.depthWrite = true; if (!m.glows.includes(mt)) Air.rim(mt); }      // ふちの光(alphaHash を 切ったので 自分で つける)
 
     const G = new Rig(m);
     // ---- こし ----
@@ -326,7 +312,6 @@ const kaiju = {
 
   // ---------- 出た ----------
   spawn(B, e, m) {
-    hookFog();
     m.B = B; m.wph = 0; m.sag = 0; m.dip = 0; m.sw = 0; m.rain = 0; m.lost = 0; m.burns.length = 0; m.rainP = null; m.deadInit = false; m.shK = 0; m.tick = 0;
     m.P.set(BASE);
     e.face = Math.atan2(B._player ? B._player.pos.x - e.x : 0, B._player ? -(B._player.pos.z - e.z) : 1);
@@ -342,12 +327,14 @@ const kaiju = {
     m.prints.instanceColor.needsUpdate = true;
     B._scene.add(m.shade); B._scene.add(m.prints);
     if (!LIVE.includes(m)) LIVE.push(m);
+    farBoost();
     e.sT = 0; e.foot = 0; e.kills = 0;
   },
   free(B, m) {
     if (m.shade.parent) m.shade.parent.remove(m.shade);
     if (m.prints.parent) m.prints.parent.remove(m.prints);
     const i = LIVE.indexOf(m); if (i >= 0) LIVE.splice(i, 1);
+    farBoost();
     if (Engine.focus.dur === MYFOCUS && Engine.focus.t > Engine.focus.outT) Engine.focusEnd();
     m.parts = null;
   },
@@ -394,6 +381,8 @@ const kaiju = {
       }
       for (let i = 2; i <= TN; i++) { const p = m.tp[i], r = TR(i) * S + 1; if ((x - p.x) ** 2 + (z - p.z) ** 2 + (y - p.y) ** 2 < r * r) return 0.3; }
       if (y > hipY - 14 && (x - e.x) ** 2 + (z - e.z) ** 2 < 17 * 17) return 0.3;
+      if (s === 1) { m.j.head.getWorldPosition(_v); m.j.chest.getWorldPosition(_d); }
+      if ((x - _v.x) ** 2 + (y - _v.y) ** 2 + (z - _v.z) ** 2 < 16 * 16 || (x - _d.x) ** 2 + (y - _d.y - 8) ** 2 + (z - _d.z) ** 2 < 20 * 20) return 0.3;
     }
     return 1;
   },
@@ -914,6 +903,7 @@ function bodyStep(B, m, e, dt) {
     if (!(m.sw > 0)) for (let i = 4; i <= TN; i++) { const p = m.tp[i], r = TR(i) * S; if (p.y - r < 2) push(p.x, p.z, r * 0.8); }
     if (moved) World.collideCircle(Pl.pos, Pl.radius);
   }
+  farBoost();
   // 見下ろし: カメラの中心を 怪獣の方へ 少し寄せて、少し 低い角度に(足が 画面の 上のはしで 切れない)。ほかの演出(登場・撃破)が 使っている間は さわらない
   const FC = Engine.focus;
   if (Pl && Engine.viewMode === 'top' && e.state !== 'enter' && !World.inside) {
@@ -1045,13 +1035,19 @@ function shadeStep(m, e, dt, dead) {
 //   肩越し・一人称: カメラだけ そちらを 見上げる
 // ---------------------------------------------------------------
 export function kaijuIntroCam(e, hero) {
-  const hx = hero.pos.x, hz = hero.pos.z;
   if (Engine.viewMode !== 'top') return { y: 60, sec: 3.6, o: { weight: 1, zoom: 1, pitch: 0, inT: 0.5, outT: 0.7 } };
-  const north = hz - e.z, side = abs(e.x - hx);
-  // 低い カメラ: 主人公の 南 約 30m・高さ 3〜4m。そこまで 壁が なく、怪獣が 北に いるとき
-  const cz = hz + 30, clear = north > 50 && side < north * 0.9 && !World.buildingAt(hx, cz) && World.segmentHit(hx, hz, hx, cz, 2.5) >= 1 && !World.inside;
-  if (clear) return { y: 143, sec: 3.6, o: { weight: 0.3, zoom: 4.4, pitch: 1.15, inT: 0.6, outT: 0.7 } };
-  return { y: 70, sec: 3.6, o: { weight: 0.45, zoom: 3.6, pitch: 0.5, inT: 0.5, outT: 0.7 } };
+  const hx = hero.pos.x, hz = hero.pos.z, dx = e.x - hx, dz = e.z - hz, d = Math.hypot(dx, dz) || 1, ux = dx / d, uz = dz / d;
+  // (1) 主人公の 後ろ(怪獣の 反対がわ)の 低い所から 見上げる。壁で ふさがらない所が あれば これ(shot = カメラの位置。演出係が 描く直前に 置く)
+  if (!World.inside && d > 60) for (const back of [26, 17]) {
+    const cx = hx - ux * back, cz = hz - uz * back;
+    if (World.buildingAt(cx, cz) || World.blockedAt(cx, cz, 1.5) || World.segmentHit(hx, hz, cx, cz, 2.2) < 1 || World.segmentHit(hx, hz, hx + ux * 30, hz + uz * 30, 6) < 1) continue;
+    // 横長の画面: 見る点を 横へ ずらす(怪獣が まん中の 名札に かくれない)。たて長: 名札を 下へ(low)
+    const tall = innerWidth < innerHeight, sd = tall ? 0 : (ux * 0.3 + uz > 0 ? 1 : -1) * 0.2 * d;
+    return { y: 60, sec: 3.4, low: tall, shot: { x: cx, y: 3.2, z: cz, lx: hx + ux * d * 0.55 - uz * sd, ly: 30 + back * 0.4, lz: hz + uz * d * 0.55 + ux * sd }, o: { weight: 0.3, zoom: 3, pitch: 0, inT: 0.5, outT: 0.7 } };
+  }
+  // (2) だめなら 高い所から 遠くの 全身を(名札は 画面の下へ = low)
+  const tall = innerWidth < innerHeight;
+  return { y: 190, sec: 3.2, low: true, o: { weight: 0.45, zoom: tall ? 5.6 : 7, pitch: 0.6, inT: 0.6, outT: 0.8 } };
 }
 
 export const KAIJU = { kaiju };
