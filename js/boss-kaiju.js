@@ -1041,9 +1041,9 @@ export function kaijuIntroCam(e, hero) {
   if (!World.inside && d > 60) for (const back of [26, 17]) {
     const cx = hx - ux * back, cz = hz - uz * back;
     if (World.buildingAt(cx, cz) || World.blockedAt(cx, cz, 1.5) || World.segmentHit(hx, hz, cx, cz, 2.2) < 1 || World.segmentHit(hx, hz, hx + ux * 30, hz + uz * 30, 6) < 1) continue;
-    // 横長の画面: 見る点を 横へ ずらす(怪獣が まん中の 名札に かくれない)。たて長: 名札を 下へ(low)
+    // 横長の画面: 見る点を 横へ ずらす(怪獣が まん中の 名札に かくれない)。たて長: 名札は 怪獣の頭の 上に おさまる
     const tall = innerWidth < innerHeight, sd = tall ? 0 : (ux * 0.3 + uz > 0 ? 1 : -1) * 0.2 * d;
-    return { y: 60, sec: 3.4, low: tall, shot: { x: cx, y: 3.2, z: cz, lx: hx + ux * d * 0.55 - uz * sd, ly: 30 + back * 0.4, lz: hz + uz * d * 0.55 + ux * sd }, o: { weight: 0.3, zoom: 3, pitch: 0, inT: 0.5, outT: 0.7 } };
+    return { y: 60, sec: 3.4, shot: { x: cx, y: 3.2, z: cz, lx: hx + ux * d * 0.55 - uz * sd, ly: 30 + back * 0.4, lz: hz + uz * d * 0.55 + ux * sd }, o: { weight: 0.3, zoom: 3, pitch: 0, inT: 0.5, outT: 0.7 } };
   }
   // (2) だめなら 高い所から 遠くの 全身を(名札は 画面の下へ = low)
   const tall = innerWidth < innerHeight;

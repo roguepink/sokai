@@ -227,7 +227,7 @@ export const BossShow = {
     else if (!it.roared) { it.roared = true; Engine.shake(1.1); Engine.fovKick(6); }
     if (it.e && it.e.alive !== false) Engine.focusTrack(it.e.x, it.y, it.e.z);
     if (it.t >= (it.dur || 2.05)) {
-      if (it.kj) this._omenDark(0.3);          // 戦いの間は 少しだけ 暗いまま
+      if (it.kj) this._omenDark(0.18);         // 戦いの間は 少しだけ 暗いまま
       this.intro = null;
       this.ui.el.hud.classList.remove('bossintro');
     }
