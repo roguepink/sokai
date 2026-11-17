@@ -57,7 +57,7 @@ export const BossShow = {
     const L = document.createElement('div');
     L.className = 'bs-layer hidden';
     L.innerHTML = `
-      <div id="bsOmen" style="position:absolute;inset:0;opacity:0;transition:opacity 2.5s ease;background:radial-gradient(ellipse at 50% 45%, rgba(0,0,0,0) 28%, rgba(6,14,4,.5) 70%, rgba(2,6,2,.88) 100%)"></div>
+      <div id="bsOmen" style="position:absolute;inset:0;opacity:0;transition:opacity 2.5s ease;background:radial-gradient(ellipse at 50% 45%, rgba(4,10,6,.3) 0%, rgba(4,10,6,.62) 58%, rgba(2,5,3,.94) 100%)"></div>
       <div class="bs-hit" id="bsHit"></div>
       <div class="bs-chroma" id="bsChroma"></div>
       <div class="bs-rage" id="bsRage"></div>
@@ -132,8 +132,8 @@ export const BossShow = {
   _onOmen(d) {
     if (!Score.active) return;
     this.omen = { t: 0, sec: d.sec || 9, next: 0.4, n: 0 };
-    this._omenDark(0.9);
-    this.ui.banner.show('…何かが 来る', '大地が ふるえている', 'boss', 3.4, 3);
+    this._omenDark(1);
+    this.ui.banner.show('…何かが 来る', '大地が ふるえている', 'boss', 3.4, 2);
     this.ui.el.vignette.classList.add('boss');
   },
   _omenStep(dt) {
