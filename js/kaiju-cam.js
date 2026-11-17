@@ -158,9 +158,9 @@ export const KaijuCam = {
           if (el > 0) this._elev = el;
         }
         if (!World.inside && this._ok >= 2) k = 1;
-        G.dist = tall ? 31 : 34; G.fov = 72; G.fovTall = 82;
+        G.dist = tall ? 31 : 34; G.fov = 74; G.fovTall = 82;
         G.elev = damp(G.elev, this._elev, this._elev > G.elev ? 4 : 1.5, dt);
-        G.frac = tall ? 0.2 : 0.14;
+        G.frac = tall ? 0.2 : 0.125;
       } else {
         // 大怪獣の方を 向いているとき だけ(横や 後ろを 向いている間は いつものカメラ)
         const M = e._M, head = M.j && M.j.head;

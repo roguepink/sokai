@@ -344,7 +344,7 @@ const kaiju = {
     for (let k = 0; k < 4; k++) m.fk[k].set(e.x + bx * (10 + TN * 9 + (k < 2 ? 12 : 28)), 4, e.z + bz * (10 + TN * 9 + (k < 2 ? 12 : 28)));      // 二またの先(はじめの 1 コマから 正しい所に。カメラ係が 使う)
     // 体の部品(当たりの丸): 足 2 つ・しっぽの低い所 4 つ・二またの先 2 つ
     const Z = B._Z;
-    m.parts = { feet: [Z.addPart(e, FOOT_R, 5), Z.addPart(e, FOOT_R, 5)], tail: [], fork: [Z.addPart(e, 3.6, 3), Z.addPart(e, 3.6, 3)], far: Z.addPart(e, 9, 20) };
+    m.parts = { feet: [Z.addPart(e, FOOT_R, 5), Z.addPart(e, FOOT_R, 5)], tail: [], fork: [Z.addPart(e, 3.6, 3), Z.addPart(e, 3.6, 3)], far: Z.addPart(e, 7, 20) };
     e.mode = 'far'; e.nFar = 0; e.nNear = 0; e.backT = 0;
     for (let s = 3; s < TN; s++) m.parts.tail.push(Z.addPart(e, (TR(s) + TR(s + 1)) / 2 * S * 0.9, 5));
     for (let i = 0; i < 10; i++) { m.printL[i] = 0; m.prints.setColorAt(i, _col.setRGB(0, 0, 0)); }
@@ -918,15 +918,16 @@ function bodyStep(B, m, e, dt) {
     if (y - p.r > 6.5) { p.x = p.z = 1e6; } else { p.x = (a.x + b.x) / 2; p.z = (a.z + b.z) / 2; }
   }
   for (let k = 0; k < 2; k++) { Pt.fork[k].x = (m.fk[k].x + m.fk[2 + k].x) / 2; Pt.fork[k].z = (m.fk[k].z + m.fk[2 + k].z) / 2; }
-  // 遠くに 立っている間(足まで 40m より 遠い): 主人公から 体へ向かう線の 38m 先に 当たりの丸を 置く = ふつうの銃でも とどく。
+  // 足が 遠い間(27m より 遠い): 主人公から 体へ向かう線の 24m 先に 当たりの丸を 置く = ふつうの銃でも とどく・自動で ねらう。
   // 当たった光の 高さは、カメラから見て むねに 重なる 高さに(弾が むねに 当たったように 見える)
   if (Pl && Pt.far) {
     const p = Pt.far, dx = e.x - Pl.pos.x, dz = e.z - Pl.pos.z, d = Math.hypot(dx, dz) || 1;
     let nearest = d;
     for (const F of m.feet) nearest = min(nearest, Math.hypot(F.x - Pl.pos.x, F.z - Pl.pos.z));
-    if (nearest < 46 || e.state === 'enter') { p.x = p.z = 1e6; }
+    // (見下ろしの 自動ねらいは 36m まで・ボスは 26m 以内なら いちばん先に ねらう決まり(weapons.js)。だから 24m 先に置く = 前と同じく いつも 大怪獣を ねらえる)
+    if (nearest < 27 || e.state === 'enter') { p.x = p.z = 1e6; }
     else {
-      const R0 = 38;
+      const R0 = 24;
       p.x = Pl.pos.x + dx / d * R0; p.z = Pl.pos.z + dz / d * R0;
       m.j.chest.getWorldPosition(_v);
       const cam = Engine.camera.position, cd = Math.hypot(_v.x - cam.x, _v.z - cam.z) || 1, pd = Math.hypot(p.x - cam.x, p.z - cam.z);
