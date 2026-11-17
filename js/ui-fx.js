@@ -50,7 +50,7 @@ export class Popups {
       let op = t > 0.55 ? 1 - (t - 0.55) / 0.45 : 1;
       const x = sc.x + p.jx * t, y = sc.y - up;
       // 上の点数の帯・右下のボタンの上には出さない。主人公の真上は うすく(まわりが見えるように)
-      if (y < Avoid.top || (x > innerWidth - 270 && y > innerHeight - 220)) op = 0;
+      if (y < Avoid.top || (x > innerWidth - Avoid.bw && y > innerHeight - Avoid.bh)) op = 0;
       else {
         const dx = x - Avoid.hx, dy = y - Avoid.hy, d2 = dx * dx + dy * dy;
         if (d2 < Avoid.r * Avoid.r) op *= 0.25 + 0.75 * Math.sqrt(d2) / Avoid.r;
@@ -63,8 +63,9 @@ export class Popups {
   clear() { for (const p of this.items) { p.on = false; p.el.style.opacity = '0'; } }
 }
 const _pt = {};
-// 数字をよける場所(UI が毎フレーム入れる): 主人公の画面の位置(hx, hy)と半径 r、上の帯の下はし top
-export const Avoid = { hx: -999, hy: -999, r: 70, top: 70 };
+// 数字をよける場所(UI が毎フレーム入れる): 主人公の画面の位置(hx, hy)と半径 r、上の帯の下はし top、
+// 右下の操作ボタン(撃つ・回転斬り・ダッシュ・◀ 札 ▶)の 幅 bw・高さ bh
+export const Avoid = { hx: -999, hy: -999, r: 70, top: 70, bw: 350, bh: 236 };
 
 // ---------- まんなかの大きな文字 ----------
 // 大事なもの(ボス・記録)は割りこむ。ふつうのもの(区切りの数)は順番待ち。

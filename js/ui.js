@@ -551,6 +551,9 @@ export const UI = {
       const chip = BossShow.el.chip;
       if (chip && !chip.classList.contains('hidden')) top = Math.max(top, chip.getBoundingClientRect().bottom);
       Avoid.top = top + 4;
+      // 右下の操作ボタンの場所(飛び出す数字を 出さない所)。縦画面は 下の 300px(ボタン・武器の切りかえ・武器の列)ぜんぶ
+      const land = innerWidth > innerHeight;
+      Avoid.bw = land ? 350 : innerWidth; Avoid.bh = land ? 236 : 300;
       // 肩越し・一人称: 大きな文字は 点数(ボスの体力)のすぐ下へ(照準のまわりを あける)
       const lc = Math.round(Avoid.top + 4) + 'px';
       if (lc !== this._laneC) { this._laneC = lc; el.hud.style.setProperty('--laneC', lc); }

@@ -449,7 +449,7 @@ function buildHero() {
   const g = new THREE.Group();
   g.name = 'hero';
   g.scale.setScalar(HERO_SCALE);
-  const heroM = heroMaterial(1.9, 0x0f3856);
+  const heroM = heroMaterial(1.35, 0x0f3856);
   const swordM = heroMaterial(2.3, 0x000000);
   const scarfM = new THREE.MeshStandardMaterial({ color: COL.scarf, roughness: 0.8, side: THREE.DoubleSide });
   const bladeGlow = new THREE.MeshBasicMaterial({ color: 0x3aa8ff, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
@@ -532,7 +532,7 @@ function buildHero() {
   put(head, lathe([[0, 0.02], [0.11, 0.03], [0.133, 0.1], [0.139, 0.18], [0.126, 0.26], [0.08, 0.318], [0, 0.335]], 14, (p) => {
     if (p.z > 0) p.z *= 1.12; p.x *= 0.94; if (p.z < 0 && p.y < 0.12) p.z *= 1.12;
   }), COL.plate, PLATE);
-  put(head, new THREE.SphereGeometry(0.134, 14, 6, Math.PI * 1.12, Math.PI * 0.76, Math.PI * 0.35, Math.PI * 0.23), COL.visor, [0.15, 0.9], { y: 0.165, z: -0.004, sx: 0.97, sy: 1.05, sz: 1.14, glow: 0.62 });
+  put(head, new THREE.SphereGeometry(0.134, 14, 6, Math.PI * 1.12, Math.PI * 0.76, Math.PI * 0.35, Math.PI * 0.23), COL.visor, [0.15, 0.9], { y: 0.165, z: -0.004, sx: 0.97, sy: 1.05, sz: 1.14, glow: 0.8 });
   put(head, box(0.032, 0.08, 0.28), COL.armor, ARMOR, { y: 0.328, z: 0.02, rx: 0.15 });                        // とさか
   for (const sx of [-1, 1]) put(head, cyl(0.046, 0.046, 0.034, 8), COL.armor, ARMOR, { x: sx * 0.128, y: 0.15, z: 0.02, rz: Math.PI / 2 });
   put(head, box(0.012, 0.15, 0.012), COL.trim, PLATE, { x: 0.142, y: 0.26, z: 0.05, rx: -0.3 });               // アンテナ
