@@ -318,7 +318,7 @@ export const Engine = {
     // タイトルの見本プレイ: ゆっくり回りこみ、少し低い角度で 迫力を出す。プレイが始まったら北が上にもどす
     if (demo) {
       this.camYaw += realDt * 0.07;
-      this.camPitch = damp(this.camPitch, 0.66, 1.5, realDt);
+      this.camPitch = damp(this.camPitch, innerWidth < innerHeight ? 0.8 : 0.66, 1.5, realDt);      // たて長は 画角が広いので 少し上から(地平線が 入らないように)
     } else {
       if (this.camYaw) this.camYaw = 0;             // スティックの向き = 画面の向き にするため、すぐもどす
       // 高い建物にはさまれた道では、真上に近い角度にして 壁で主人公がかくれないように(main が street を 0..1 で入れる)
@@ -398,9 +398,11 @@ export const Engine = {
     const zr = this.viewMode === 'top' || this._demo ? Math.max(1, this.camDist / C.DIST) : 1;
     const fk = this.viewMode === 'top' && this.focus.w > 0 ? 1 + 0.6 * Math.min(1, this.focus.w / Math.max(0.01, this.focus.weight)) : 1;   // ボスを見せている間は 遠くまで
     this.fogScale = Math.pow(zr, 0.9) * this.farBoost * fk;
+    this.lowCam = !!(this._demo && ViewCam.shot);      // タイトルの「映画のような低い角度」の間(world-sky.js が 霧とかすみを 肩越しと同じに する)
+    if (this.lowCam) this.fogScale *= 2.4;
     if (this.final) {
       let n = 0; try { n = World.night || 0; } catch (e) { /* なし */ }
-      this.final.grade.set(RD.VIGNETTE * (this.viewMode === 'top' ? 1 : 0.8), RD.CONTRAST * (1 - 0.65 * n), 1.06, 0.035 * n);
+      this.final.grade.set(RD.VIGNETTE * (this.viewMode === 'top' ? 1 : 0.8) * (1 - 0.45 * n), RD.CONTRAST * (1 - 0.65 * n), 1.06, 0.035 * n);
     }
     this._measureFps();
     this._shadowTick();

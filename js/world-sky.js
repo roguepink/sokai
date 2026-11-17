@@ -496,8 +496,9 @@ export const Sky = {
       hz.r *= 0.96; hz.b *= 1.06;
       if (Engine.hemi) { hz.r += Engine.hemi.color.r * 0.07 * nightK; hz.g += Engine.hemi.color.g * 0.07 * nightK; hz.b += Engine.hemi.color.b * 0.07 * nightK; }
       const wxK = 1 + wx.fog * 1.5 + wx.rain * 0.5 + wx.storm * 0.7 + wx.snow * 0.8 + wx.ash * 1.0;
-      const dens = (v === 'top' ? 0.011 : 0.0042) * (1 - 0.4 * nightK) * wxK;
-      Air.set(dens, hz.r, hz.g, hz.b, v === 'top' ? 0.5 : 0.62);
+      const topAir = v === 'top' && !Engine.lowCam;
+      const dens = (topAir ? 0.011 : 0.0042) * (1 - 0.4 * nightK) * wxK;
+      Air.set(dens, hz.r, hz.g, hz.b, topAir ? 0.5 : 0.62);
       // ふちの光 = 空の光 + 太陽(月)の光。夜は 少し強く(暗い中で ゾンビの りんかくが 分かる)
       const hI = Engine.hemi ? Engine.hemi.intensity : 1, sI = Engine.sun ? Engine.sun.intensity : 1, rk = (1.3 + 0.5 * nightK) * (1 - ov * 0.3);
       const hc = Engine.hemi ? Engine.hemi.color : _c2.setRGB(0.7, 0.75, 0.9), scol = Engine.sun ? Engine.sun.color : hc;
