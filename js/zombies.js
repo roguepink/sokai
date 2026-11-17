@@ -63,7 +63,7 @@ export const Zombies = {
   list: [],               // 生きている敵 {id,type,def,x,z,vx,vz,hp,maxHp,r,alive,boss,t,...}
   _id: 0,
   _hHead: new Int32Array(NB), _hNext: new Int32Array(MAX + 64), _hEnt: new Array(MAX + 64), _hCx: new Int32Array(MAX + 64), _hCz: new Int32Array(MAX + 64),
-  _stamp: 0,
+  _stamp: 0, _qStamp: 0, _pad: 3,
   _pending: [],           // 爆発待ちのふくれゾンビ
   _gas: [],               // ガスマスク兵の毒ガス
   _atkCool: 0,
@@ -92,7 +92,7 @@ export const Zombies = {
   },
 
   reset() {
-    for (const e of this.list) { e.alive = false; if (e.boss) Bosses.remove(e); }
+    for (const e of this.list) { e.alive = false; if (e.boss && !e.part) Bosses.remove(e); }
     this.list.length = 0;
     this._hHead.fill(-1);
     Render.reset(); Gore.reset(); Flow.reset(); Bosses.reset();
@@ -134,6 +134,32 @@ export const Zombies = {
     return e;
   },
 
+  // 大きいボス(大怪獣)の「体の部品」= 当たりの丸だけの敵(足・しっぽ)。list に入るので どの武器でも当たる。
+  // ダメージ・燃える・凍る などは 持ち主(owner)へ送る。位置は ボス係が 毎ステップ 入れる(使わないときは 遠くへ: x = 1e6)
+  addPart(owner, r, hitY = 4) {
+    const def = owner._partDef || (owner._partDef = Object.assign({}, owner.def, { scale: 3.5 }));
+    const p = {
+      id: ++this._id, type: owner.type, def, x: 1e6, z: 1e6, vx: 0, vz: 0, y: 0, hp: 1e9, maxHp: 1e9, r, alive: true, boss: true, part: true, owner, name: owner.name,
+      t: 0, kx: 0, kz: 0, stun: 0, flash: 0, frozen: 0, burn: 0, burnDps: 0, shock: 0, _burnAcc: 0, face: 0, ph: 0, spd: 0, dist: 99, rise: 0, hitY, _B: null,
+    };
+    (owner.parts || (owner.parts = [])).push(p);
+    this.list.push(p);
+    return p;
+  },
+  _dropParts(e) {
+    if (!e.parts) return;
+    for (const p of e.parts) { p.alive = false; const i = this.list.indexOf(p); if (i >= 0) this.list.splice(i, 1); }
+    e.parts = null;
+  },
+  _partStep(p) {
+    const o = p.owner;
+    if (!o || !o.alive) { p.alive = false; const i = this.list.indexOf(p); if (i >= 0) this.list.splice(i, 1); return; }
+    if (p.burn > 0) { o.burn = Math.max(o.burn, p.burn); o.burnDps = Math.max(o.burnDps, p.burnDps); p.burn = 0; }
+    if (p.frozen > 0) { o.frozen = Math.max(o.frozen, Math.min(p.frozen, 1.2)); p.frozen = 0; }
+    if (p.shock > 0) { o.shock = Math.max(o.shock, p.shock); p.shock = 0; }
+    p.stun = 0; p.kx = p.kz = 0; p.flash = o.flash;
+  },
+
   // ---------- 毎ステップ ----------
   update(dt, player) {
     const px = player.pos.x, pz = player.pos.z, pr = player.radius;
@@ -152,6 +178,7 @@ export const Zombies = {
       if (i >= list.length) continue;
       const e = list[i];
       if (!e.alive) continue;
+      if (e.part) { this._partStep(e); continue; }
       if (e.boss) { this._status(e, dt); if (e.alive) Bosses.update(dt, e, player); continue; }
       this._status(e, dt);
       if (!e.alive) continue;
@@ -359,11 +386,14 @@ export const Zombies = {
     const H = this._hHead, N = this._hNext, E = this._hEnt, HX = this._hCx, HZ = this._hCz;
     H.fill(-1);
     const list = this.list;
+    let pad = 3;
     for (let i = 0; i < list.length; i++) {
       const e = list[i];
+      if (e.r > pad) pad = e.r;
       const gx = Math.floor(e.x / HCELL), gz = Math.floor(e.z / HCELL), b = bucket(gx, gz);
       HX[i] = gx; HZ[i] = gz; E[i] = e; N[i] = H[b]; H[b] = i;
     }
+    this._pad = pad;      // 今いる敵の いちばん大きい半径(ボスがいないときは 小さい = さがす区画が少ない)
   },
 
   // ---------- 当たり判定(武器係が使う) ----------
@@ -371,7 +401,8 @@ export const Zombies = {
   queryCircle(x, z, r, out = []) {
     out.length = 0;
     const H = this._hHead, N = this._hNext, E = this._hEnt, HX = this._hCx, HZ = this._hCz;
-    const pad = Math.max(3, BOSS_MAX_R);   // いちばん大きいボスの半径
+    const pad = this._pad || Math.max(3, BOSS_MAX_R);   // いちばん大きい敵の半径
+    const qs = ++this._qStamp;
     const c0x = Math.floor((x - r - pad) / HCELL), c1x = Math.floor((x + r + pad) / HCELL);
     const c0z = Math.floor((z - r - pad) / HCELL), c1z = Math.floor((z + r + pad) / HCELL);
     for (let cz = c0z; cz <= c1z; cz++) for (let cx = c0x; cx <= c1x; cx++) {
@@ -379,8 +410,16 @@ export const Zombies = {
         if (HX[i] !== cx || HZ[i] !== cz) continue;
         const e = E[i];
         if (!e.alive) continue;
-        const dx = e.x - x, dz = e.z - z, rr = r + e.r;
-        if (dx * dx + dz * dz <= rr * rr) out.push(e);
+        const dx = e.x - x, dz = e.z - z, rr = r + e.r, d2 = dx * dx + dz * dz;
+        if (d2 > rr * rr) continue;
+        // 部品を持つボス(大怪獣): 1 回の しらべで 1 つだけ返す(いちばん近い部品)。爆発が 足としっぽに 重なっても 2 倍に ならない
+        const g = e.owner || (e.parts ? e : null);
+        if (g) {
+          const pen = Math.sqrt(d2) - e.r;
+          if (g._qs === qs) { if (pen < g._qd) { out[g._qi] = e; g._qd = pen; } continue; }
+          g._qs = qs; g._qd = pen; g._qi = out.length;
+        }
+        out.push(e);
       }
     }
     return out;
@@ -433,13 +472,44 @@ export const Zombies = {
       const px2 = ex - dx * t, pz2 = ez - dz * t;
       if (px2 * px2 + pz2 * pz2 <= e.r * e.r * 1.4) out.push({ e, t });
     }
+    let grouped = false;
+    for (const m of Bosses._active) {
+      const ps = m.e && m.e.alive && m.e.parts;
+      if (!ps) continue;
+      grouped = true;
+      for (let k = 0; k < ps.length; k++) {
+        const e = ps[k];
+        if (!e.alive || e._ray === stamp) continue;
+        e._ray = stamp;
+        const ex = e.x - x, ez = e.z - z, t = ex * dx + ez * dz;
+        if (t < 0 || t > maxDist) continue;
+        const px2 = ex - dx * t, pz2 = ez - dz * t;
+        if (px2 * px2 + pz2 * pz2 <= e.r * e.r * 1.2) out.push({ e, t: Math.max(0, t - e.r * 0.7) });
+      }
+    }
     if (out.length > 1) out.sort(byT);
+    if (grouped && out.length > 1) {      // 同じボスの部品は 手前の 1 つだけ(つらぬく弾が 何回も当たらない)
+      for (let i = 0; i < out.length; i++) {
+        const g = out[i].e.owner || (out[i].e.parts ? out[i].e : null);
+        if (!g) continue;
+        if (g._rs === stamp) { out.splice(i--, 1); continue; }
+        g._rs = stamp;
+      }
+    }
     return out;
   },
 
   // ダメージ。opts: { dirX, dirZ, force(ふっとび), cause(武器の名前), crit }
   damage(e, amount, opts = _noOpts) {
     if (!e.alive) return false;
+    if (e.owner) {      // 体の部品(足・しっぽ): 持ち主へ。当たった印は 部品の場所に出す
+      const o = e.owner;
+      if (!o.alive) return false;
+      o._hx = e.x; o._hz = e.z; o._hy = e.hitY;
+      const k = this.damage(o, amount, opts);
+      o._hx = undefined;
+      return k;
+    }
     // 盾: 前からの弾は盾が受ける。爆発・回転斬りは 盾ごと こわす
     if (e.shieldHp > 0 && e._B && e._B.shield) {
       const k = causeKind(opts.cause), dX = opts.dirX || 0, dZ = opts.dirZ || 0;
@@ -463,10 +533,11 @@ export const Zombies = {
     const f = (opts.force || 0) / (sc * sc) * (e.boss ? 0.15 : 1);
     if (f) { e.kx += (opts.dirX || 0) * f; e.kz += (opts.dirZ || 0) * f; if (!e.boss) e.stun = Math.max(e.stun, 0.12 + Math.min(0.25, f * 0.02)); }
     if (e.boss) Bosses.hit(e, amount, opts);
-    Events.emit('hit', { x: e.x, y: 1.2 * sc, z: e.z, amount, crit: !!opts.crit, boss: e.boss, cause });
+    const hx = e._hx !== undefined ? e._hx : e.x, hz = e._hx !== undefined ? e._hz : e.z, hy = e._hx !== undefined ? e._hy : 1.2 * sc;
+    Events.emit('hit', { x: hx, y: hy, z: hz, amount, crit: !!opts.crit, boss: e.boss, cause });
     if (e.hp <= 0) { this._kill(e, opts); return true; }
     // 剣・回転斬りは 当たったところから血
-    if (cause === 'sword' || cause === 'spin') FX.blood(e.x, 1.2 * sc, e.z, opts.dirX || 0, opts.dirZ || 0, 0.6);
+    if (cause === 'sword' || cause === 'spin') FX.blood(hx, Math.min(hy, 6), hz, opts.dirX || 0, opts.dirZ || 0, 0.6);
     else if (cause !== 'fire' && Math.random() < 0.07) Gore.splat(e.x + (opts.dirX || 0) * 0.8, e.z + (opts.dirZ || 0) * 0.8, 0.5 + Math.random() * 0.5, opts.dirX || 0, opts.dirZ || 0, 1.5);
     return false;
   },
@@ -526,6 +597,8 @@ export const Zombies = {
     const i = this.list.indexOf(e);
     if (i >= 0) this.list.splice(i, 1);
     if (e._B) { Render.release(e._B); e._B = null; }
+    if (e.part) return;
+    this._dropParts(e);
     if (e.boss) Bosses.remove(e);
   },
 
@@ -536,6 +609,7 @@ export const Zombies = {
     const cause = opts.cause || '';
     const dirX = opts.dirX || 0, dirZ = opts.dirZ || 0, force = opts.force || 0;
     if (e.boss) {
+      this._dropParts(e);
       Bosses.kill(e, opts);
       Events.emit('bossDeath', { name: e.name, x: e.x, z: e.z, e });
     } else if (e._B) {

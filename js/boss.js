@@ -4,6 +4,7 @@
 //   boss-extra.js   … 変異ゴリラ マッドコング / 女王ハイブ クイーン / ゾンビ装甲車 デスローダー
 //   boss-giants.js  … ゾンビ巨神 / 鬼 オニ / 首なし騎士 / 合体ゾンビ レギオン
 //   boss-beasts.js  … 屍竜 / 大地喰いワーム / 女郎ぐも / メカ屍 / 暴走ゾンビ列車
+//   boss-kaiju.js   … 最強の 1 体: 終末竜 ムクロドン(高さ 90m の大怪獣。ふつうの順番には入らない = spec.special。出現係が 特別に出す)
 // しくみ:
 //   - 攻撃は いつも 地面の赤い予告(boss-warn.js)のあとに来る。主人公に当たると Player.knock で 吹っとぶ(体力は減らない)
 //   - 体力 50% と 20% で 怒る(吠える・光る・速くなる・新しい攻撃)。イベント bossPhase {e, phase, x, z, name}
@@ -26,9 +27,10 @@ import { stepLater } from './boss-giants.js';
 import { EXTRA } from './boss-extra.js';
 import { GIANTS } from './boss-giants.js';
 import { BEASTS } from './boss-beasts.js';
+import { KAIJU } from './boss-kaiju.js';
 
 export { BOSS_CAUSES };
-const SPECS = { ...CLASSIC, ...EXTRA, ...GIANTS, ...BEASTS };
+const SPECS = { ...CLASSIC, ...EXTRA, ...GIANTS, ...BEASTS, ...KAIJU };
 export const BOSS_TYPES = {};
 for (const k of Object.keys(SPECS)) {
   const d = SPECS[k].def;
@@ -37,8 +39,8 @@ for (const k of Object.keys(SPECS)) {
 // 出る順番の もと(出現係がまぜる)
 export const BOSS_ORDER = ['tyrant', 'oni', 'gorilla', 'butcher', 'spider', 'titan', 'queen', 'mecha', 'abomination', 'dragon', 'tank', 'knight',
   'crawlerKing', 'worm', 'legion', 'train'].filter((k) => SPECS[k]);
-for (const k of Object.keys(SPECS)) if (!BOSS_ORDER.includes(k)) BOSS_ORDER.push(k);
-export const BOSS_MAX_R = Math.max(...Object.values(BOSS_TYPES).map((d) => d.r || 2));
+for (const k of Object.keys(SPECS)) if (!BOSS_ORDER.includes(k) && !SPECS[k].special) BOSS_ORDER.push(k);
+export const BOSS_MAX_R = Math.max(...Object.keys(SPECS).map((k) => (SPECS[k].special ? 2 : SPECS[k].def.r || 2)));
 
 const PHASE_AT = [0.5, 0.2];
 const SPEED_MUL = [1, 1.22, 1.45];
@@ -73,7 +75,19 @@ export const Bosses = {
   prepare(type) {
     if (!SPECS[type]) return;
     const L = this._pool[type] || (this._pool[type] = []);
-    if (!L.length) L.push(build(type));
+    if (!L.length) {
+      const m = build(type);
+      L.push(m);
+      if (this._compiled) this._compileOne(m);      // 出たときに 固まらないように(あとから作った形)
+    }
+  },
+  _compileOne(m) {
+    try {
+      m.root.position.set(0, -400, 0);
+      this._scene.add(m.root);
+      Engine.renderer.compile(this._scene, Engine.camera);
+      this._scene.remove(m.root);
+    } catch (err) { console.warn('boss compile', err); }
   },
 
   _precompile() {
@@ -102,7 +116,7 @@ export const Bosses = {
     this._scene.add(m.root);
     e._M = m;
     const def = e.def;
-    e.size = def.size; e.bossTier = def.tier || 1; e.phaseHp = PHASE_AT; e.title = def.title || ''; e.icon = def.icon || '';
+    e.size = def.size; e.bossTier = def.tier || 1; e.phaseHp = spec.phaseAt || PHASE_AT; e.title = def.title || ''; e.icon = def.icon || '';
     e.state = 'enter'; e.st = 0; e.cool = 1.2; e.ph = 0; e.spd = 0; e.phase = 0; e.rage = 0; e.last = '';
     e.vy = 0; e.y = 0; e.kx = 0; e.kz = 0; e.spawnT = 0; e.lockFace = false; e.n = 0; e.hitDone = 0; e._stepS = 0;
     e.enter = spec.enter || 'rise';
@@ -150,8 +164,8 @@ export const Bosses = {
     let dx = px - e.x, dz = pz - e.z;
     let d = Math.hypot(dx, dz) || 0.001;
     // 遠くへ はなれすぎた・道がなくて 近づけない → 主人公の近くに あらためて 現れる(いつも 攻めてくる)
-    e.farT = d > 36 && e.state === 'walk' ? (e.farT || 0) + dt : 0;
-    if ((d > 110 || e.farT > 6) && e.state === 'walk') {
+    e.farT = d > 36 && e.state === 'walk' && !spec.noFar ? (e.farT || 0) + dt : 0;
+    if ((d > 110 || e.farT > 6) && e.state === 'walk' && !spec.noFar) {
       e.farT = 0;
       let p = null;
       for (let i = 0; i < 12 && !p; i++) { const q = World.spawnPoint(px, pz, 16, 26); if (q && !World.buildingAt(q.x, q.z) && !World.blockedAt(q.x, q.z, 2.5)) p = q; }
@@ -178,7 +192,7 @@ export const Bosses = {
     e.cool -= sdt;
     // 怒る(体力 50% / 20%)
     const hp = e.hp / e.maxHp;
-    if (e.phase < 2 && hp < PHASE_AT[e.phase] && e.state !== 'enter') this._enrage(e, m, spec);
+    if (e.phase < 2 && hp < (spec.phaseAt || PHASE_AT)[e.phase] && e.state !== 'enter') this._enrage(e, m, spec);
     e.rage = Math.min(1, e.rage + dt * 0.5) * (e.phase > 0 ? 1 : 0);
     const c = _ctx;
     c.d = d; c.mx = mx; c.mz = mz; c.px = px; c.pz = pz; c.dx = dx / d; c.dz = dz / d;
@@ -224,7 +238,7 @@ export const Bosses = {
     // 見た目
     m.root.position.set(e.x, e.y || 0, e.z);
     m.root.rotation.y = -e.face;
-    if (!frozen) spec.anim(m, e, sdt, c);
+    if (!frozen || spec.noFreeze) spec.anim(m, e, sdt, c);
     this._tint(m, e, dt);
     this._fadeFor(m, e, dt);
   },
@@ -237,9 +251,9 @@ export const Bosses = {
     Events.emit('bossPhase', { e, phase: e.phase, x: e.x, z: e.z, name: e.name, type: e.type });
   },
   _roar(e, m, spec, dt, c) {
-    if (e.st > 0.35 && !e.hitDone) { e.hitDone = 1; roarBlast(this, e, 10 + e.size * 0.6, true); }
+    if (e.st > (spec.roarAt || 0.35) && !e.hitDone) { e.hitDone = 1; roarBlast(this, e, spec.roarR || 10 + e.size * 0.6, true); }
     if (e.st > 0.4 && e.st < 1.3 && Math.random() < dt * 8) quake(this, e.x, e.z, 0.4);
-    if (e.st > 1.5) { e.state = 'walk'; e.st = 0; e.hitDone = 0; e.cool = 0.3; }
+    if (e.st > (spec.roarT || 1.5)) { e.state = 'walk'; e.st = 0; e.hitDone = 0; e.cool = 0.3; }
     return 0;
   },
   _enter(e, m, spec, dt, c) {
@@ -285,8 +299,9 @@ export const Bosses = {
   // 主人公とカメラの間に 体があると すかす(見下ろしで 主人公が かくれないように)
   _fadeFor(m, e, dt) {
     let want = 1;
-    const cam = Engine.camera, P = this._player;
-    if (cam && P && Engine.viewMode !== 'fps') {
+    const cam = Engine.camera, P = this._player, spec = SPECS[m.type];
+    if (spec.fade) want = cam && P ? spec.fade(m, e, cam, P) : 1;
+    else if (cam && P && Engine.viewMode !== 'fps') {
       const ax = P.pos.x, az = P.pos.z, ay = 1, bx = cam.position.x, bz = cam.position.z, by = cam.position.y;
       const sx = bx - ax, sz = bz - az, L2 = sx * sx + sz * sz || 1;
       const t = clamp(((e.x - ax) * sx + (e.z - az) * sz) / L2, 0, 1);
@@ -310,6 +325,7 @@ export const Bosses = {
     const l = Math.hypot(dx, dz) || 1; dx /= l; dz /= l;
     const a = R(-0.9, 0.9), ca = cos(a), sa = sin(a);
     m.fdx = dx * ca - dz * sa; m.fdz = dx * sa + dz * ca;
+    if (spec.fallDir) spec.fallDir(this, e, m);
     m.fallT = spec.fallT || 1.5;
     m.fallKind = spec.fall || 'topple';
     m.x0 = e.x; m.z0 = e.z; m.y0 = e.y || 0;
@@ -341,7 +357,8 @@ export const Bosses = {
       const e = m.e;
       if (e && !m.dead && top && this._player && e.state !== 'enter') {
         const d = Math.hypot(e.x - this._player.pos.x, e.z - this._player.pos.z);
-        const z = 1 + clamp(((e.def.zoom || e.size) - 3) / 12, 0, 1.0) * clamp(1.5 - d / 50, 0, 1);
+        const sp = SPECS[m.type];
+        const z = sp.zoomFor ? sp.zoomFor(e, d) : 1 + clamp(((e.def.zoom || e.size) - 3) / 12, 0, 1.0) * clamp(1.5 - d / 50, 0, 1);
         zoom = max(zoom, z);
       }
       if (!m.dead) continue;
@@ -363,7 +380,8 @@ export const Bosses = {
     const kind = m.fallKind;
     if (!m.fell) {
       // たおれる先の予告(下じきになると 吹っとぶ)
-      if (kind === 'topple') Warn.rect(m.x0, m.z0, m.fdx, m.fdz, (e.def.h || e.size) * 0.95, max(4, e.r * 2.2), k, 0xff6a20);
+      const fw = spec.fallW || max(4, e.r * 2.2);
+      if (kind === 'topple') Warn.rect(m.x0, m.z0, m.fdx, m.fdz, (e.def.h || e.size) * 0.95, fw, k, 0xff6a20);
       else Warn.circle(m.x0, m.z0, e.r * 2.2, k, 0xff6a20);
       // ふらつき → たおれる
       const wob = sin(m.deadT * 9) * 0.06 * (1 - k);
@@ -387,7 +405,7 @@ export const Bosses = {
       if (k >= 1) {
         m.fell = true;
         const L = kind === 'topple' ? (e.def.h || e.size) * 0.9 : 0, cx = m.x0 + m.fdx * L * 0.55, cz = m.z0 + m.fdz * L * 0.55;
-        if (kind === 'topple') line(this, e, m.x0, m.z0, m.fdx, m.fdz, L, max(4, e.r * 2.2), { dmg: 2500, force: 30, hero: 20, lift: 7, cause: 'bossfall', shake: 1.8 });
+        if (kind === 'topple') line(this, e, m.x0, m.z0, m.fdx, m.fdz, L, fw, { dmg: 2500, force: 30, hero: 20, lift: 7, cause: 'bossfall', shake: 1.8 });
         else line(this, e, m.x0 - m.fdx * e.r, m.z0 - m.fdz * e.r, m.fdx, m.fdz, e.r * 2, e.r * 2.4, { dmg: 2500, force: 30, hero: 18, lift: 6, cause: 'bossfall', shake: 1.6 });
         const n = FX.q(40);
         for (let i = 0; i < n; i++) {
