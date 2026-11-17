@@ -17,6 +17,7 @@ import { WeaponGrid } from './ui-weapons.js';
 import { Input } from './input.js';
 import { BossShow, bossThreat } from './ui-bossfx.js';
 import { BossDex } from './ui-bossdex.js';
+import { WeaponIcons, CAT_NAMES } from './ui-icons.js';
 
 const $ = (id) => document.getElementById(id);
 const fmt = (n) => Math.floor(n).toLocaleString();
@@ -69,13 +70,14 @@ export const UI = {
         <div class="combo-label"><span>COMBO</span><em id="hudMult">×1</em></div>
         <div class="combo-bar"><i id="hudComboBar"></i></div>
       </div>
-      <div class="weapon-name" id="hudWeapon"></div>
+      <div class="weapon-name" id="hudWeapon"><i class="wi" id="hudWeaponIcon"><em></em></i><span class="wn-txt"><b id="hudWeaponName"></b><small class="wn-key"><kbd>スペース</kbd>で 次の武器</small></span></div>
+      <div class="wpop" id="wpop"><i class="wi" id="wpopIcon"><em></em></i><span><small id="wpopCat"></small><b id="wpopName"></b></span></div>
       <div class="hud-zone" id="hudZone"></div>
       <div class="banner" id="banner"><b></b><small></small></div>
       <div class="sub-banner" id="subBanner"></div>
       <div class="boss-arrow hidden" id="bossArrow"><i>▲</i><span>BOSS</span><small id="bossDist"></small></div>
       <div class="rot-hint" id="rotHint">📱 横向きにすると 大きく遊べます</div>
-      <button class="hud-pause" id="btnPause" type="button" aria-label="一時停止">Ⅱ</button>`;
+      <button class="hud-pause" id="btnPause" type="button" aria-label="一時停止"><i></i><kbd class="keyhint">Esc</kbd></button>`;
     root.appendChild(hud);
     // 武器の列は、操作の層(スティック)より上に置く(さわれるように)
     const wbar = document.createElement('div');
@@ -94,7 +96,8 @@ export const UI = {
       hud, score: q('hudScore'), scoreBox: q('hudScoreBox'), best: q('hudBest'), pace: q('hudPace'), paceBox: q('hudPaceBox'),
       kills: q('hudKills'), time: q('hudTime'),
       combo: q('hudCombo'), comboN: q('hudComboN'), mult: q('hudMult'), comboBar: q('hudComboBar'),
-      weapon: q('hudWeapon'), weaponBar: wbar,
+      weapon: q('hudWeapon'), weaponIcon: q('hudWeaponIcon'), weaponName: q('hudWeaponName'), weaponBar: wbar,
+      wpop: q('wpop'), wpopIcon: q('wpopIcon'), wpopCat: q('wpopCat'), wpopName: q('wpopName'),
       boss: q('hudBoss'), bossName: q('hudBossName'), bossFill: q('hudBossFill'), bossLag: q('hudBossLag'),
       bossBar: q('hudBossBar'), bossSegs: q('hudBossSegs'), bossStars: q('hudBossStars'), bossTime: q('hudBossTime'), bossPhase: q('hudBossPhase'),
       bossArrow: q('bossArrow'), bossDist: q('bossDist'), vignette: q('vignette'),
@@ -128,7 +131,22 @@ export const UI = {
       ring.className = 'spin-ring';
       this.el.spin.appendChild(ring);
     }
+    // パソコン: ボタンの下に キーの案内(小さな札。どれも 同じ形・同じ場所)。スマホでは 出ない(CSS)
+    const KEYS = { '.btn-fire': 'クリック / J', '.btn-spin': 'Shift / E', '.btn-dash': '右クリック', '.btn-view': 'V' };
+    for (const sel in KEYS) {
+      const b = document.querySelector('#controls ' + sel);
+      if (!b || b.querySelector('.keyhint')) continue;
+      const k = document.createElement('kbd');
+      k.className = 'keyhint'; k.textContent = KEYS[sel];
+      b.appendChild(k);
+    }
+    // ダッシュの小さい字は 2 行に(1 行だと 字が小さすぎて読めない)
+    const ds = document.querySelector('#controls .btn-dash small');
+    if (ds) ds.innerHTML = '2回で<br>叩きつけ';
 
+    // 武器の絵(3D の形から 1 回だけ作る。少しずつ描くので 起動は重くならない。作れなければ 絵文字のまま)
+    this.icons = WeaponIcons;
+    WeaponIcons.build(Engine.renderer, WEAPONS, Weapons._models);
     WeaponGrid.init(root, Input, Audio);
     this._buildWeaponBar();
     this._wireEvents();
@@ -292,7 +310,7 @@ export const UI = {
     this.el.scoreBox.classList.remove('record');
     this.el.combo.classList.remove('on', 'end');
     this.el.vignette.classList.remove('boss');
-    this.el.boss.classList.add('hidden');
+    this.el.boss.classList.add('hidden'); this.el.hud.classList.remove('hasboss');
     this.el.bossArrow.classList.add('hidden');
     this.el.sub.classList.remove('on'); this._subWait = null;
     this.el.hud.classList.remove('fever', 'killcam');
@@ -300,6 +318,7 @@ export const UI = {
     this._subT = -9999; this._multiT = -9999;
     this._zone = ''; this._zoneWant = ''; this.el.zone.classList.remove('on');
     this.el.rot.classList.remove('on');
+    this.el.wpop.classList.remove('on');
     this._weapon(false);
   },
 
@@ -416,16 +435,16 @@ export const UI = {
     // いちばん左: ぜんぶ ならべて えらぶ(31 種類あるので)
     const all = document.createElement('button');
     all.type = 'button'; all.className = 'wbtn wall'; all.setAttribute('aria-label', '武器をぜんぶ見る');
-    all.innerHTML = '<span>▦</span><small>全部</small>';
+    all.innerHTML = '<span class="wall-ic"></span><small>全部</small>';
     all.addEventListener('click', (e) => { e.preventDefault(); Audio.click(); WeaponGrid.show(); });
     all.addEventListener('pointerdown', (e) => e.stopPropagation());
     bar.appendChild(all);
     WEAPONS.forEach((w, i) => {
       const b = document.createElement('button');
       b.type = 'button';
-      b.className = 'wbtn';
+      b.className = 'wbtn wc-' + WeaponIcons.cat(w);
       b.setAttribute('aria-label', w.name || w.id);
-      b.innerHTML = `<span>${w.icon || '🔫'}</span>${i < 10 ? `<sub>${(i + 1) % 10}</sub>` : ''}`;
+      b.innerHTML = WeaponIcons.html(i) + (i < 10 ? `<sub>${(i + 1) % 10}</sub>` : '');
       b.addEventListener('click', (e) => { e.preventDefault(); Audio.click(); Weapons.select(i); });
       b.addEventListener('pointerdown', (e) => e.stopPropagation());
       bar.appendChild(b);
@@ -434,10 +453,15 @@ export const UI = {
   },
 
   _weapon(changed) {
-    const w = Weapons.current || {};
-    const name = (w.icon || '') + ' ' + (w.name || '');
-    this.el.weapon.textContent = name;
-    const bar = this.el.weaponBar;
+    const w = Weapons.current || {}, el = this.el, cat = WeaponIcons.cat(w);
+    // 撃つボタンの上の札(絵 + 名前)。長い名前は 少し小さい字
+    if (this._wShown !== w) {
+      this._wShown = w;
+      WeaponIcons.set(el.weaponIcon, w);
+      el.weaponName.textContent = w.name || '';
+      el.weapon.className = 'weapon-name wc-' + cat + ((w.name || '').length > 8 ? ' long' : '');
+    }
+    const bar = el.weaponBar;
     if (bar) {
       [...bar.children].forEach((b, i) => b.classList.toggle('on', i - 1 === Weapons.index));
       const cur = bar.children[Weapons.index + 1];
@@ -447,8 +471,16 @@ export const UI = {
       }
     }
     if (changed) {
-      const el = this.el.weapon;
-      el.classList.remove('wpop'); void el.offsetWidth; el.classList.add('wpop');
+      // 武器が変わった: まんなかより少し下に 大きな絵と名前が サッと出て消える(0.9 秒)。札も 一瞬 光る
+      el.weapon.classList.remove('chg'); void el.weapon.offsetWidth; el.weapon.classList.add('chg');
+      if (Score.active && !this.paused) {
+        WeaponIcons.set(el.wpopIcon, w);
+        el.wpopCat.textContent = CAT_NAMES[cat] || '';
+        el.wpopName.textContent = w.name || '';
+        el.wpop.className = 'wpop wc-' + cat;
+        void el.wpop.offsetWidth;
+        el.wpop.classList.add('on');
+      }
     }
   },
 
@@ -470,7 +502,12 @@ export const UI = {
       if (target - this._disp < 1) this._disp = target;
     } else this._disp = target;
     const txt = fmt(this._disp);
-    if (txt !== this._lastScoreTxt) { el.score.textContent = txt; this._lastScoreTxt = txt; this._fitWeaponBar(); }
+    if (txt !== this._lastScoreTxt) {
+      el.score.textContent = txt;
+      // けたの数を CSS に伝える(縦画面は けたが多いほど 少し小さい字に。右のボタンに とどかないように)
+      if (txt.length !== this._lastScoreTxt.length) el.scoreBox.style.setProperty('--slen', String(Math.max(7, txt.length)));
+      this._lastScoreTxt = txt; this._fitWeaponBar();
+    }
     this._scoreBump += (1 - this._scoreBump) * (1 - Math.exp(-10 * dt));
     const sTf = `scale(${this._scoreBump.toFixed(3)})`;
     if (sTf !== this._scoreTf) { this._scoreTf = sTf; el.score.style.transform = sTf; }
@@ -508,9 +545,17 @@ export const UI = {
     if (close !== this._close) { this._close = close; el.hud.classList.toggle('close', close); this._avoidT = 0; }
     if ((this._avoidT = (this._avoidT || 0) - dt) <= 0) {        // 大きさを測るのは ときどき(重くしない)
       this._avoidT = 0.5;
-      Avoid.top = (Bosses.list.length ? el.boss.getBoundingClientRect().bottom : el.scoreBox.getBoundingClientRect().bottom) + 4;
+      // 上の帯の下はし: ボスの体力 > 「次のボスまで」の札 > 点数 の いちばん下
+      let top = el.scoreBox.getBoundingClientRect().bottom;
+      if (Bosses.list.length) top = Math.max(top, el.boss.getBoundingClientRect().bottom + (el.bossPhase.textContent ? 14 : 0));   // 「怒り状態」の字の分
+      const chip = BossShow.el.chip;
+      if (chip && !chip.classList.contains('hidden')) top = Math.max(top, chip.getBoundingClientRect().bottom);
+      Avoid.top = top + 4;
+      // 右下の操作ボタンの場所(飛び出す数字を 出さない所)。縦画面は 下の 300px(ボタン・武器の切りかえ・武器の列)ぜんぶ
+      const land = innerWidth > innerHeight;
+      Avoid.bw = land ? 350 : innerWidth; Avoid.bh = land ? 236 : 300;
       // 肩越し・一人称: 大きな文字は 点数(ボスの体力)のすぐ下へ(照準のまわりを あける)
-      const lc = Math.round(Avoid.top + 2) + 'px';
+      const lc = Math.round(Avoid.top + 4) + 'px';
       if (lc !== this._laneC) { this._laneC = lc; el.hud.style.setProperty('--laneC', lc); }
       // 大きな文字の場所(ボスの矢印が よける)
       this._banRect = this.banner.t > 0 ? this.banner.main.getBoundingClientRect() : null;
@@ -575,13 +620,14 @@ export const UI = {
     const el = this.el, B = Bosses.list;
     const cur = B.length ? B[0] : null;
     if (!cur) {
-      if (this._bossKey) { this._bossKey = null; el.boss.classList.add('hidden'); el.bossArrow.classList.add('hidden'); el.vignette.classList.remove('boss'); }
+      if (this._bossKey) { this._bossKey = null; el.boss.classList.add('hidden'); el.hud.classList.remove('hasboss'); el.bossArrow.classList.add('hidden'); el.vignette.classList.remove('boss'); }
       return;
     }
     const e = cur.e;
     if (this._bossKey !== e) {
       this._bossKey = e; this._bossLag = 1; this._bossPh = 1; this._bossTimeTxt = ''; this._bossGoals = null;
       el.boss.classList.remove('hidden', 'ph2', 'ph3');
+      el.hud.classList.add('hasboss');                 // まんなかの大きな文字を 体力バーの下へ(CSS の --lane)
       el.bossName.textContent = cur.name + (B.length > 1 ? ' ほか' + (B.length - 1) + '体' : '');
       const th = bossThreat(e);
       el.bossStars.textContent = '★'.repeat(th);
@@ -641,7 +687,7 @@ export const UI = {
     const cr = this._chRect;                              // 左上のチャレンジの札
     if (cr && x < cr.right + 30 && y < cr.bottom + 30) { if (uy < -0.5) x = cr.right + 30; else y = cr.bottom + 30; }
     if (x > W - 330 && y < 70) y = 70;
-    const BW = W > H ? 360 : 250, BH = W > H ? 230 : 330;   // 右下のボタン(撃つ・回転斬り・ダッシュ・武器)の場所
+    const BW = W > H ? 392 : 330, BH = W > H ? 264 : 340;   // 右下のボタン(撃つ・回転斬り・ダッシュ・武器の切りかえ)の場所
     if (x > W - BW && y > H - BH) { if (ux > 0.5 && uy < 0.5) y = H - BH; else x = W - BW; }
     if (W > H && x > W - 200 && y > 50 && y <= H - BH + 1) x = W - 200;   // 右の コンボ・武器の名前 にかぶらない
     // まんなかの大きな文字に かぶらない(横へ よける)
@@ -757,7 +803,11 @@ export const UI = {
     if (ex) {
       const st = Score.stats || {}, fav = Score.favoriteWeapon();
       const items = [];
-      if (fav && fav.n > 0) items.push(['いちばん倒した武器', `${fav.name} <small>${fmt(fav.n)}体</small>`]);
+      if (fav && fav.n > 0) {
+        // 武器なら 絵文字のかわりに 武器の絵(剣・回転斬りなどは そのまま)
+        const fw = WEAPONS.find((w) => fav.name && fav.name.endsWith(' ' + w.name));
+        items.push(['いちばん倒した武器', `${fw ? WeaponIcons.html(fw, 'inl') + fw.name : fav.name} <small>${fmt(fav.n)}体</small>`]);
+      }
       if (st.bestMulti) items.push(['最大まとめ倒し', fmt(st.bestMulti) + '体']);
       if (st.fevers) items.push(['無双モード', st.fevers + '回' + (st.feverBest ? ` <small>最高 ${fmt(st.feverBest)}体</small>` : '')]);
       if (st.events) items.push(['出来事クリア', st.events + '回']);

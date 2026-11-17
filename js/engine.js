@@ -3,14 +3,15 @@ import * as THREE from '../vendor/three/build/three.module.min.js';
 import { EffectComposer } from '../vendor/three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from '../vendor/three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from '../vendor/three/addons/postprocessing/UnrealBloomPass.js';
-import { OutputPass } from '../vendor/three/addons/postprocessing/OutputPass.js';
 import { CONFIG } from './config.js';
 import { World } from './world.js';
 import { Events } from './events.js';
 import { damp, hashValue, HASH } from './util.js';
 import { ViewCam } from './view-camera.js';
+import { Air } from './depth-air.js';
+import { makeFinalPass } from './depth-post.js';
 
-const C = CONFIG.CAMERA, V = CONFIG.VIEW;
+const C = CONFIG.CAMERA, V = CONFIG.VIEW, RD = CONFIG.RENDER;
 
 export const Engine = {
   renderer: null, scene: null, camera: null, composer: null, bloom: null,
@@ -44,6 +45,8 @@ export const Engine = {
     // 省エネモード: 設定で保存。アドレスの #eco でも(確認用。#eco=0 で切る)
     this.eco = HASH.has('eco') || (hashValue('eco') ? hashValue('eco') !== '0' : saved.eco === true);
     this.prof = PROFILE[this.quality] || PROFILE.high;
+    // 第5弾(立体感): 空気のかすみ・ふちの光の部品を、どの材質よりも前に入れる(depth-air.js)
+    Air.install();
 
     // 軽量化: 画面効果(光のにじみ)を使うときは、絵は いったん別の紙(にじみ用)に描くので、
     // キャンバスの なめらか処理(MSAA)は 効かない(重いだけ)。だから切る(見た目は変わらない)
@@ -89,7 +92,9 @@ export const Engine = {
       lightenBloom(this.bloom, this);
       this._bloomScale = this.prof.bloom >= 1 && !this.eco ? 1 : 0.5;
       this.composer.addPass(this.bloom);
-      this.composer.addPass(new OutputPass());
+      // 色の仕上げ(前は OutputPass)。同じ 1 回の中で 画面のふちを暗く・コントラストを少し(depth-post.js)
+      this.final = makeFinalPass();
+      this.composer.addPass(this.final);
       this.bloom.setScale(this._bloomScale);
     }
 
@@ -132,6 +137,12 @@ export const Engine = {
   slowMo(sec, scale = 0.35) { this._slow = Math.max(this._slow, sec); this._slowScale = scale; },
   // カメラの引き具合(1 = いつも, 1.5 = 引く)
   setZoom(mult) { this._zoomMult = mult; },
+  // 第5弾: 遠くまで見せる(超巨大なボス用)。v = 1 ふつう 〜 3。霧の距離を v 倍にし(上限 350m)、影をつくる光も 高い所まで とどくようにする。
+  // setZoom で 大きく引いたとき(3〜4 倍)は 引いた分だけ 霧と影の広さが 自動で 広がるので、ふつうは 呼ばなくてよい。
+  // 「引いても まだ ボスの上のほうが 霧で かすむ / 影が とちゅうで切れる」ときに 足す。終わったら setFarBoost(1) でもどす
+  setFarBoost(v) { this.farBoost = Math.max(1, Math.min(3, +v || 1)); },
+  farBoost: 1,
+  fogScale: 1,              // 霧の距離に かける数(引き具合 × farBoost)。world-sky.js が読む
   // 画角のパンチ(度。爆発・叩きつけなどで 一瞬 広がる。肩越し・一人称のとき)
   fovKick(deg) { ViewCam.punch(deg); },
   // カメラのかたむき(ラジアン。ダッシュで横へ)。0 でもどる
@@ -225,12 +236,12 @@ export const Engine = {
     } else if (demo && ViewCam.cine(this, realDt, target)) mode = 'close';
     else this._topCamera(realDt, target, inside, demo);
     ViewCam.post(this, realDt, mode, innerWidth < innerHeight ? C.FOV * 1.35 : C.FOV);
-    this._updateSun(target, close);
+    this._updateSun(target, close, realDt);
   },
 
   // 太陽(夜は月)の向きを 時間に合わせる。影は主人公のまわりだけ計算する(肩越し・一人称は 見ている方を広めに)。
   // マップ係が World.sunDir / World.moonDir を持っていれば それを使う。なければ World.timeOfDay から 空と同じ式で出す
-  _updateSun(target, close) {
+  _updateSun(target, close, realDt = 0.016) {
     const sun = this.sun; if (!sun) return;
     let t = 0.22;
     try { t = World.timeOfDay ?? 0.22; } catch (e) {}
@@ -239,8 +250,23 @@ export const Engine = {
     else _sd.set(-Math.sin(sa) * 0.92, Math.cos(sa) * 0.9 + 0.06, 0.38).normalize();
     if (World.moonDir && World.moonDir.isVector3) _md.copy(World.moonDir).normalize();
     else _md.set(Math.sin(sa) * 0.7 + 0.2, Math.max(0.25, -Math.cos(sa) * 0.75), -0.5).normalize();
+    const sunY = _sd.y;       // 空の太陽の高さ(昼か夜かは これで決める)
+    // 第5弾(立体感): 影をつくる光の向きを 整える(空に見える太陽の位置は そのまま)
+    //  - 見下ろし: 光は いつも 西(画面の左)から。影が 右へ のびて 体に かくれず、体・建物に 明るい面と 暗い面が できる。
+    //    地面の石の 浮き彫り(world-tex.js。左からの光で 焼きこんである)とも 向きが そろう
+    //    (前は 光が カメラの側から当たり、影が 物のうしろに かくれて 平たく見えた)。肩越し・一人称は 空の太陽の向きのまま
+    //  - 真昼でも 高さを SUN_MAX_Y(見下ろしは TOP_SUN_MAX_Y)まで下げる(影に 長さが出る)
+    this._topK = damp(this._topK === undefined ? (close ? 0 : 1) : this._topK, close ? 0 : 1, 5, realDt);
+    if (this._topK > 0.001) {
+      const kx = RD.TOP_LIGHT_X, tk = this._topK;
+      _sd.x += (-(kx + (1 - kx) * Math.abs(_sd.x)) - _sd.x) * tk; _sd.z += (RD.TOP_LIGHT_Z - _sd.z) * tk;
+      _md.x += (-(kx + (1 - kx) * Math.abs(_md.x)) - _md.x) * tk; _md.normalize();      // 月も 同じ側から(夕方・明け方に 影が ぐるっと回らない)
+    }
+    _sd.normalize();
+    const maxY = RD.SUN_MAX_Y + (RD.TOP_SUN_MAX_Y - RD.SUN_MAX_Y) * this._topK;
+    if (_sd.y > maxY) { const h = Math.hypot(_sd.x, _sd.z), hw = Math.sqrt(1 - maxY * maxY); if (h > 1e-4) { _sd.x *= hw / h; _sd.z *= hw / h; _sd.y = maxY; } else _sd.set(-hw, maxY, 0); }
     // 太陽が しずむ前後で 月の向きへ なめらかに うつす
-    const day = Math.max(0, Math.min(1, (_sd.y + 0.02) / 0.16));
+    const day = Math.max(0, Math.min(1, (sunY + 0.02) / 0.16));
     const k = day * day * (3 - 2 * day);
     _ld.copy(_md).lerp(_sd, k);
     // 低すぎると 影が のびすぎて ちらつくので、高さは 24° 以上にする
@@ -257,14 +283,33 @@ export const Engine = {
     let cx = target.x, cz = target.z;
     if (close) { cx += this.viewDir.x * 20; cz += this.viewDir.z * 20; }
     // 影の ちらつき止め: 影の地図の 1 マスきざみに 中心をそろえる(光から見た 横・縦の向きで)
-    const S = CONFIG.RENDER.SHADOW_AREA, texel = (2 * S) / sun.shadow.mapSize.x;
+    // 第5弾: 大きく引いたとき(ボス)は 影の広さも 段で広げる(行ったり来たり しないよう 少し遊びを入れる)。超巨大なボスは 光を遠くへ
+    const zr = close ? 1 : this.camDist / C.DIST, stepOf = (z) => (z > 2.6 ? 3 : z > 1.75 ? 2 : z > 1.25 ? 1.45 : 1);
+    let sc = this._shSc || 1;
+    if (stepOf(zr) > sc) sc = stepOf(zr); else if (stepOf(zr / 0.9) < sc) sc = stepOf(zr / 0.9);
+    // 影の地図に入れる広さ(光から見た 横 Sr・縦 Su の半分。m)。肩越し・一人称は 四角(SHADOW_AREA)。
+    // 見下ろしは 画面に入る地面に 合わせて しぼる(光は いつも 西から = 横 Sr が 南北・縦 Su が 東西)。
+    // せまい分 影が 細かく くっきりし、影の地図に入る物(描く回数)も へる
+    const wide = close || this._demo;        // タイトルの見本プレイは カメラが回るので 四角のまま
+    const Sr = (wide ? RD.SHADOW_AREA : RD.TOP_SHADOW_NS) * sc, Su = (wide ? RD.SHADOW_AREA : RD.TOP_SHADOW_EW) * sc;
+    const ldist = (close ? 90 : 80 * sc) * Math.max(1, this.farBoost);      // 光を置く距離(これより 高い物の影は 切れる)
+    if (Sr !== this._shS || Su !== this._shU || ldist !== this._shDist) {
+      this._shS = Sr; this._shU = Su; this._shDist = ldist;
+      const sc_ = sun.shadow.camera;
+      sc_.left = -Sr; sc_.right = Sr; sc_.top = Su; sc_.bottom = -Su; sc_.far = ldist + (close ? 110 : 55 * sc);
+      sc_.updateProjectionMatrix();
+      this._viewT = Math.max(this._viewT || 0, 2);      // 広さが変わった直後は 影を すぐ 描きなおす
+    }
+    this._shSc = sc;
+    if (!wide) cz -= 8 * sc;      // 見下ろしは 画面の奥(北)のほうが 広く見えるので、影の中心を 少し奥へ
+    const texel = (2 * Sr) / sun.shadow.mapSize.x, texelU = (2 * Su) / sun.shadow.mapSize.y;
     _rt.set(-_ld.z, 0, _ld.x).normalize();               // 光から見た 横
     _up.crossVectors(_ld, _rt);                           // 光から見た 縦
     _c.set(cx, 0, cz);
-    const a = Math.round(_c.dot(_rt) / texel) * texel, b = Math.round(_c.dot(_up) / texel) * texel, n = _c.dot(_ld);
+    const a = Math.round(_c.dot(_rt) / texel) * texel, b = Math.round(_c.dot(_up) / texelU) * texelU, n = _c.dot(_ld);
     _c.copy(_rt).multiplyScalar(a).addScaledVector(_up, b).addScaledVector(_ld, n);
     sun.target.position.copy(_c);
-    sun.position.copy(_c).addScaledVector(_ld, 90);
+    sun.position.copy(_c).addScaledVector(_ld, ldist);
   },
 
   // 見下ろしのカメラ(いつもの)
@@ -273,23 +318,32 @@ export const Engine = {
     // タイトルの見本プレイ: ゆっくり回りこみ、少し低い角度で 迫力を出す。プレイが始まったら北が上にもどす
     if (demo) {
       this.camYaw += realDt * 0.07;
-      this.camPitch = damp(this.camPitch, 0.78, 1.5, realDt);
+      this.camPitch = damp(this.camPitch, innerWidth < innerHeight ? 0.8 : 0.66, 1.5, realDt);      // たて長は 画角が広いので 少し上から(地平線が 入らないように)
     } else {
       if (this.camYaw) this.camYaw = 0;             // スティックの向き = 画面の向き にするため、すぐもどす
       // 高い建物にはさまれた道では、真上に近い角度にして 壁で主人公がかくれないように(main が street を 0..1 で入れる)
       this._street = damp(this._street || 0, inside ? 0 : this.street, 2.5, realDt);
-      this.camPitch = damp(this.camPitch, C.PITCH + 0.25 * this._street, 4, realDt);
+      const tall = innerWidth < innerHeight ? C.TALL_PITCH : 0;      // たて長の画面は 少し 上から(奥が 入りすぎて 重くならないように)
+      this.camPitch = damp(this.camPitch, Math.min(1.25, C.PITCH + tall + (inside ? C.INSIDE_PITCH : 0) + C.STREET_PITCH * this._street), 4, realDt);
     }
     // ボスを見せる(focusOn): 中心を寄せる・引く・少し低い角度
     const fw = demo ? 0 : this.focus.w, F = this.focus;
     const want = (inside ? C.INSIDE_DIST : C.DIST) * (this._zoomMult || 1) * (demo ? 1.12 + 0.08 * Math.sin(this.camYaw * 2.3) : 1 + 0.08 * (this._street || 0))
       * (1 + (F.zoom - 1) * (fw > 0 ? Math.min(1, fw / Math.max(0.01, F.weight)) : 0));
     this.camDist = damp(this.camDist, want, fw > 0 ? 5 : 3, realDt);
-    const tx = target.x + (F.x - target.x) * fw, tz = target.z + (F.z - target.z) * fw;
+    // 第5弾: 走ると カメラが 進む先を 少し見る(行く先が広く見える・景色が流れて 奥行きが出る)。操作の向きは 変わらない
+    const hero = this.ctx && this.ctx.Player, hv = hero && hero.vel;
+    let lx = 0, lz = 0;
+    if (hv && !demo && !inside) {
+      const sp = Math.hypot(hv.x, hv.z), k = sp > 0.5 ? Math.min(1.25, sp / CONFIG.PLAYER.SPEED) * C.LEAD / sp : 0;
+      lx = hv.x * k; lz = hv.z * k;
+    }
+    this._leadX = damp(this._leadX || 0, lx, 2.2, realDt); this._leadZ = damp(this._leadZ || 0, lz, 2.2, realDt);
+    const tx = target.x + this._leadX + (F.x - target.x) * fw, tz = target.z + this._leadZ + (F.z - target.z) * fw;
     this.camTarget.x = damp(this.camTarget.x, tx, C.LERP, realDt);
     this.camTarget.z = damp(this.camTarget.z, tz, C.LERP, realDt);
     this.camTarget.y = damp(this.camTarget.y, target.y + 1 + (F.y * 0.35) * fw, C.LERP, realDt);
-    const d = this.camDist, p = this.camPitch - F.pitch * (fw > 0 ? Math.min(1, fw / Math.max(0.01, F.weight)) : 0);
+    const d = this.camDist, p = Math.max(Math.min(this.camPitch, 0.52), this.camPitch - F.pitch * (fw > 0 ? Math.min(1, fw / Math.max(0.01, F.weight)) : 0));
     const cam = this.camera;
     cam.position.set(
       this.camTarget.x + Math.sin(this.camYaw) * Math.cos(p) * d,
@@ -340,6 +394,16 @@ export const Engine = {
     if (!this._gated && !this._gate(performance.now(), this._demo ? 'title' : 'play')) return;
     if (this._bk > 0) this._bk = Math.max(0, this._bk - (this._bkDecay || 1) * Math.min(0.1, realDt || 0.016));
     if (this.bloom) this.bloom.strength = (this.viewMode === 'fps' ? 0.35 : this.viewMode === 'tps' ? 0.42 : 0.5) + (this._bk || 0);
+    // 第5弾: 霧の距離(引いた分だけ 遠くへ)と、画面の仕上げ(夜は コントラストを弱く・暗い所を 少し持ち上げる)
+    const zr = this.viewMode === 'top' || this._demo ? Math.max(1, this.camDist / C.DIST) : 1;
+    const fk = this.viewMode === 'top' && this.focus.w > 0 ? 1 + 0.6 * Math.min(1, this.focus.w / Math.max(0.01, this.focus.weight)) : 1;   // ボスを見せている間は 遠くまで
+    this.fogScale = Math.pow(zr, 0.9) * this.farBoost * fk;
+    this.lowCam = !!(this._demo && ViewCam.shot);      // タイトルの「映画のような低い角度」の間(world-sky.js が 霧とかすみを 肩越しと同じに する)
+    if (this.lowCam) this.fogScale *= 2.4;
+    if (this.final) {
+      let n = 0; try { n = World.night || 0; } catch (e) { /* なし */ }
+      this.final.grade.set(RD.VIGNETTE * (this.viewMode === 'top' ? 1 : 0.8) * (1 - 0.45 * n), RD.CONTRAST * (1 - 0.65 * n), 1.06, 0.035 * n);
+    }
     this._measureFps();
     this._shadowTick();
     for (let i = 0; i < this.beforeRender.length; i++) this.beforeRender[i]();

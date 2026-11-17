@@ -5,6 +5,7 @@
 //   world-town.js 町 / world-interiors.js 中に入れる建物 / world-nature.js 森・公園・住宅地・工場地帯
 //   第4弾: 町は 地区に分かれる(world-district.js 地区の地図と空気 / world-dtex.js 壁と看板の絵 / world-dkit.js 建物の道具 /
 //          world-dgen.js 繁華街・中華街・下町・門 / world-dgen2.js 寺町・オフィス街・崩壊地区・中に入れる店)
+//   第5弾: 西部の町「ウエスタン通り」(町の北の出口のすぐ外。world-westex.js 模様 / world-westkit.js 建物の道具と小道具 / world-western.js 町の並びと 砂ぼこり・転がる草)
 import * as THREE from '../vendor/three/build/three.module.min.js';
 import { CONFIG } from './config.js';
 import { seeded } from './util.js';
@@ -23,13 +24,16 @@ import { outerZone, OUTER_NAMES, OUTER_GROUND, OUTER_MAP, OUT } from './world-ou
 import { Events } from './events.js';
 import { makeDistrictMaterials } from './world-dtex.js';
 import { defineDistrictProps } from './world-dkit.js';
-import { District, districtAt, DNAME } from './world-district.js';
+import { District, districtAt, DNAME, inWest } from './world-district.js';
+import { makeWestMaterials } from './world-westex.js';
+import { defineWestProps } from './world-westkit.js';
+import { genWestern, West } from './world-western.js';
 
 const CELL = 8;           // ぶつかり判定の区画の大きさ(m)
 const NAV = 1;            // 道さがし地図の1マス(m)
 const CHUNK = 100;        // 見た目をまとめる区画(m)
 // 肩越し・一人称で 描く距離(m)。木は霧で かすむ 140m まで、草・小物は もっと近くだけ
-const CLOSE_VIS = { sakura: 140, pine: 140, broad: 140, birch: 140, dead: 120, bush: 85, grass: 70, rock: 100, log: 90, grave: 100, cross: 100, hay: 110, corn: 110 };
+const CLOSE_VIS = { cactus: 130, sakura: 140, pine: 140, broad: 140, birch: 140, dead: 120, bush: 85, grass: 70, rock: 100, log: 90, grave: 100, cross: 100, hay: 110, corn: 110 };
 const OCC = 2;            // 「もう何か置いた」地図の1マス(m)
 const MAP_PX = 1024;       // ミニマップの大きさ
 
@@ -63,6 +67,7 @@ export const World = {
     const q = Engine.quality;
     const M = this.M = makeMaterials(Engine.renderer, q);
     makeDistrictMaterials(M, Engine.renderer, q);
+    let tw = performance.now(); makeWestMaterials(M, Engine.renderer, q); this.westMs = performance.now() - tw;   // westMs = 西部の町に かかった時間(確認用)
     const B = new Builder(CHUNK, h), I = new Instancer(CHUNK, h), CB = new Builder(CHUNK * 2, h), SB = new Builder(400, h);
     I.thin = q === 'low' ? 0.45 : q === 'mid' ? 0.8 : 1;
     // ミニマップ
@@ -99,10 +104,15 @@ export const World = {
     defineProps(ctx);
     defineProps2(ctx);
     defineDistrictProps(ctx);
+    tw = performance.now(); defineWestProps(ctx); this.westMs += performance.now() - tw;
     Sky.init(this, M);
     if (q !== 'low') this._embers(q === 'high' ? 420 : 260);
     this._ground(ctx, mx, k);
     genTown(ctx);
+    // 西部の町(乱数は 別にする = ほかの場所の並びを 変えない)
+    tw = performance.now();
+    { const r0 = ctx.rnd; ctx.rnd = seeded(1881); genWestern(ctx); ctx.rnd = r0; }
+    this.westMs = Math.round(this.westMs + performance.now() - tw);
     genBuildings(ctx);
     genNature(ctx);
     // まわりの壁(マップの外へ出ない)
@@ -118,6 +128,7 @@ export const World = {
     this._sky = Sky;
     Life.init(this);
     District.init(this);
+    West.init(this);
     // 建物の印をミニマップの上に
     for (const b of this.buildings) {
       if (b.small) continue;
@@ -175,6 +186,7 @@ export const World = {
       const ix = Math.round((x + h) / G) % 101, iz = Math.round((z + h) / G) % 101;
       const n = 0.82 + noise[iz * 101 + ix] * 0.36;
       if (OUTER_GROUND[zn]) { const c = OUTER_GROUND[zn]; return [c[0] * n, c[1] * n, c[2] * n]; }
+      if (zn === 'western') return [0.74 * n, 0.5 * n, 0.34 * n];   // 赤茶の土
       if (zn === 'forest') return [0.47 * n, 0.45 * n, 0.3 * n];
       if (zn === 'industrial') return [0.5 * n, 0.5 * n, 0.5 * n];
       if (zn === 'park' || zn === 'suburb') return [0.36 * n, 0.5 * n, 0.27 * n];
@@ -200,18 +212,19 @@ export const World = {
     const S = CONFIG.WORLD_SIZE;
     for (let z = -h; z < h; z += 4) for (let x = -h; x < h; x += 4) {
       const zn = this.zoneAt(x + 2, z + 2);
-      mx.fillStyle = OUTER_MAP[zn] ? OUTER_MAP[zn] : zn === 'forest' ? '#26361f' : zn === 'industrial' ? '#55524c' : zn === 'park' || zn === 'suburb' ? '#3f5a2c' : zn === 'lake' ? '#2d5a70' : '#3a3a3e';
+      mx.fillStyle = OUTER_MAP[zn] ? OUTER_MAP[zn] : zn === 'western' ? '#a8734a' : zn === 'forest' ? '#26361f' : zn === 'industrial' ? '#55524c' : zn === 'park' || zn === 'suburb' ? '#3f5a2c' : zn === 'lake' ? '#2d5a70' : '#3a3a3e';
       mx.fillRect((x + h) * k, (z + h) * k, 4 * k + 0.5, 4 * k + 0.5);
     }
     void S;
   },
 
-  // 場所の種類: 'town' 町 / 'industrial' 工場地帯 / 'suburb' 住宅地 / 'park' 公園 / 'forest' 森 / 'lake' 湖
+  // 場所の種類: 'town' 町 / 'industrial' 工場地帯 / 'suburb' 住宅地 / 'park' 公園 / 'forest' 森 / 'lake' 湖 / 'western' 西部の町
   zoneAt(x, z) {
     if (Math.abs(x) > 400 || Math.abs(z) > 400 || (z < OUT.river.z1 && z > OUT.river.z0)) { const o = outerZone(x, z); if (o) return o; }
     for (const L of LAKES) { const dx = (x - L.x) / L.rx, dz = (z - L.z) / L.rz; if (dx * dx + dz * dz < 1) return 'lake'; }
     const T = TOWN.ext;
     if (x >= T[0] && x <= T[2] && z >= T[1] && z <= T[3]) return 'town';
+    if (inWest(x, z)) return 'western';
     if (x > T[2] && x <= 404 && z > -215 && z < 215) return 'industrial';
     if (x < T[0] && z > -150 && z < 290) return 'suburb';
     if (z > T[3] && Math.abs(x) <= T[2] && z < 372) return 'park';
@@ -225,7 +238,7 @@ export const World = {
     const b = this.buildingAt(x, z);
     if (b && b.name) return b.name;
     const zn = this.zoneAt(x, z);
-    if (zn === 'town') { const d = districtAt(x, z); if (d) return DNAME[d]; }
+    if (zn === 'town' || zn === 'western') { const d = districtAt(x, z); if (d) return DNAME[d]; }
     return OUTER_NAMES[zn] || { town: 'ダウンタウン', industrial: '工場地帯', suburb: '住宅街', park: '公園', forest: '森', lake: '湖' }[zn] || '';
   },
   // 上から見た地図(北が上、マップ全体)。UI のミニマップ用。1px = WORLD_SIZE/512 m
@@ -466,6 +479,7 @@ export const World = {
     Brk.update(dt, px, pz);
     Life.update(dt, px, pz);
     District.update(dt, px, pz);
+    West.update(dt, px, pz);
     if (this._emberPts) this._emberPts.visible = this._emberU.uAmt.value > 0.02;
     if ((this._cullT -= dt) <= 0) { this._cullT = 0.15; this._cull(); }
   },

@@ -95,15 +95,19 @@ export const Minimap = {
       else if (m.kind === 'golden') { star(g, x, y, s * 1.3); g.fill(); g.stroke(); }
       else { g.beginPath(); g.arc(x, y, s, 0, Math.PI * 2); g.fill(); g.stroke(); }
     }
-    // 自分(向きのある三角)
-    const f = Player.facing || 0;
-    g.translate(R, R); g.rotate(f);
-    g.beginPath(); g.moveTo(0, -6 * this.dpr); g.lineTo(4.5 * this.dpr, 5 * this.dpr); g.lineTo(-4.5 * this.dpr, 5 * this.dpr); g.closePath();
-    g.fillStyle = '#5fe0ff'; g.fill(); g.lineWidth = 1.2 * this.dpr; g.strokeStyle = '#fff'; g.stroke();
+    // 自分(向きのある三角)+ まわりの水色の輪(画面の 足もとの輪と 同じ色。ゾンビの赤い点の中でも すぐ分かる)
+    const f = Player.facing || 0, u = this.dpr;
+    g.translate(R, R);
+    g.beginPath(); g.arc(0, 0, 9 * u, 0, Math.PI * 2);
+    g.fillStyle = 'rgba(0,0,0,.35)'; g.fill();
+    g.lineWidth = 1.6 * u; g.strokeStyle = 'rgba(95,224,255,.9)'; g.stroke();
+    g.rotate(f);
+    g.beginPath(); g.moveTo(0, -7 * u); g.lineTo(5 * u, 5.5 * u); g.lineTo(0, 3 * u); g.lineTo(-5 * u, 5.5 * u); g.closePath();
+    g.fillStyle = '#5fe0ff'; g.fill(); g.lineWidth = 1.3 * u; g.strokeStyle = '#fff'; g.stroke();
     g.restore();
-    // 縁
-    g.beginPath(); g.arc(R, R, R - 1.5 * this.dpr, 0, Math.PI * 2);
-    g.lineWidth = 2 * this.dpr; g.strokeStyle = 'rgba(255,255,255,.55)'; g.stroke();
+    // 縁(ほかの板と 同じ 白い線)
+    g.beginPath(); g.arc(R, R, R - 1.5 * u, 0, Math.PI * 2);
+    g.lineWidth = 2 * u; g.strokeStyle = 'rgba(255,255,255,.62)'; g.stroke();
   },
 
   reset() { this.base = null; },

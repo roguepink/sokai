@@ -173,7 +173,7 @@ function pier(ctx, x0, x1, z0, z1) {
 // ---------------- 外へのびる道 ----------------
 function roads(ctx) {
   const O = OUT, { z0, z1 } = O.river;
-  road(ctx, z1 + 3, -192, 40, 6, false);           // 町の北 → 橋 → 空港
+  road(ctx, z1 + 3, -294, 40, 6, false);   // 町の北 →(西部の町の土の道)→ 橋 → 空港
   road(ctx, -478, z0 - 3, 40, 6, false);
   road(ctx, z1 + 3, -150, -330, 4.5, false);        // 住宅街 → 橋 → 空港の西
   road(ctx, -478, z0 - 3, -330, 4.5, false);
@@ -188,7 +188,7 @@ function roads(ctx) {
   // 道ぞいの街灯
   for (let x = -580; x < 500; x += 36) lamp(ctx, x, -484.5, Math.PI / 2, 0.02);
   for (let x = -390; x < 510; x += 30) lamp(ctx, x, 411, Math.PI / 2);
-  for (let z = -430; z < -200; z += 30) { lamp(ctx, 47.5, z, Math.PI); lamp(ctx, 307.5, z + 15, Math.PI); }
+  for (let z = -430; z < -200; z += 30) { if (z < -300) lamp(ctx, 47.5, z, Math.PI); lamp(ctx, 307.5, z + 15, Math.PI); }
 }
 
 // ---------------- 墓地 ----------------

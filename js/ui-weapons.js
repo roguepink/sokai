@@ -3,6 +3,15 @@
 //  - さわった武器に すぐ切りかえて 閉じる。✕・まわりをタップ・Esc でも閉じる
 import { Weapons, WEAPONS } from './weapons.js';
 import { Events } from './events.js';
+import { WeaponIcons, CAT_NAMES, CAT_ORDER } from './ui-icons.js';
+
+// 長い名前は ことばの切れ目で 2 行に(字を小さくしない)。例: グレネード / ランチャー
+const TAILS = ['ランチャー', 'ショットガン', 'ロケット', 'ライフル', 'ミサイル', '放射器', '発生器', 'ドローン', '衝撃波', 'ボウガン', 'ハンマー', 'レーザー', 'ホール'];
+function nameHtml(name) {
+  if (name.length < 8) return name;
+  for (const t of TAILS) { const i = name.lastIndexOf(t); if (i > 1 && i + t.length === name.length) return name.slice(0, i) + '<wbr>' + t; }
+  return name;
+}
 
 export const WeaponGrid = {
   open: false, el: null, _input: null, _audio: null,
@@ -12,14 +21,16 @@ export const WeaponGrid = {
     const el = this.el = document.createElement('div');
     el.id = 'weaponGrid';
     el.className = 'overlay weapon-grid hidden';
-    el.innerHTML = `<div class="wg-head"><h2>武器をえらぶ <small>${WEAPONS.length}種類</small></h2><button type="button" class="wg-close" aria-label="閉じる">✕</button></div>
+    // 種類の色の見本(銃・爆発物・エネルギー・近接・召喚)
+    const legend = CAT_ORDER.map((c) => `<span class="wc-${c}"><i></i>${CAT_NAMES[c]}</span>`).join('');
+    el.innerHTML = `<div class="wg-head"><h2>武器をえらぶ <small>${WEAPONS.length}種類</small></h2><div class="wg-legend">${legend}</div><button type="button" class="wg-close" aria-label="閉じる">✕</button></div>
       <div class="wg-list"></div>
       <p class="wg-note pc-only">数字キー 1〜0。同じ数字を もう一度 押すと 11〜・21〜 / スペース・Q・R・ホイールで となり / T で この画面</p>`;
     const list = el.querySelector('.wg-list');
     WEAPONS.forEach((w, i) => {
       const b = document.createElement('button');
-      b.type = 'button'; b.className = 'wg-item' + ((w.name || '').length > 8 ? ' long' : ''); b.dataset.i = i;
-      b.innerHTML = `<b>${w.icon || '🔫'}</b><span>${w.name || w.id}</span><sub>${i + 1}</sub>`;
+      b.type = 'button'; b.className = 'wg-item wc-' + WeaponIcons.cat(w); b.dataset.i = i;
+      b.innerHTML = `${WeaponIcons.html(i)}<span>${nameHtml(w.name || w.id)}</span><sub>${i + 1}</sub>`;
       list.appendChild(b);
     });
     list.addEventListener('click', (e) => {

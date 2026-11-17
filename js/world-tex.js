@@ -67,6 +67,59 @@ function crack(x, x0, y0, len, width, color) {
   x.stroke();
 }
 
+// ---------- 第5弾(立体感): 凹凸 ----------
+// 模様の「高さ」(明るい = 高い・暗い = へこみ)から、光と影を 色の絵に 焼きこむ(浮き彫り)。計算は 起動のとき 1 回だけで、描くときの重さは 0。
+// 光は 左(西)から(見下ろしの光の向きと そろえてある。world-build の地面の板は 絵の左 = 西・上 = 北)。
+// 画質 'high' は そのうえに 法線の絵(normalMap)も作り、本物の光で 凹凸が動いて見える。
+let QUAL = 'high';
+const NRM = [];              // [材質の名前, 法線の絵, 強さ](makeMaterials が 材質に入れる)
+// c の 明るさ → 高さの配列(0..1)。blur 回 ぼかす(つなぎ目は 反対側へ つながる)
+function heightOf(c, blur = 1) {
+  const w = c.width, h = c.height, d = c.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, w, h).data;
+  let H = new Float32Array(w * h), T = new Float32Array(w * h);
+  for (let i = 0, j = 0; i < H.length; i++, j += 4) H[i] = (d[j] * 0.3 + d[j + 1] * 0.55 + d[j + 2] * 0.15) / 255;
+  for (let k = 0; k < blur; k++) {
+    for (let y = 0; y < h; y++) { const o = y * w; for (let x = 0; x < w; x++) T[o + x] = (H[o + (x + w - 1) % w] + H[o + x] * 2 + H[o + (x + 1) % w]) * 0.25; }
+    for (let y = 0; y < h; y++) { const o = y * w, a = ((y + h - 1) % h) * w, b = ((y + 1) % h) * w; for (let x = 0; x < w; x++) H[o + x] = (T[a + x] + T[o + x] * 2 + T[b + x]) * 0.25; }
+  }
+  return H;
+}
+// 色の絵 x に 浮き彫りを焼きこむ。amt = 強さ(高さ 1 の段差で 何段 明るく/暗くするか。0..255)
+function emboss(x, w, h, H, amt) {
+  const img = x.getImageData(0, 0, w, h), p = img.data;
+  for (let y = 0; y < h; y++) {
+    const o = y * w, a = ((y + h - 1) % h) * w, b = ((y + 1) % h) * w;
+    for (let xx = 0; xx < w; xx++) {
+      const d = ((H[o + (xx + 1) % w] - H[o + (xx + w - 1) % w]) + 0.4 * (H[a + xx] - H[b + xx])) * amt;
+      const i = (o + xx) * 4;
+      p[i] += d; p[i + 1] += d; p[i + 2] += d;
+    }
+  }
+  x.putImageData(img, 0, 0);
+}
+// 高さ → 法線の絵(青っぽい絵。光の計算に使う)
+function normalTex(H, w, h, strength) {
+  const [c, x] = cnv(w, h), img = x.createImageData(w, h), p = img.data;
+  for (let y = 0; y < h; y++) {
+    const o = y * w, a = ((y + h - 1) % h) * w, b = ((y + 1) % h) * w;
+    for (let xx = 0; xx < w; xx++) {
+      const nx = (H[o + (xx + w - 1) % w] - H[o + (xx + 1) % w]) * strength, ny = (H[b + xx] - H[a + xx]) * strength;
+      const l = 1 / Math.sqrt(nx * nx + ny * ny + 1), i = (o + xx) * 4;
+      p[i] = (nx * l * 0.5 + 0.5) * 255; p[i + 1] = (ny * l * 0.5 + 0.5) * 255; p[i + 2] = (l * 0.5 + 0.5) * 255; p[i + 3] = 255;
+    }
+  }
+  x.putImageData(img, 0, 0);
+  return tex(c, { srgb: false, aniso: Math.min(ANISO, 4) });
+}
+// まとめ: 色の絵 c に 凹凸をつける。name = 材質の名前(high のとき 法線の絵も作る)。hc = 高さの絵(省くと 色の明るさから)
+function relief(name, c, x, amt, { blur = 1, hc = null, nrm = 3, walls = false } = {}) {
+  if (QUAL === 'low' && walls) return;
+  const w = c.width, h = c.height, H = heightOf(hc || c, blur);
+  const hi = QUAL === 'high';
+  emboss(x, w, h, H, hi ? amt * 0.55 : amt);
+  if (hi && name && nrm > 0) NRM.push([name, normalTex(H, w, h, nrm), 1]);
+}
+
 // ---------- 地面・道 ----------
 function groundTex() {
   const S = 512, [c, x] = cnv(S);
@@ -79,6 +132,9 @@ function groundTex() {
     x.lineWidth = 1; x.beginPath(); x.moveTo(px, py); x.lineTo(px + Math.cos(a) * l, py + Math.sin(a) * l); x.stroke();
   }
   for (let i = 0; i < 260; i++) { x.fillStyle = R() < 0.5 ? 'rgba(120,85,55,0.5)' : 'rgba(80,80,70,0.5)'; x.beginPath(); x.ellipse(R() * S, R() * S, rr(1, 4), rr(1, 3), R() * 3, 0, 7); x.fill(); }
+  // 小石・土のかたまり(明るい丸 = もり上がり)
+  for (let i = 0; i < 150; i++) { const v = ri(165, 195); x.fillStyle = rgb(v, v - 3, v - 10, 0.4); x.beginPath(); x.ellipse(R() * S, R() * S, rr(1.2, 3.2), rr(1.2, 2.6), R() * 3, 0, 7); x.fill(); }
+  relief('ground', c, x, 100, { blur: 1, nrm: 2.2 });
   grain(x, S, S, 26);
   return tex(c);
 }
@@ -90,6 +146,7 @@ function asphaltTex() {
   for (let i = 0; i < 5; i++) { x.fillStyle = rgb(70, 70, 74, 0.6); x.fillRect(R() * S, R() * S, rr(30, 90), rr(20, 60)); }
   for (let i = 0; i < 9; i++) crack(x, R() * S, R() * S, ri(8, 22), rr(0.8, 1.8), 'rgba(25,25,28,0.8)');
   for (let i = 0; i < 4000; i++) { x.fillStyle = R() < 0.5 ? 'rgba(150,150,150,0.5)' : 'rgba(30,30,30,0.5)'; x.fillRect(R() * S, R() * S, 1.5, 1.5); }
+  relief('asphalt', c, x, 170, { blur: 1, nrm: 2.6 });
   grain(x, S, S, 30);
   return tex(c);
 }
@@ -102,19 +159,38 @@ function sidewalkTex() {   // 4m × 4m。1m の石板
   x.strokeStyle = 'rgba(60,58,55,0.9)'; x.lineWidth = 2;
   for (let i = 0; i <= n; i++) { x.beginPath(); x.moveTo(i * q, 0); x.lineTo(i * q, S); x.stroke(); x.beginPath(); x.moveTo(0, i * q); x.lineTo(S, i * q); x.stroke(); }
   for (let i = 0; i < 4; i++) crack(x, R() * S, R() * S, ri(4, 9), 0.8, 'rgba(50,48,45,0.7)');
+  relief('sidewalk', c, x, 150, { blur: 1, nrm: 3 });
   grain(x, S, S, 22);
   return tex(c);
 }
-function paveTex() {       // 広場の石だたみ(4m)
-  const S = 256, [c, x] = cnv(S), n = 8, q = S / n;
-  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
-    const o = (j % 2) * q / 2, v = ri(140, 175);
-    x.fillStyle = rgb(v, v - 1, v - 3); x.fillRect(i * q + o, j * q, q, q); x.fillRect(i * q + o - S, j * q, q, q);
-    x.strokeStyle = 'rgba(60,60,60,0.9)'; x.lineWidth = 2; x.strokeRect(i * q + o, j * q, q, q); x.strokeRect(i * q + o - S, j * q, q, q);
+function paveTex() {       // 広場の石だたみ(7m)。第5弾: 石を 1 つずつ ふくらませて 目地を へこませた(前は 平らな四角で 波もようが出ていた)
+  const S = 512, [c, x] = cnv(S), [hc, hx] = cnv(S), rows = 14, q = S / rows;
+  x.fillStyle = rgb(74, 72, 70); x.fillRect(0, 0, S, S);          // 目地(暗い)
+  hx.fillStyle = '#000'; hx.fillRect(0, 0, S, S);
+  for (let j = 0; j < rows; j++) {
+    let X = -R() * 50;
+    while (X < S) {
+      const w = rr(34, 62), v = ri(134, 172), t = rr(-2, 7);
+      for (const ox of [0, S, -S]) {
+        if (X + ox > S || X + ox + w < 0) continue;
+        x.fillStyle = rgb(v + t, v, v - t - 3); rrect(x, X + ox + 1.5, j * q + 1.5, w - 3, q - 3, 3.5); x.fill();
+        // 高さ: ふちが なだらかに 下がる
+        hx.fillStyle = '#8a8a8a'; rrect(hx, X + ox + 1.5, j * q + 1.5, w - 3, q - 3, 3.5); hx.fill();
+        hx.fillStyle = '#d8d8d8'; rrect(hx, X + ox + 3.5, j * q + 3.5, w - 7, q - 7, 3); hx.fill();
+        hx.fillStyle = `rgb(${ri(235, 255)},255,255)`; rrect(hx, X + ox + 6, j * q + 6, w - 12, q - 12, 3); hx.fill();
+      }
+      X += w;
+    }
   }
-  blots(x, S, S, 16, 10, 40, ['rgba(70,60,50,0.25)']);
-  grain(x, S, S, 22);
+  blots(x, S, S, 26, 16, 70, ['rgba(70,60,50,0.2)', 'rgba(215,210,200,0.1)']);
+  relief('pave', c, x, 78, { blur: 1, hc, nrm: 3.2 });
+  grain(x, S, S, 18);
   return tex(c);
+}
+// 角の丸い四角の道すじ
+function rrect(x, X, Y, w, h, r) {
+  x.beginPath(); x.moveTo(X + r, Y); x.lineTo(X + w - r, Y); x.quadraticCurveTo(X + w, Y, X + w, Y + r); x.lineTo(X + w, Y + h - r); x.quadraticCurveTo(X + w, Y + h, X + w - r, Y + h);
+  x.lineTo(X + r, Y + h); x.quadraticCurveTo(X, Y + h, X, Y + h - r); x.lineTo(X, Y + r); x.quadraticCurveTo(X, Y, X + r, Y); x.closePath();
 }
 function paintTex() {      // 道の白線(すり減り)
   const S = 128, [c, x] = cnv(S);
@@ -155,6 +231,7 @@ function officeTex() {
     // 窓の下の 汚れのすじ
     for (let s = 0; s < 3; s++) { x.fillStyle = 'rgba(80,78,72,0.18)'; x.fillRect(X + R() * W, Y + H + 5, rr(2, 6), rr(8, 22)); }
   }
+  relief('office', c, x, 110, { blur: 1, nrm: 3, walls: true });
   grain(x, S, S, 16);
   return [tex(c), tex(ce)];
 }
@@ -178,6 +255,7 @@ function aptTex() {        // れんがのアパート(12m × 12m)
     x.fillStyle = rgb(230, 225, 215); x.fillRect(X + W / 2 - 1, Y, 3, H); x.fillRect(X - 8, Y + H + 4, W + 16, 6);
     if (R() < 0.3) { x.fillStyle = rgb(200, 200, 195); x.fillRect(X + W - 22, Y + H + 12, 24, 14); }  // エアコン
   }
+  relief('apt', c, x, 90, { blur: 0, nrm: 2.6, walls: true });
   grain(x, S, S, 18);
   return [tex(c), tex(ce)];
 }
@@ -201,6 +279,7 @@ function ribbonTex() {     // コンクリートの横長窓(12m × 14m)
     x.fillStyle = rgb(80, 80, 80); x.fillRect(0, Y - 3, S, 3); x.fillRect(0, Y + H, S, 3);
     for (let s = 0; s < 14; s++) { x.fillStyle = 'rgba(70,65,60,0.2)'; x.fillRect(R() * S, Y + H + 3, rr(2, 6), rr(10, 26)); }
   }
+  relief('ribbon', c, x, 110, { blur: 1, nrm: 3, walls: true });
   grain(x, S, S, 16);
   return [tex(c), tex(ce)];
 }
@@ -231,6 +310,7 @@ function shopTex() {       // 1階の店先(12m × 4.5m)
       x.strokeStyle = rgb(40, 40, 40); x.lineWidth = 4; x.strokeRect(X + 10, 48, sw - 20, H - 52);
     }
   }
+  relief('shop', c, x, 90, { blur: 1, nrm: 0, walls: true });
   grain(x, W, H, 14);
   return [tex(c), tex(ce)];
 }
@@ -239,6 +319,7 @@ function roofTex() {
   x.fillStyle = rgb(110, 108, 104); x.fillRect(0, 0, S, S);
   blots(x, S, S, 30, 10, 50, ['rgba(60,58,55,0.35)', 'rgba(150,148,140,0.25)']);
   x.strokeStyle = 'rgba(70,68,64,0.6)'; x.lineWidth = 1; for (let i = 0; i < S; i += 32) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i, S); x.stroke(); }
+  relief('roof', c, x, 120, { blur: 1, nrm: 0, walls: true });
   grain(x, S, S, 30);
   return tex(c);
 }
@@ -261,6 +342,7 @@ function tileTex() {       // 床タイル(4m に 8×8)
   x.strokeStyle = 'rgba(110,108,100,0.9)'; x.lineWidth = 2;
   for (let i = 0; i <= n; i++) { x.beginPath(); x.moveTo(i * q, 0); x.lineTo(i * q, S); x.stroke(); x.beginPath(); x.moveTo(0, i * q); x.lineTo(S, i * q); x.stroke(); }
   blots(x, S, S, 6, 30, 80, ['rgba(100,90,70,0.08)']);
+  relief('tile', c, x, 90, { blur: 1, nrm: 0 });
   grain(x, S, S, 10);
   return tex(c);
 }
@@ -286,6 +368,7 @@ function woodTex() {       // 板の床(4m)
     }
     x.fillStyle = 'rgba(50,30,15,0.8)'; x.fillRect(0, j * q, S, 2);
   }
+  relief('wood', c, x, 110, { blur: 1, nrm: 3 });
   grain(x, S, S, 14);
   return tex(c);
 }
@@ -295,6 +378,7 @@ function concreteTex() {   // 工場・倉庫の床、打ちっぱなし(8m)
   blots(x, S, S, 14, 30, 90, ['rgba(100,100,98,0.16)', 'rgba(200,200,195,0.14)', 'rgba(70,60,50,0.12)']);
   x.strokeStyle = 'rgba(80,80,80,0.7)'; x.lineWidth = 1.5; x.beginPath(); x.moveTo(S / 2, 0); x.lineTo(S / 2, S); x.moveTo(0, S / 2); x.lineTo(S, S / 2); x.stroke();
   for (let i = 0; i < 3; i++) crack(x, R() * S, R() * S, ri(4, 10), 0.8, 'rgba(60,60,60,0.6)');
+  relief('concrete', c, x, 140, { blur: 1, nrm: 0 });
   grain(x, S, S, 18);
   return tex(c);
 }
@@ -409,6 +493,7 @@ export function cutout(mat, radius = CUT.r, near = CUT.near0) {
 export function makeMaterials(renderer, quality) {
   ANISO = Math.min(8, renderer.capabilities.getMaxAnisotropy ? renderer.capabilities.getMaxAnisotropy() : 4);
   if (quality === 'low') ANISO = Math.min(ANISO, 2);
+  QUAL = quality; NRM.length = 0;
   const std = (o, s = [4, 4], { cast = false, cut = false } = {}) => {
     const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, metalness: 0, ...o });
     m.userData.s = s; m.userData.cast = cast;
@@ -449,6 +534,15 @@ export function makeMaterials(renderer, quality) {
     ceiling: std({ map: plasterTex(), roughness: 0.95 }, [4, 4]),
     glass: cutout(std({ color: 0x9fc0d4, roughness: 0.06, metalness: 0.6, transparent: true, opacity: 0.32, depthWrite: false }, [1, 1])),
   };
+  // 第5弾: 法線の絵(画質 'high' だけ。relief が作ったもの)を 材質に入れる。板の床は 板の壁と 同じ絵
+  for (const [k, t, sc] of NRM) {
+    // (板の絵は 壁用・床用の 2 回 作られる。作った順に 1 つずつ入れる)
+    for (const name of k === 'wood' ? ['wood', 'woodFloor'] : [k]) {
+      const m = M[name]; if (!m || m.normalMap) continue;
+      m.normalMap = t; m.normalScale = new THREE.Vector2(sc, sc);
+      break;
+    }
+  }
   // 遠くでは描かない距離(m)。小さい物・床・シールは近くだけ(描く回数を へらす)
   const VIS = { decal: 95, paint: 120, pool: 110, glow: 230, plain: 165, plainNoCut: 140, car: 175, tile: 85, lino: 85, woodFloor: 85, ceiling: 80, flame: 160, rock: 150, wood: 170, floorC: 150, plaster: 120 };
   for (const k in VIS) if (M[k]) M[k].userData.vis = VIS[k];
