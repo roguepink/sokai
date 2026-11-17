@@ -305,9 +305,7 @@ function fountain(ctx, x, z, r = 4.5) {
 }
 function plazaDeco(ctx, x0, z0, x1, z1) {
   const { M, rnd } = ctx;
-  // 床の光る線(青)と 石の帯
-  for (const z of [z0 + 0.6, z1 - 0.6]) ctx.B.flat(M.glow, (x0 + x1) / 2, Y + 0.02, z, x1 - x0 - 1, 0.12, { col: [0.35, 1.3, 2.4] });
-  for (const x of [x0 + 0.6, x1 - 0.6]) ctx.B.flat(M.glow, x, Y + 0.02, (z0 + z1) / 2, 0.12, z1 - z0 - 1, { col: [0.35, 1.3, 2.4] });
+  // 石の帯。(前は 広場のふちに「床の光る青い線」も 引いていたが、見下ろしで 水色の細い線が 画面を横切って 不具合に見えたので やめた。第5弾の確認)
   for (let x = x0 + 6; x < x1 - 4; x += 8) ctx.B.flat(M.paint, x, Y + 0.015, (z0 + z1) / 2, 0.7, z1 - z0 - 2, { col: [0.44, 0.46, 0.5] });
   // 両わきの並木
   for (let z = z0 + 3; z < z1 - 2; z += 6) for (const x of [x0 + 3, x1 - 3]) if (ctx.isFree(x, z, 1.2)) { ctx.prop('planter', x, z, 0, { y: Y, col: [0.75, 0.76, 0.78] }); placeTree(ctx, 'birch', x, z, 0.8, rnd() * 6); }

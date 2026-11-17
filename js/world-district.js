@@ -43,7 +43,8 @@ const AIR = {
   temple: { fog: [1.08, 0.98, 1.06], light: [1.05, 1.0, 1.03], ember: 0, petal: 1 },
   office: { fog: [0.86, 0.98, 1.16], light: [0.94, 1.0, 1.1], ember: 0.3, petal: 0 },
   ruins: { fog: [1.32, 0.92, 0.66], light: [1.2, 0.92, 0.75], ember: 2.2, petal: 0 },
-  western: { fog: [1.36, 1.04, 0.68], light: [1.2, 1.02, 0.78], ember: 0, petal: 0, dust: 1 },   // 砂色・夕日色の空気。砂ぼこり
+  // 砂色・夕日色の空気。砂ぼこり。night = 夜だけ 空の光を 何割 足すか(赤茶の地面は 青い月の光を はね返しにくく、明かりの外が 暗く しずむので。西部にいる間だけ)
+  western: { fog: [1.36, 1.04, 0.68], light: [1.2, 1.02, 0.78], ember: 0, petal: 0, dust: 1, night: 0.9 },
 };
 
 const LO = EDGES[0], HI = EDGES[EDGES.length - 1];
@@ -127,7 +128,8 @@ export const District = {
     this.k.petal += (a.petal - this.k.petal) * f;
     this.k.dust += ((a.dust || 0) - this.k.dust) * f;
     this.fog.lerp(_c.setRGB(a.fog[0], a.fog[1], a.fog[2]), f);
-    this.light.lerp(_c.setRGB(a.light[0], a.light[1], a.light[2]), f);
+    const nl = 1 + (a.night || 0) * (this.W.night || 0);
+    this.light.lerp(_c.setRGB(a.light[0] * nl, a.light[1] * nl, a.light[2] * nl), f);
     const W = this.W;
     if (W._emberU && W._emberU.uAmt) W._emberU.uAmt.value = this.k.ember;
     if (this._pts) {

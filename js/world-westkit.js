@@ -291,7 +291,7 @@ export function defineWestProps(ctx) {
   // ほろ馬車
   P('wagon', [{ geo: makeGeo((b) => {
     bx(b, -1.8, 0.78, -0.72, 1.8, 1.32, 0.72, WOODC, { skip: '' }); bx(b, 1.8, 0.72, -0.05, 3.5, 0.8, 0.05, DARKW);
-    const g = new THREE.CylinderGeometry(0.8, 0.8, 3.4, 10, 3); _m.makeRotationZ(Math.PI / 2); _m.multiply(new THREE.Matrix4().makeScale(1.25, 1, 1)); _m.setPosition(0, 1.6, 0); b.geom(null, g, _m, { col: [0.88, 0.82, 0.68] }); g.dispose();
+    const g = new THREE.CylinderGeometry(0.8, 0.8, 3.4, 10, 3); _m.makeRotationZ(Math.PI / 2); _m.multiply(new THREE.Matrix4().makeScale(1.25, 1, 1)); _m.setPosition(0, 1.6, 0); b.geom(null, g, _m, { col: [0.66, 0.61, 0.5] }); g.dispose();   // ほろ: 前は [0.88,0.82,0.68](昼に 真っ白に とんだ)
     for (const x of [-1.25, 1.25]) for (const s of [-1, 1]) wheel(b, x, x < 0 ? 0.68 : 0.56, s * 0.82, x < 0 ? 0.68 : 0.56);
   }), mat: M.plain }], 4.0, 1.9, 2.6);
   // 駅馬車

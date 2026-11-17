@@ -80,7 +80,7 @@ export const ViewHud = {
   onStart() {
     this._playing = true; this._slamHinted = false;
     this.hideHint();
-    if (Engine.viewMode !== 'top' && (Engine.settings._get().hintLook2 || 0) < 3) setTimeout(() => { if (Engine.viewMode !== 'top' && this._playing) this.showHint('look'); }, 900);
+    if (Engine.viewMode !== 'top' && this._lookOk()) setTimeout(() => { if (Engine.viewMode !== 'top' && this._playing) this.showHint('look'); }, 900);
   },
 
   // ---------- 視点が変わった ----------
@@ -88,8 +88,7 @@ export const ViewHud = {
     if (!this._playing) return;
     this.showToast(mode);
     if (mode !== 'top') {
-      const s = Engine.settings._get();
-      if ((s.hintLook2 || 0) < 3) setTimeout(() => { if (Engine.viewMode !== 'top' && this._playing) this.showHint('look'); }, 1500);   // 視点の名前(1.6 秒)と 重ならないように
+      if (this._lookOk()) setTimeout(() => { if (Engine.viewMode !== 'top' && this._playing) this.showHint('look'); }, 1500);   // 視点の名前(1.6 秒)と 重ならないように
     } else if (this._hintKind === 'look') this.hideHint();
   },
   showToast(mode) {
@@ -100,16 +99,21 @@ export const ViewHud = {
     this._toastT = 1.6;
     if (first) { const s = Engine.settings._get(); Engine.settings._set('viewToastN', (s.viewToastN || 0) + 1); }
   },
+  // 向きの変え方の ひとことを 出してよいか: 通算 3 回まで(保存)・1 回のページの中では 2 回まで(保存できない環境でも 何度も出ない)・
+  // もう マウスで向きを変えている(マウスロック中)なら 出さない
+  _lookOk() { return (Engine.settings._get().hintLook2 || 0) < 3 && (this._lookN || 0) < 2 && !document.pointerLockElement; },
   showHint(kind) {
     const pc = document.body.classList.contains('pc');
     const h = this.hint;
-    this._hintKind = kind;
+    if (kind === 'look' && !this._lookOk()) return;
+    this._hintKind = kind; this._hintLocked = false;
     if (kind === 'look') {
+      this._lookN = (this._lookN || 0) + 1;
       h.innerHTML = pc ? '<b>🖱️</b><span>画面をクリックすると<br>マウスで 向きが変わる<small>(Esc で もどる / B で 視点の設定)</small></span>'
         : '<b class="swipe">👆</b><span>撃つボタンを 押したまま<br>左右に なぞると 向きが変わる<small>右側の あいている所を なぞっても OK</small></span>';
       const s = Engine.settings._get(); Engine.settings._set('hintLook2', (s.hintLook2 || 0) + 1);
-      this._hintLook0 = this.ctx.Input.lookT;
-      this._hintT = 7;
+      this._hintLook0 = this.ctx.Input.lookT; this._hintLook0T = (pc ? 5 : 7) - 1.2;
+      this._hintT = pc ? 5 : 7;          // パソコンは 5 秒(読む量が 少ない)。スマホは 7 秒
     } else {
       h.innerHTML = `<b>💨</b><span>ダッシュを すばやく<br>2回 押すと <em>ジャンプ叩きつけ!</em>${pc ? '<small>(F を2回 / G)</small>' : ''}</span>`;
       const s = Engine.settings._get(); Engine.settings._set('hintSlam', (s.hintSlam || 0) + 1);
@@ -222,7 +226,13 @@ export const ViewHud = {
     if (this._hintT > 0) {
       if (((this._hintT * 4) | 0) !== (((this._hintT - dt) * 4) | 0)) this._placeHint();
       this._hintT -= dt;
-      const looked = this._hintKind === 'look' && Input.lookT !== this._hintLook0 && this._hintT < 5.8;
+      // パソコン: 画面をクリックして マウスで向きを変えはじめたら、ひとことを「Esc で もどる」だけにして 2 秒で消す。もう 次からは 出さない
+      if (this._hintKind === 'look' && !this._hintLocked && document.pointerLockElement) {
+        this._hintLocked = true; this._hintT = Math.min(this._hintT, 2);
+        this.hint.innerHTML = '<b>🖱️</b><span>マウスで 向きが変わります<small>(Esc で マウスが もどる / B で 視点の設定)</small></span>';
+        Engine.settings._set('hintLook2', 3);
+      }
+      const looked = this._hintKind === 'look' && !this._hintLocked && Input.lookT !== this._hintLook0 && this._hintT < (this._hintLook0T || 5.8);
       if (this._hintT <= 0 || looked || !playing || (this._hintKind === 'look' && !close)) this.hideHint();
     }
   },

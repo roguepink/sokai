@@ -137,7 +137,7 @@ function church(ctx) {
   S.light(cx, -272, 5, [0.5, 0.36, 0.16]); S.light(cx, -280.5, 4, [0.5, 0.36, 0.16]);
   S.onRoof(() => {
     const B = ctx.B;
-    wgable(ctx, B.bucket(M.west, cx, -274), x0, z0, x1, z1, h, false, WT.shingle, [0.72, 0.68, 0.7], 4.4, 0.5, [0.8, 0.86, 0.96]);
+    wgable(ctx, B.bucket(M.west, cx, -274), x0, z0, x1, z1, h, false, WT.shingle, [0.72, 0.68, 0.7], 4.4, 0.5, [0.6, 0.63, 0.68]);   // 三角の壁: 前は [0.8,0.86,0.96]。第5弾の強い日ざしで 真っ白に とんで 光が にじんだので おさえた
     // 鐘の塔(正面の上)
     wbox(ctx, cx - 2, h - 0.2, z1 - 4.2, cx + 2, h + 5.2, z1 - 0.2, WT.clap, col, WT.shingle, 4);
     for (const [nx, nz] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) B.box(M.plain, cx + nx * 2.02 - (nz ? 0.8 : 0.02), h + 3.0, z1 - 2.2 + nz * 2.02 - (nx ? 0.8 : 0.02), cx + nx * 2.02 + (nz ? 0.8 : 0.02), h + 4.6, z1 - 2.2 + nz * 2.02 + (nx ? 0.8 : 0.02), { col: [0.06, 0.05, 0.05], skip: '' });
@@ -148,7 +148,7 @@ function church(ctx) {
   });
   wfloor(ctx, cx - 1.6, z1, cx + 1.6, -260.6, 0.03, WT.walk, [0.85, 0.85, 0.85], 2.6);
   for (const s of [-1, 1]) ctx.prop('wlamp', cx + s * 3.2, z1 + 1.6, s > 0 ? Math.PI : 0, {});
-  for (const s of [-1, 1]) placeFence(ctx, cx + s * 2.4, -261.4, cx + s * 7.4, -261.4, [1.1, 1.1, 1.05]);
+  for (const s of [-1, 1]) placeFence(ctx, cx + s * 2.4, -261.4, cx + s * 7.4, -261.4, [0.76, 0.76, 0.73]);   // 白いさく: 前は [1.1,1.1,1.05](昼に 光って見えた)
   S.finish();
 }
 
@@ -292,6 +292,11 @@ export function genWestern(ctx) {
     else if (q < 0.78) placeTree(ctx, 'dead', x, z, 0.7 + rnd() * 0.5, R(0, 6.28), [0.8, 0.66, 0.52]);
     else if (q < 0.84) ctx.prop('skull', x, z, R(0, 6.28), { solid: false, s: 1.1 });
     else ctx.I.add('grass', x, 0, z, R(0, 6.28), 0.7 + rnd() * 0.5, [1.5, 1.15, 0.6]);
+  }
+  // 荷物置き場のランプ(第5弾の確認: 夜に ここだけ 明かりがなく 暗かった)。いちばん最後に置く(上の ばらまきの 並びを 変えないため)
+  for (const [x, z, r] of [[129, -231, 0], [141, -219.5, Math.PI], [155, -233, Math.PI]]) {
+    if (!ctx.isFree(x, z, 0.6)) continue;
+    ctx.prop('wlamp', x, z, r, {}); pool(ctx, x + (r ? -0.6 : 0.6), z, 6, [0.34, 0.2, 0.07], 0.035);
   }
   ctx.occupy(W.x0, W.z0, W.x1, W.z1);
 }
