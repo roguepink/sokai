@@ -419,6 +419,14 @@ const kaiju = {
     T[Q.hdZ] = 0.06 * sin(t * 0.7);
     T[Q.jaw] = -0.12 - 0.07 * sin(t * 1.7);
     T[Q.aLx] += 0.12 * sin(m.wph + 1) * wk + 0.05 * breath; T[Q.aRx] -= 0.12 * sin(m.wph + 1) * wk - 0.05 * breath;
+    if (St === 'walk') {
+      // 2026-11-18 ノブさん「動きが止まって つまらない」: 遠く(90m)からでも 動いて見えるように、ふだんの威嚇を 大きく
+      T[Q.nY] = 0.3 * sin(t * 0.55); T[Q.hdZ] = 0.15 * sin(t * 0.8); T[Q.hdX] += 0.2 * sin(t * 0.65);
+      T[Q.jaw] = -0.15 - 0.55 * Math.pow(max(0, sin(t * 0.9)), 3);           // ときどき 口を 大きく開ける
+      T[Q.aLx] += 0.4 * sin(t * 1.3); T[Q.aRx] += 0.4 * sin(t * 1.3 + 2.2);
+      T[Q.aLz] -= 0.25 * max(0, sin(t * 0.7)); T[Q.aRz] += 0.25 * max(0, sin(t * 0.7 + 1));
+      T[Q.chY] = 0.14 * sin(t * 0.6); T[Q.lean] += 0.07 * sin(t * 0.45);
+    }
     let shake = 0;
     const rear = (k) => {      // のけぞって ほえる
       T[Q.lean] = BASE[0] + 0.48 * k; T[Q.chX] = -0.12 + 0.2 * k; T[Q.n1] = BASE[4] + 0.26 * k; T[Q.n2] = BASE[5] + 0.35 * k; T[Q.hdX] = BASE[7] - 0.45 * k;
@@ -460,6 +468,14 @@ const kaiju = {
       else if (st < T0 + 0.75) { T.set(P_CLAW); T[a2] = 0.9 + 1.9 * ease(min(1, (st - T0) / 0.6)); T[f2] = 0.4; T[Q.spY] = -e.arm * 0.2; rate = st < T0 + 0.25 ? 20 : 7; }
       else if (st < T0 + 1.5) { T.set(P_CLAW); T[a] = 1.5; T[fo] = 0.6; rate = st < T0 + 1.0 ? 20 : 6; }
       else rate = 3;
+    } else if (St === 'bones') {
+      const T0 = e.T0 || 1.0;
+      if (st < T0) { rear(0.7 * ease(min(1, st / T0))); T[Q.aLz] = -0.9; T[Q.aRz] = 0.9; rate = 6; }
+      else { T[Q.lean] = -0.45; T[Q.spY] = 0.28 * sin(t * 9); T[Q.chY] = -0.18 * sin(t * 9 + 1); T[Q.jaw] = -0.75; T[Q.aLz] = -0.6; T[Q.aRz] = 0.6; rate = 12; shake = 0.015; }
+    } else if (St === 'quake') {
+      const per = e.per || 0.9, k = abs(sin(PI * st / per));
+      T[Q.lean] = -0.5 + 0.15 * k; T[Q.drop] = 0.55 * (1 - k); T[Q.hdX] = 1.0 - 0.3 * k; T[Q.jaw] = -0.4 - 0.4 * (1 - k);
+      T[Q.aLx] = 1.2 + 0.6 * k; T[Q.aRx] = 1.2 + 0.6 * k; T[Q.aLz] = -0.5; T[Q.aRz] = 0.5; rate = 10;
     } else if (St === 'rain') {
       T[Q.spY] = 0.3 * sin(t * 14); T[Q.chY] = -0.2 * sin(t * 14 + 1); T[Q.lean] = -0.6; T[Q.aLz] = -0.8; T[Q.aRz] = 0.8; T[Q.jaw] = -0.6; rate = 14;
     } else if (St === 'nova') {
@@ -543,18 +559,22 @@ const kaiju = {
       const back = c.d < D - 4 && (ox * c.dx + oz * c.dz) < 0;
       let sp = e.def.speed * (1 + 0.15 * e.phase) * (od > 90 ? 2.2 : od > 30 ? 1.7 : 1) * clamp(od / 12, 0, 1) * (od < 3 ? 0 : 1);
       if (back) sp = min(sp, e.backT > 0 ? 13 : 6);
-      e.vx += (ox / od * sp - e.vx) * min(1, dt * 1.2); e.vz += (oz / od * sp - e.vz) * min(1, dt * 1.2);
+      // 着いていても 止まらない: 主人公のまわりを ゆっくり 横歩き(足が 動き続ける。2026-11-18)
+      if ((e.pT = (e.pT || 0) - dt) <= 0) { e.pT = R(3, 6); e.pDir = Math.random() < 0.5 ? 1 : -1; }
+      const tg = od < 16 ? 5.5 * (e.pDir || 1) : 0;
+      e.vx += (ox / od * sp - c.dz * tg - e.vx) * min(1, dt * 1.2); e.vz += (oz / od * sp + c.dx * tg - e.vz) * min(1, dt * 1.2);
+      e.cool -= dt * 0.8;                                  // 技と技の あいだを 短く
       turnTo(e, Math.atan2(c.dx, -c.dz), dt, 0.5 * sm);
-      if (e.cool <= 0 && m.feet[0].planted && m.feet[1].planted) {
+      if (e.cool <= 0 && ((m.feet[0].planted && m.feet[1].planted) || e.cool < -1)) {
         let a2 = e.force || null;      // e.force = 技の名前(確認用: 次に その技を出す)
         e.force = null;
         if (!a2) {
-          if (c.d < 60) {                                  // 近い: 足・しっぽ・口・前足
+          if (c.d < 60 && !(e.mode === 'far' && e.backT > 0)) {   // 近い: 足・しっぽ・口・前足(下がっている間は 出さない = 全身が見える所へ もどる)
             a2 = pick(e, c.d, NEAR);
             if (a2) { e.nNear = (e.nNear || 0) + 1; if (near && e.nNear >= 2 + (e.phase > 0 ? 1 : 0)) { e.mode = 'far'; e.nFar = 0; e.backT = 4.5; } }
           } else if (near) { /* 歩いて 近づいている とちゅう */ }
           else if ((e.nFar || 0) >= (e.phase > 1 ? 1 : 2)) { e.mode = 'near'; e.nNear = 0; e.cool = 0.3; }      // 近づく番
-          else if (od < 30 || e.st > 4) { a2 = pick(e, c.d, FAR); if (a2) e.nFar = (e.nFar || 0) + 1; }
+          else if (od < 30 || e.st > 2.5) { a2 = pick(e, c.d, FAR); if (a2) e.nFar = (e.nFar || 0) + 1; }
         }
         if (a2) {
           const nm = a2;
@@ -691,6 +711,53 @@ const kaiju = {
       if (st > T0 + 1.7) done(e, 1.2, c);
       return -1;
     }
+    // ---- 骨のつぶて(背中のあばらから 骨の矢が 弧をえがいて 主人公のまわりに ふってくる。遠くからの技)----
+    if (St === 'bones') {
+      brake(3);
+      const T0 = e.T0 = 1.0 / sm, FLY = 1.15, N = 8 + e.phase * 3;
+      if (e.n === 0) {
+        e.n = 1; e.bl = [];
+        for (let i = 0; i < N; i++) { const a = R(0, TAU), r = i === 0 ? 0 : R(5, 24); e.bl.push({ x: c.px + cos(a) * r + c.dx * -2, z: c.pz + sin(a) * r, t0: T0 + i * 0.13, hit: 0, ox: R(-14, 14), oz: R(-14, 14) }); }
+      }
+      let left = 0;
+      for (const b of e.bl) {
+        if (st < b.t0 + FLY) Warn.circle(b.x, b.z, 7, min(1, st / (b.t0 + FLY)), 0xc02a0a);
+        if (st > b.t0 && !b.hit) {
+          const k = min(1, (st - b.t0) / FLY), sx = e.x + b.ox, sz = e.z + b.oz;
+          const x = sx + (b.x - sx) * k, z = sz + (b.z - sz) * k, y = 62 * (1 - k) + 38 * sin(PI * k) + 1;
+          FX.glow(x, y, z, 5.5, BONE2, 1.4); FX.glow(x, y, z, 2.4, HOT, 1.8);       // 遠くからでも 見える大きさ
+          if (Math.random() < dt * 40) FX.spark(x, y, z, R(-3, 3), R(-1, 3), R(-3, 3), 0.35, 0.4, HOT, 3, GREEN, 1, 0.05, 0, 0, 0);
+          if (k >= 1) {
+            b.hit = 1;
+            slam(B, e, b.x, b.z, 7, { dmg: 0, hero: 16, lift: 6, cause: 'bones', shake: 0.7, world: 1500, force: 0 });
+            mow(B, e, b.x, b.z, 7, 2000, 26, 'bones');
+            if (FX.explosion) FX.explosion(b.x, b.z, 4, 'small');
+            FX.decal(b.x, b.z, 4, 'scorch', 20);
+            if (!e.hitDone) { e.hitDone = 1; act(e, 'bonesHit', b.x, b.z); }
+          }
+        }
+        if (!b.hit) left++;
+      }
+      if (!left && st > T0 + 0.5) { e.bl = null; done(e, 1.0, c); }
+      return -1;
+    }
+    // ---- 地ならし(その場で 何度も 足をふみならし、広がる衝撃波を 次々に。跳べば よけられる)----
+    if (St === 'quake') {
+      brake(4);
+      const per = e.per = 0.9 / sm, N = 3 + (e.phase > 0 ? 1 : 0) + (e.phase > 1 ? 1 : 0);
+      if (st > per * 0.5 && e.n < N && st > per * (e.n + 0.5)) {
+        e.n++;
+        const F = m.feet[e.n % 2];
+        m.dip += 0.3;
+        footFx(B, m, e, F, 1.5);
+        slam(B, e, F.x, F.z, 13, { dmg: 0, hero: 18, lift: 6, cause: 'stomp', shake: 1.3, world: 2500, force: 0 });
+        mow(B, e, F.x, F.z, 14, 2500, 30, 'stomp');
+        ringWave(B, e, F.x, F.z, { r0: 10, speed: 30, max: 100 + e.phase * 12, w: 2.4, dmg: 0, hero: 16 });
+        act(e, 'stompLand', F.x, F.z);
+      }
+      if (st > per * (N + 0.5) + 0.8) done(e, 1.0, c);
+      return -1;
+    }
     // ---- ゾンビの雨(体から はがれた ゾンビが ふってくる)----
     if (St === 'rain') {
       brake(3);
@@ -733,8 +800,10 @@ const kaiju = {
 };
 // [名前, 最小距離, 最大距離, 重み, 怒りの段階]。NEAR = 近づいたとき(こしまで 60m より近い)/ FAR = 遠くに立っているとき(全身が 見える)
 const NEAR = [['stomp', 0, 52, 4], ['tail', 0, 62, 3], ['bite', 30, 62, 3], ['claw', 14, 62, 3], ['howl', 0, 40, 1],
-  ['stomp3', 0, 56, 3.5, 1], ['nova', 0, 62, 3.5, 2]];
-const FAR = [['breath', 60, 140, 4], ['howl', 60, 140, 1.6], ['rain', 60, 140, 2.2], ['breath2', 60, 140, 3.5, 1]];
+  ['stomp3', 0, 56, 3.5, 1], ['nova', 0, 62, 3.5, 2], ['quake', 0, 62, 1.5]];
+// 2026-11-18: 遠くからの技に「骨のつぶて」「地ならし」を足した(遠くに立っている間も 攻めてくる)
+const FAR = [['breath', 60, 140, 3.5], ['howl', 60, 140, 1.4], ['rain', 60, 140, 2], ['breath2', 60, 140, 3.5, 1],
+  ['bones', 60, 140, 3.5], ['quake', 60, 140, 2.5]];
 
 function turnTo(e, want, dt, rate) {
   let da = want - e.face; da = Math.atan2(sin(da), cos(da));
