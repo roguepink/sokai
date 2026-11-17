@@ -5,6 +5,7 @@ import { cabin } from './world-interiors.js';
 import { decal, pool, lamp, tower, TOWN } from './world-town.js';
 import { genSuburb, genIndustrial } from './world-zones.js';
 import { genOuter } from './world-outer.js';
+import { inWest } from './world-district.js';
 
 // 湖・池(水面。中は歩けない)
 export const LAKES = [
@@ -96,11 +97,12 @@ function paths(ctx) {
       const L = Math.hypot(x1 - x0, z1 - z0), rot = Math.atan2(z1 - z0, x1 - x0);
       for (let s = 0; s < L; s += 6) {
         const t = (s + 3) / L, x = x0 + (x1 - x0) * t, z = z0 + (z1 - z0) * t;
+        if (inWest(x, z) && x > 20) { if (rnd() < 0.25) { rnd(); rnd(); rnd(); } continue; }   // 西部の町の中(乱数は 同じだけ使う)
         B.flat(M.decal, x, 0.012 + (i % 2) * 0.002, z, 9, 6, { rot, uv: [0.25, 0, 0.5, 0.25], col: [1, 1, 1] });
         ctx.occupy(x - 4, z - 4, x + 4, z + 4);
         if (rnd() < 0.25) decal(ctx, 5, x + (rnd() - 0.5) * 3, z + (rnd() - 0.5) * 3, 2.5, rnd() * 6, 0.02);
       }
-      ctx.mapLine(x0, z0, x1, z1, 4, '#6a5638');
+      if (!(inWest((x0 + x1) / 2, (z0 + z1) / 2) && (x0 + x1) / 2 > 20)) ctx.mapLine(x0, z0, x1, z1, 4, '#6a5638');
     }
   }
 }

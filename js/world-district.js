@@ -19,7 +19,10 @@ export const GRID = [
   ['china', 'china', 'china', 'neon', 'neon'],
   ['china', 'china', 'ruins', 'ruins', 'ruins'],
 ];
-export const DNAME = { plaza: '中央広場', neon: 'ネオン繁華街', china: '中華街', shita: '下町商店街', temple: '寺町', office: 'オフィス街', ruins: '崩壊地区' };
+// 西部の町(町の北の出口を出てすぐ。ダウンタウンのマスの外)。キャンプ場の所は のぞく
+export const WEST = { x0: -6, z0: -294, x1: 206, z1: -196 };
+export function inWest(x, z) { return x >= WEST.x0 && x <= WEST.x1 && z >= WEST.z0 && z <= WEST.z1 && (x > 17 || z > -262 || (x * x + (z + 280) * (z + 280)) > 17 * 17); }
+export const DNAME = { western: 'ウエスタン通り', plaza: '中央広場', neon: 'ネオン繁華街', china: '中華街', shita: '下町商店街', temple: '寺町', office: 'オフィス街', ruins: '崩壊地区' };
 // 地区の色: map = ミニマップの地面 / bmap = ミニマップの建物 / road = 道の材質と色 / pad = 歩道の材質と色
 export const DSTYLE = {
   plaza: { map: '#6e6a62', bmap: '#2a2a2e', road: ['asphalt', [1, 1, 1]], pad: ['sidewalk', null], lines: true },
@@ -29,6 +32,7 @@ export const DSTYLE = {
   temple: { map: '#4f6a46', bmap: '#2a3428', road: ['pave', [0.86, 0.84, 0.78]], pad: ['pave', [0.95, 0.92, 0.84]], lines: false },
   office: { map: '#355a80', bmap: '#152a40', road: ['asphalt', [0.7, 0.74, 0.82]], pad: ['pave', [1.08, 1.1, 1.14]], lines: true },
   ruins: { map: '#5a3a28', bmap: '#2a1810', road: ['asphalt', [0.7, 0.52, 0.4]], pad: ['sidewalk', [0.66, 0.52, 0.42]], lines: true },
+  western: { map: '#a8734a', bmap: '#5a3a22', road: ['ground', [0.66, 0.44, 0.3]], pad: ['ground', [0.66, 0.44, 0.3]], lines: false },
 };
 // 空気の色(霧と空の光に かける数)と、火の粉の量・花びらの量
 const AIR = {
@@ -39,13 +43,14 @@ const AIR = {
   temple: { fog: [1.08, 0.98, 1.06], light: [1.05, 1.0, 1.03], ember: 0, petal: 1 },
   office: { fog: [0.86, 0.98, 1.16], light: [0.94, 1.0, 1.1], ember: 0.3, petal: 0 },
   ruins: { fog: [1.32, 0.92, 0.66], light: [1.2, 0.92, 0.75], ember: 2.2, petal: 0 },
+  western: { fog: [1.36, 1.04, 0.68], light: [1.2, 1.02, 0.78], ember: 0, petal: 0, dust: 1 },   // 砂色・夕日色の空気。砂ぼこり
 };
 
 const LO = EDGES[0], HI = EDGES[EDGES.length - 1];
 export function cellOf(v) { if (v < LO || v > HI) return -1; let i = 0; while (i < 4 && v >= EDGES[i + 1]) i++; return i; }
 export function districtAt(x, z) {
   const i = cellOf(x), j = cellOf(z);
-  if (i < 0 || j < 0) return null;
+  if (i < 0 || j < 0) return inWest(x, z) ? 'western' : null;
   return GRID[j][i];
 }
 export function districtOfCell(i, j) { return i < 0 || j < 0 || i > 4 || j > 4 ? null : GRID[j][i]; }
@@ -54,7 +59,7 @@ export function districtOfCell(i, j) { return i < 0 || j < 0 || i > 4 || j > 4 ?
 const _c = new THREE.Color();
 export const District = {
   W: null, cur: null, _want: null, _wantT: 0, _emitted: null, _t: 0,
-  k: { ember: 1, petal: 0 }, fog: new THREE.Color(1, 1, 1), light: new THREE.Color(1, 1, 1),
+  k: { ember: 1, petal: 0, dust: 0 }, fog: new THREE.Color(1, 1, 1), light: new THREE.Color(1, 1, 1),
 
   init(W) {
     this.W = W;
@@ -120,6 +125,7 @@ export const District = {
     const a = this._airAt(px, pz), f = Math.min(1, dt * 1.2);
     this.k.ember += (a.ember - this.k.ember) * f;
     this.k.petal += (a.petal - this.k.petal) * f;
+    this.k.dust += ((a.dust || 0) - this.k.dust) * f;
     this.fog.lerp(_c.setRGB(a.fog[0], a.fog[1], a.fog[2]), f);
     this.light.lerp(_c.setRGB(a.light[0], a.light[1], a.light[2]), f);
     const W = this.W;

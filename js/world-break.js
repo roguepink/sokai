@@ -40,6 +40,12 @@ export const KINDS = {
   glass: { hp: 12, end: 'hide', fx: 'glass' },
   tent: { hp: 60, end: 'hide', fx: 'cloth' },
   stall: { hp: 120, end: 'hide', fx: 'wood' },
+  // 西部の町(world-westkit.js)
+  wbarrel: { hp: 45, end: 'hide', fx: 'wood' },
+  dynamite: { hp: 30, ex: { r: 7.5, d: 650 }, end: 'hide', fx: 'wood' },
+  wagon: { hp: 150, end: 'hide', fx: 'wood' },
+  coach: { hp: 170, end: 'hide', fx: 'wood' },
+  wlamp: { hp: 25, end: 'hide', fx: 'glass' },
 };
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Euler(), _p = new THREE.Vector3(), _s = new THREE.Vector3();
 const ZERO = new THREE.Matrix4().makeScale(0, 0, 0);
@@ -226,6 +232,7 @@ export const Brk = {
     else Events.emit('propBreak', { x: rec.x, z: rec.z, kind: rec.kind, fx: def.fx });
     if (rec.kind === 'hydrant') this.fountains.push({ x: rec.x, z: rec.z, t: 0, life: 10 });
     if (rec.kind === 'fireBarrel' || rec.kind === 'pump' || rec.kind === 'propane') this.addFire(rec.x, rec.y + 0.1, rec.z, 0.9, 12 + Math.random() * 10);
+    if (rec.kind === 'wlamp') this.addFire(rec.x, rec.y + 0.1, rec.z, 0.7, 10 + Math.random() * 8);   // ランプの油に 火がつく
     void opts;
   },
 
