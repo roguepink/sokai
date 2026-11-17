@@ -45,7 +45,8 @@ function blocked(x0, y0, z0, x1, y1, z1, trees = false, pad = 0) {
       // 細い物(木の幹・街灯)は、低い所を通る線だけ・まわり 2.5m を ふさぐ物として 数える(木の葉で 体が かくれないように)
       const thin = b.maxX - b.minX <= 1.5 && b.maxZ - b.minZ <= 1.5, g = thin ? 2.5 : pad;
       if (thin && (!trees || b.h < 3.5)) continue;
-      if (y < b.h + g && x > b.minX - g && x < b.maxX + g && z > b.minZ - g && z < b.maxZ + g) return true;
+      if (pad && b.h < 4) continue;      // 車・さく などの 低い物は 主人公を かくさない
+      if (y < b.h + (thin ? g : pad * 0.5) && x > b.minX - g && x < b.maxX + g && z > b.minZ - g && z < b.maxZ + g) return true;
     }
   }
   return false;
