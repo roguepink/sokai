@@ -6,6 +6,7 @@ import { CONFIG } from './config.js';
 import { Engine } from './engine.js';
 import { buildAtlas, buildGeometries, makeZombieMaterial, makePartMesh, TILE } from './zombie-models.js';
 import { NJ, HIP_H, poseAlive } from './zombie-anim.js';
+import { Ground } from './depth-ground.js';
 
 // 部位の番号(第2弾: 下あご・盾・ガスマスク)
 export const P = { PELVIS: 0, TORSO: 1, HEAD: 2, UAL: 3, UAR: 4, LAL: 5, LAR: 6, ULL: 7, ULR: 8, LLL: 9, LLR: 10, HELMET: 11, JAW: 12, SHIELD: 13, MASK: 14 };
@@ -84,6 +85,7 @@ export const Render = {
     this.eyes.instanceColor.setUsage(THREE.DynamicDrawUsage);
     this.eyes.frustumCulled = false; this.eyes.count = 0; this.eyes.castShadow = false;
     scene.add(this.eyes);
+    Ground.init(scene, Engine.quality);      // 第5弾: 足もとの 接地の影(depth-ground.js)
     for (let i = 0; i < MAX_BODY; i++) this.bodies.push(newBody(i));
     for (let i = 0; i < MAX_GIB; i++) this.gibs.push(newGib());
     this.reset();
@@ -187,6 +189,7 @@ export const Render = {
     const cp = cam.position, close = Engine.viewMode && Engine.viewMode !== 'top';
     const lx = close ? cp.x : cx, lz = close ? cp.z : cz;          // 近い・遠いを測る場所
     const cur = this._cursor; cur.fill(0);
+    Ground.begin();
     const meshes = this.meshes;
     const eyes = this.eyes, eyeArr = eyes.instanceMatrix.array, eyeCol = eyes.instanceColor.array;
     let ne = 0;
@@ -207,6 +210,7 @@ export const Render = {
           this.computeMats(B);
           B.lastPose = this.frame;
         }
+        if (d < 70) Ground.add(x, z, 0.5 * B.s * B.fat + 0.12, 0.55, B.e.y || 0);      // 足もとの丸い影
       } else this.computeMats(B);
       // 部位を書く
       const hide = B.hide;
@@ -233,6 +237,7 @@ export const Render = {
         }
       }
     }
+    Ground.flush(Engine.ctx, close ? 62 : 90 * (Engine.fogScale || 1));
     eyes.count = ne;
     if (ne) { eyes.instanceMatrix.needsUpdate = true; eyes.instanceColor.needsUpdate = true; }
     // ばらばらの部位

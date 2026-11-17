@@ -5,6 +5,7 @@
 // 絵の 1 マスの中: 横 = 体のまわり(左端 = 背中, 真ん中 = 正面), 縦 = 上が部位の上。
 // 透明度(alpha)は「色のつけ方」: 0 = 肌の色をかける, 0.5 = 絵の色そのまま, 1 = 服の色をかける。
 import * as THREE from '../vendor/three/build/three.module.min.js';
+import { Air } from './depth-air.js';
 import { mergeGeometries } from '../vendor/three/addons/utils/BufferGeometryUtils.js';
 import { seeded } from './util.js';
 
@@ -726,6 +727,7 @@ totalEmissiveRadiance += vec3(0.12, 0.3, 0.55) * vFx.y * 0.18;
 }`);
   };
   mat.customProgramCacheKey = () => 'zombie-v1';
+  Air.rim(mat);                 // 第5弾: ふちの光(depth-air.js)
   return mat;
 }
 
