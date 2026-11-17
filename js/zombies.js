@@ -1,6 +1,8 @@
 // ゾンビ係: たくさんのゾンビ(とボス)を出す・動かす・当たり判定・倒れる。
 // - 見た目: 部位ごとの InstancedMesh(zombie-render.js / zombie-models.js)、動き: zombie-anim.js
 // - 倒れ方・血・ばらばら: zombie-gore.js、道さがし: zombie-flow.js、ボス: boss.js
+// - 第5弾: 大怪獣の「体の部品」(addPart。足・しっぽの 当たりの丸。e.part / e.owner)。list に入るが ダメージは 持ち主へ。
+//   queryCircle / raycast は 同じボスの部品を 1 つにまとめて返す(爆発や つらぬく弾が 何回も 当たらない)
 // 約束(API)は CLAUDE.md のとおり。list / spawn / count / queryCircle / nearest / raycast / damage / damageCircle / TYPES / reset
 import * as THREE from '../vendor/three/build/three.module.min.js';
 import { CONFIG } from './config.js';

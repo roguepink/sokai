@@ -40,6 +40,7 @@ const fmt = (n) => Math.floor(n).toLocaleString();
 const mmss = (s) => { s = Math.max(0, Math.ceil(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
 const NOVA_FALLBACK = 1.6;      // bossFall が来ないとき、倒して何秒(ゲームの時間)で衝撃波
 const N_COINS = 40;
+const KAIJU_BONUS = 1000000;    // 大怪獣の 討伐ボーナス(無双などの倍率が かかる)
 
 export const BossShow = {
   ui: null, el: {},
@@ -174,7 +175,8 @@ export const BossShow = {
     el.title.textContent = look.title;
     const th = threat(e, size);
     el.pips.innerHTML = '<i class="on"></i>'.repeat(th) + '<i></i>'.repeat(5 - th);
-    el.size.textContent = kj ? `測定不能 ・ 高さ ${Math.round(e.size)}m ・ 全長 ${e.def.len || 150}m` : e && e.size ? `全長 ${Math.round(e.size)}m` : '';
+    el.size.textContent = kj ? `高さ ${Math.round(e.size)}m・全長 ${e.def.len || 150}m` : e && e.size ? `全長 ${Math.round(e.size)}m` : '';
+    el.size.style.letterSpacing = kj ? '0' : '';
     el.card.classList.toggle('t5', th >= 5);
     replay(el.alert); replay(el.card);
     const ic = kj ? kaijuIntroCam(e, Player) : null, dur = ic ? ic.sec : 2.0;
@@ -257,6 +259,8 @@ export const BossShow = {
     const kj = !!e && e.type === 'kaiju';      // 大怪獣は たおれるのに 4 秒かかる: 地面に つくまで 衝撃波を 待つ・カメラも 長く
     this._pending.push({ e, x, z, size, g: 0, r: 0, wait: kj ? 6 : NOVA_FALLBACK });
     const lines = jackLines(j);
+    // 大怪獣を 倒した: 特別の 討伐ボーナス(いちばんの ごほうび)
+    if (kj) { const p = Score.bonus(KAIJU_BONUS, x, z); if (p > 0) { lines.push({ label: '🦖 大怪獣 討伐ボーナス', val: '+' + fmt(p), cls: 'new' }); j.total += p; } }
     // もう演出中(ボスを続けて倒した): 行を足して 合計を のばす
     if (this.seq && this.seq.t < 3.5) {
       const s = this.seq;

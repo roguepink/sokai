@@ -72,6 +72,7 @@ export const Director = {
     const def = BOSS_TYPES[type]; if (!def) return null;
     const kaiju = type === 'kaiju', K = this._kaiju;
     if (kaiju && K.e && K.e.alive) return null;      // 大怪獣は 1 体だけ
+    if (!kaiju && ((K.e && K.e.alive) || K.omen > 0)) return null;      // 大怪獣の 予告中・出ている間は ほかのボスを 出さない(ボスラッシュも)
     const lap = kaiju ? K.n : Math.floor(this._bossIdx / BOSS_ORDER.length);
     const e = Zombies.spawn(type, x, z);
     if (e) {
